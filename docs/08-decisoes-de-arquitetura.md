@@ -1,0 +1,407 @@
+# 08 — Decisões de arquitetura (ADR)
+
+Cada decisão de stack fica registrada com o contexto, a escolha, as alternativas descartadas e as consequências. O TAPI não impõe stack, mas exige **coerência entre arquitetura e implementação e a justificativa de cada escolha** (TAPI, seção 8).
+
+Formato: ADR curto (contexto → decisão → alternativas → consequências). Um ADR aceito não é editado. Se a decisão mudar, um novo ADR o **substitui** e o antigo é marcado como *substituído*.
+
+## Resumo da stack
+
+| Camada | Escolha | ADR |
+| --- | --- | --- |
+| Aplicação principal | Ruby + Ruby on Rails 8 | [ADR-001](#adr-001--aplicação-principal-em-ruby-on-rails-8) |
+| Interface web | Hotwire (Turbo + Stimulus) com ActionCable | [ADR-002](#adr-002--interface-web-em-hotwire-sem-spa) |
+| Modelo das regras de roteamento | Forma normal disjuntiva em JSONB | [ADR-003](#adr-003--regras-de-roteamento-em-forma-normal-disjuntiva) |
+| Mensageria | Apache Kafka 4.x em modo KRaft, nó único | [ADR-004](#adr-004--mensageria-com-apache-kafka-4x-kraft) |
+| Cliente Kafka | Karafka (consumo) e WaterDrop (produção) | [ADR-004](#adr-004--mensageria-com-apache-kafka-4x-kraft) |
+| Jobs assíncronos | Sidekiq + Redis | [ADR-005](#adr-005--jobs-assíncronos-com-sidekiq--redis) |
+| Persistência | PostgreSQL, com padrão outbox e auditoria só de inserção | [ADR-006](#adr-006--postgresql-como-fonte-da-verdade) |
+| Broker de webhooks | Serviço Ruby separado (Rack/Roda) | [ADR-007](#adr-007--broker-de-webhooks-como-serviço-separado) |
+| Agente de IA | Mock determinístico em Ruby, configurável | [ADR-008](#adr-008--agente-de-ia-mock-determinístico) |
+| Observabilidade | OpenTelemetry (`traceparent`), Prometheus, Grafana, logs JSON | [ADR-009](#adr-009--observabilidade-com-opentelemetry-prometheus-e-grafana) |
+| Testes e experimento | RSpec, karafka-testing, k6, pandas + Plotly | [ADR-010](#adr-010--testes-e-experimento) |
+| Empacotamento | Docker Compose | [ADR-011](#adr-011--empacotamento-com-docker-compose) |
+| Canais | Provedores simulados num serviço próprio (`channels-mock`) | [ADR-012](#adr-012--canais-simulados-como-provedores-externos) |
+| Versionamento das regras | Conjunto de regras da marca versionado inteiro | [ADR-013](#adr-013--versionar-o-conjunto-de-regras-inteiro) |
+| Isolamento entre marcas | Lógico, por `brand_id` em todas as tabelas de negócio | [ADR-014](#adr-014--isolamento-lógico-por-marca) |
+| Prazos e cronômetros | Gravados no Postgres e executados a partir de ações duráveis no outbox | [ADR-016](#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox) |
+
+### Orçamento de memória (RNF-29: 4 vCPU, 8 GB)
+
+Estimativa para validar no primeiro `docker compose up`. Os números do Rails e do Sidekiq vêm do dimensionamento publicado do Chatwoot, que tem stack equivalente.
+
+| Contêiner | Estimativa |
+| --- | --- |
+| `web` (Rails/Puma + ActionCable) | ~1 GB |
+| `worker` (Sidekiq) | ~400 MB |
+| `consumer` (Karafka: respostas do agente) | ~400 MB |
+| `broker` (webhooks → Kafka) | ~200 MB |
+| `agent-mock` | ~200 MB |
+| `scheduler` (prazos) | ~250 MB |
+| `channels-mock` (provedores + simulador do cliente) | ~150 MB |
+| `kafka` (heap limitado a 768 MB) | ~1 GB |
+| `postgres` | ~1 GB |
+| `redis` | ~100 MB |
+| `prometheus` + `grafana` | ~400 MB |
+| **Total** | **~5,2 GB**, com folga para o SO e o k6 |
+
+---
+
+## ADR-001 — Aplicação principal em Ruby on Rails 8
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** O projeto é individual e dura 1 mês. A plataforma é pesada em CRUD (filas, regras, equipes, atendentes), autenticação, perfis e telas em tempo real. A carga-alvo é baixa para qualquer linguagem moderna: 20 msg/s de referência e 60 msg/s de capacidade (RNF-09, RNF-12). O gargalo provável é o banco e o desenho (outbox, partições), não a linguagem. O TAPI informa que a CloudWalk opera boa parte do atendimento em Ruby.
+
+**Decisão.** Ruby (versão estável mais recente no início da implementação) com Rails 8.x.
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Python + FastAPI | Async e Pydantic (contratos) são vantagens, mas autenticação, perfis, migrações, admin e tempo real teriam de ser montados à mão. Também se afasta da stack da CloudWalk. Seria a escolha se o domínio de Ruby fosse um risco. |
+| Rust ou Go | Desempenho e memória melhores, mas o desempenho não é o gargalo nesta carga. Construir toda a interface e o CRUD sozinho em 1 mês é o maior risco do projeto. |
+
+**Consequências.**
+
+- (+) Mesma linguagem da operação da CloudWalk: o código pode ser lido e avaliado por quem mantém o atendimento hoje.
+- (+) O Chatwoot, recomendado pelo TAPI, usa Rails, Sidekiq, PostgreSQL, Redis e ActionCable. Serve como referência de desenho.
+- (+) As convenções do Rails reduzem o código de infraestrutura e deixam o tempo para o que o TAPI avalia: filas, integração, handoff e experimento.
+- (−) O GVL limita o paralelismo de CPU por processo. A escala horizontal (RNF-11) é feita com mais processos ou réplicas, não com threads.
+- (−) Um processo Rails consome mais memória que Go ou Rust (ver orçamento acima).
+
+---
+
+## ADR-002 — Interface web em Hotwire, sem SPA
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** Três interfaces: simulador de cliente (RF-04), painel do analista em tempo real (RF-45 a RF-50) e configuração de filas e regras (RF-13 a RF-21). O painel precisa receber mensagens novas em p95 ≤ 1 s (RNF-06) e ter LCP ≤ 2,5 s (RNF-32).
+
+**Decisão.** Hotwire (Turbo Drive, Turbo Frames, Turbo Streams e Stimulus) servido pelo próprio Rails, com atualizações em tempo real por ActionCable (adaptador Redis, ver ADR-005). Sem etapa de build de JavaScript (importmap).
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| React ou Next.js separado | Dois apps, autenticação entre eles (CORS, tokens), estado duplicado no cliente e testes em duas linguagens. Ganha em interações ricas, mas a única tela que precisaria disso é o editor de regras, resolvido pelo ADR-003. |
+| Hotwire + ilha React só no editor de regras | Exige bundler (jsbundling/esbuild) e uma API JSON só para o editor. Fica como **plano B**, se o editor em Stimulus não ficar usável (ver gatilho abaixo). |
+
+**Consequências.**
+
+- (+) Um só app e um só deploy. HTML renderizado no servidor ajuda no LCP (RNF-32).
+- (+) Turbo Streams por ActionCable entregam as mensagens novas ao painel sem polling.
+- (−) Interações muito ricas (aninhamento arbitrário, arrastar e soltar complexo) ficam trabalhosas em Stimulus.
+- **Gatilho do plano B:** se o teste cronometrado do RNF-31 (criar fila e regra em ≤ 3 min) falhar por causa do editor, ele vira uma ilha React. O modelo de dados não muda (ADR-003).
+- A ordenação das regras por arrastar (RF-15) usa SortableJS com um controller Stimulus.
+
+---
+
+## ADR-003 — Regras de roteamento em forma normal disjuntiva
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** O RF-14 pede condições combináveis com E/OU sobre marca, canal, categoria, prioridade e tags. Uma árvore booleana arbitrária exige um editor recursivo, difícil de fazer em Stimulus. As regras precisam ser versionadas (RF-18, RN-20) e valer sem deploy (RF-16).
+
+**Decisão.** Cada regra é uma **disjunção de grupos**, e cada grupo é uma **conjunção de condições**: `(A e B) ou (C e D)`. As condições ficam numa coluna JSONB validada por JSON Schema versionado:
+
+```json
+{
+  "schema_version": 1,
+  "any": [
+    { "all": [ { "field": "category", "op": "eq", "value": "credito" },
+               { "field": "priority", "op": "in", "value": ["alta", "critica"] } ] },
+    { "all": [ { "field": "tags", "op": "contains", "value": "vip" } ] }
+  ]
+}
+```
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Árvore booleana com aninhamento livre | Mais expressiva na forma, não no poder: toda expressão booleana tem equivalente em forma normal disjuntiva. Custa um editor recursivo. |
+| Regras em código (Ruby, DSL) | Viola o RF-16 e o TAPI: a operação precisa editar sem desenvolvimento. |
+| Motor de regras externo | Mais um componente para operar, sem ganho neste volume. |
+
+**Consequências.**
+
+- (+) A interface tem só dois níveis ("adicionar condição", "adicionar grupo").
+- (+) O avaliador é simples e testável: uma regra casa se algum grupo tem todas as condições verdadeiras.
+- (+) O JSON é o mesmo para qualquer editor: trocar para a ilha React (ADR-002) não mexe no banco nem no avaliador.
+- (−) Expressões com "ou" dentro de "e" precisam ser distribuídas pelo supervisor em mais de um grupo.
+
+---
+
+## ADR-004 — Mensageria com Apache Kafka 4.x (KRaft)
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** A arquitetura atual da CloudWalk usa um tópico Kafka entre o broker e o agente, e o TAPI avalia a "aderência da arquitetura ao desenho fornecido". A ordem das mensagens de uma conversa deve ser preservada com vários consumidores (RNF-13), e eventos precisam ser reprocessáveis (RF-37).
+
+**Decisão.** Apache Kafka 4.x em modo KRaft, com um nó no Docker Compose. Em Ruby, Karafka para consumir e WaterDrop para produzir (ambos sobre o librdkafka). Tópicos iniciais:
+
+| Tópico | Produtor → consumidor | Chave |
+| --- | --- | --- |
+| `helpdesk.agent.inbound.v1` | broker → agente | `conversation_id` |
+| `helpdesk.agent.outbound.v1` | agente → plataforma | `conversation_id` |
+| `helpdesk.agent.dlq.v1` | consumidores → supervisor (RF-37) | `conversation_id` |
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Redpanda | Compatível com a API do Kafka e mais leve, mas a Community Edition usa licença BSL (não é open source). O p99 em execuções longas é contestado (ver referências do [05](05-requisitos-nao-funcionais.md)). Como o código é o mesmo, a troca continua possível. |
+| RabbitMQ | Retentativa e DLQ simples (DLX), mas não tem ordem por chave nem replay nativos e se afasta do "tópico Kafka" do desenho de referência. |
+
+**Consequências.**
+
+- (+) A partição por `conversation_id` garante ordem por conversa e permite escalar consumidores até o número de partições (RNF-11, RNF-13).
+- (+) Desde a 4.0 o ZooKeeper foi removido, então o Kafka roda num contêiner só.
+- (+) O Karafka traz DLQ, retentativas e testes sem cluster (karafka-testing).
+- (−) A JVM consome ~1 GB. O heap é limitado no Compose.
+- (−) A entrega é "pelo menos uma vez". Todo consumidor precisa ser idempotente por `event_id` (RF-35, RN-47).
+- Número de partições inicial: **48**. Cada partição é processada um evento por vez, então a vazão do agente é cerca de partições ÷ latência do agente. Com o mock a 2 s, 6 partições dariam só ~3 turnos/s, abaixo da carga de referência. Com 48, o teto é ~24 turnos/s, e as 48 partições também dividem bem entre 1, 2 e 4 réplicas no E5. *Revisado em 17/11/2026 após revisão externa; a versão anterior previa 6.*
+- A ordem garantida pelo Kafka é a de **publicação** na partição. A ordem de negócio é a do `seq` no Postgres, e a validade de cada resposta é decidida no banco ([07, seção 3.4](07-arquitetura.md#34-cliente-que-escreve-enquanto-a-ia-responde-turnos)).
+
+---
+
+## ADR-005 — Jobs assíncronos com Sidekiq + Redis
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** Disparo de webhooks com retentativa (RF-29, RF-34), publicação do outbox, timers de SLA e de inatividade (RN-07, RN-25), timeout do agente (RF-36) e geração de resumo do handoff precisam rodar fora da requisição. O Postgres é a peça medida no E1.
+
+**Decisão.** Sidekiq com Redis. O mesmo Redis serve ao ActionCable (ADR-002) e ao rate limit por marca e canal (RNF-33).
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Solid Queue e Solid Cable (padrão do Rails 8) | Tira o Redis da stack, mas joga a fila de jobs e o pub/sub dos WebSockets no Postgres. Isso mistura essa carga com a medida do experimento e dificulta isolar o gargalo. |
+| Consumir tudo pelo Kafka | O Kafka não tem agendamento nem atraso por mensagem, que os timers de SLA e o backoff precisam. |
+
+**Consequências.**
+
+- (+) É a sugestão do TAPI e o padrão do Chatwoot. É maduro, tem painel web e suporta retentativa com backoff.
+- (+) Um único Redis atende três necessidades.
+- (−) Mais um contêiner. O Redis não é a fonte da verdade: se ele perder dados, o outbox no Postgres permite republicar (ADR-006).
+
+---
+
+## ADR-006 — PostgreSQL como fonte da verdade
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** Nenhuma mensagem aceita pode ser perdida (RNF-14). A auditoria deve ser imutável (RNF-21, RN-54). As filas e regras são dados versionados (RF-18).
+
+**Decisão.** PostgreSQL (versão estável mais recente) como fonte da verdade, com três padrões:
+
+1. **Outbox transacional:** a mensagem do cliente e o evento a publicar são gravados na mesma transação, e só então a ingestão responde. Um job publica o outbox no broker.
+2. **Auditoria só de inserção:** tabela `audit_events` com `UPDATE` e `DELETE` revogados ao usuário da aplicação.
+3. **Versionamento por linha:** cada alteração de fila ou regra cria uma nova linha de versão, e as antigas não mudam.
+
+**Alternativas consideradas.** O banco já é sugerido pelo TAPI e não há candidato melhor para o volume. Um armazenamento separado para auditoria (por exemplo, um tópico Kafka compactado) foi descartado por adicionar consistência eventual onde a auditoria precisa ser exata.
+
+**Consequências.**
+
+- (+) Garantia de "aceitou, persistiu" (RPO = 0 da RNF-19).
+- (+) JSONB para as condições das regras (ADR-003) e o contexto dos eventos.
+- (−) O outbox adiciona um salto de latência. Ele entra no orçamento do RNF-03 e é medido no E1.
+
+---
+
+## ADR-007 — Broker de webhooks como serviço separado
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** No desenho atual, um broker consome do help desk os webhooks e os publica num tópico Kafka. O TAPI pede integração "em estrutura semelhante à atual" e avalia a robustez diante de falhas e reentregas.
+
+**Decisão.** Um serviço Ruby pequeno (Rack/Roda + WaterDrop), em contêiner próprio. Ele recebe o webhook, valida o HMAC-SHA256 e a janela anti-replay (RNF-23), valida o contrato (RNF-28) e publica no tópico de entrada com a chave `conversation_id`.
+
+**Alternativas consideradas.** A plataforma poderia publicar direto no Kafka, o que é mais simples e mais rápido. Foi descartada porque quebra a aderência ao desenho de referência e deixaria sem teste justamente a fronteira webhook que o TAPI pede (reentrega, assinatura, duplicatas).
+
+**Consequências.**
+
+- (+) Mesmo fluxo da CloudWalk: plataforma → webhook → broker → tópico → agente.
+- (+) O broker pode cair e voltar de forma independente (RNF-17, E2).
+- (−) Mais um salto HTTP, medido no RNF-04 (p99 ≤ 100 ms).
+
+---
+
+## ADR-008 — Agente de IA mock determinístico
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** O agente real não será fornecido. O experimento precisa de comportamento reprodutível (RNF-30) e de injeção de falhas (E2). O TAPI aceita mock determinístico ou LLM aberto, desde que modelo, versão e configuração sejam registrados.
+
+**Decisão.** Um consumidor Karafka em Ruby que lê o tópico de entrada e responde no tópico de saída. Ele decide por regras configuráveis (palavras-chave → responder, consultar, escalar ou encerrar) e tem latência, taxa de falha e modo "mudo" configuráveis (RF-38). Cada resposta carrega `agent_model`, `agent_version` e `agent_config_hash` (RN-37).
+
+**Alternativas consideradas.** Um agente com LLM aberto deixaria a demonstração mais realista, mas a latência e as decisões variam entre execuções, o que prejudica a reprodutibilidade do experimento. Fica como evolução: o contrato do tópico não muda, então um agente com LLM pode substituir o mock.
+
+**Consequências.**
+
+- (+) Experimento reprodutível com semente fixa. A latência do agente vira parâmetro e é descontada do overhead (RNF-03).
+- (−) Não avalia a qualidade das respostas da IA, o que está fora do escopo do TAPI.
+
+---
+
+## ADR-009 — Observabilidade com OpenTelemetry, Prometheus e Grafana
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** Cada mensagem precisa de um trace ID ponta a ponta (RF-56, RNF-20). O experimento mede latência por salto (RNF-03) e os quatro sinais de ouro (RNF-22).
+
+**Decisão.** Propagação W3C `traceparent` com o SDK do OpenTelemetry para Ruby (HTTP e cabeçalhos Kafka). Métricas em `/metrics` no formato Prometheus, painéis no Grafana e logs em JSON com `trace_id` e PII mascarada (RNF-25).
+
+**Consequências.**
+
+- (+) Padrão aberto. O mesmo `trace_id` liga logs, auditoria e eventos do Kafka.
+- (−) Um coletor de traces (Jaeger ou Tempo) é opcional. Sem ele, a correlação é feita pelos logs e pela auditoria, o que basta para o experimento.
+
+---
+
+## ADR-010 — Testes e experimento
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Decisão.**
+
+| Uso | Ferramenta | Motivo |
+| --- | --- | --- |
+| Testes de domínio e de aceite (RNF-27) | RSpec | Padrão do ecossistema Ruby, sugerido pelo TAPI |
+| Testes de consumidores e produtores Kafka | karafka-testing | Testa sem subir o cluster |
+| Testes de contrato (RNF-28) | json_schemer | Valida os esquemas JSON versionados |
+| Carga (E1, E5) | k6, executor `constant-arrival-rate` | Modelo aberto, evita *coordinated omission* |
+| Análise dos resultados | pandas + Plotly (Python) | Sugerido pelo TAPI. Roda fora da plataforma, então a segunda linguagem não pesa |
+| Segurança (RNF-26) | Brakeman, bundler-audit, Trivy | Análise estática e de dependências |
+
+---
+
+## ADR-011 — Empacotamento com Docker Compose
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** A plataforma deve ser self-hosted e subir com um comando numa máquina limpa (RNF-29).
+
+**Decisão.** Docker Compose com todos os serviços (`web`, `worker`, `scheduler`, `consumer`, `broker`, `agent-mock`, `channels-mock`, `kafka`, `postgres`, `redis`, `prometheus`, `grafana`) e um `Makefile` (`make up`, `make seed`, `make bench`).
+
+**Alternativas consideradas.** O Kamal (citado pelo TAPI) faz deploy em servidores reais e fica como evolução. O Kubernetes é desproporcional para uma máquina e um mês.
+
+**Consequências.**
+
+- (+) Reprodutível por qualquer avaliador seguindo só o README.
+- (−) Tudo numa máquina: os números do experimento são um limite inferior de latência (limitação já declarada no [05](05-requisitos-nao-funcionais.md)).
+
+---
+
+## ADR-012 — Canais simulados como provedores externos
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** WhatsApp, e-mail e chat do app são simulados (escopo). Mesmo assim, a plataforma deve receber as mensagens "pelo mesmo caminho que um canal real" (RF-01 a RF-03) e responder pelo canal de origem (RF-06). O orçamento de latência mede a entrada (salto 1) e a entrega (salto 6) separadamente.
+
+**Decisão.** Um serviço `channels-mock` faz o papel dos provedores. Ele envia webhooks de entrada no formato de cada canal, expõe uma "API do provedor" para a plataforma entregar as respostas e hospeda o simulador do cliente (RF-04). A plataforma nunca fala direto com o cliente.
+
+**Alternativas consideradas.** Colocar o simulador dentro do `web` é mais simples, mas a entrega ao cliente viraria uma chamada interna, sem rede, sem falha possível e sem medida do salto 6. Também esconderia o que muda quando um provedor real entrar.
+
+**Consequências.**
+
+- (+) Trocar o mock por um provedor real (por exemplo, a API do WhatsApp Business) mexe só nos adaptadores de entrada e saída.
+- (+) Permite injetar falhas na entrega (E2) e medir o salto 6 (RNF-03).
+- (−) Mais um contêiner (~150 MB).
+
+---
+
+## ADR-013 — Versionar o conjunto de regras inteiro
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** As regras são avaliadas em ordem e a primeira que casa decide (RN-16), então a **ordem faz parte do significado**. Toda decisão de roteamento deve registrar a versão aplicada (RN-20), e a alteração deve valer em até 5 s sem reinício (RNF-07).
+
+**Decisão.** Cada marca tem um **conjunto de regras** (`routing_rulesets`) versionado como um todo: a lista ordenada de regras (no formato do [ADR-003](#adr-003--regras-de-roteamento-em-forma-normal-disjuntiva)) e a fila padrão. Qualquer mudança (editar, criar, excluir ou reordenar) cria uma nova versão. O roteamento lê a versão atual e a guarda no atendimento e na auditoria. Os processos mantêm a versão em cache e conferem o número da versão a cada roteamento, uma consulta barata por chave primária.
+
+**Alternativas consideradas.** Versionar cada regra separadamente não captura a reordenação nem mudanças em várias regras ao mesmo tempo: o roteamento poderia ver metade de uma alteração.
+
+**Consequências.**
+
+- (+) Toda decisão aponta para um estado completo e reproduzível da configuração. O E3 só precisa comparar números de versão.
+- (+) A troca é atômica: um atendimento usa a versão antiga ou a nova, nunca uma mistura.
+- (+) Simular uma regra antes de salvar (RF-20) é avaliar um conjunto ainda não salvo.
+- (−) Cada edição grava o conjunto inteiro, o que é irrelevante para dezenas de regras por marca.
+
+---
+
+## ADR-014 — Isolamento lógico por marca
+
+**Status:** aceito · **Data:** 17/11/2026
+
+**Contexto.** Nenhum perfil pode ver dados de marca não atribuída (RN-52, RNF-24). O guia de isolamento da AWS, citado no TAPI, descreve três modelos: silo (infraestrutura por inquilino), ponte (esquema por inquilino) e pool (tabelas compartilhadas com identificador do inquilino).
+
+**Decisão.** Modelo **pool**: `brand_id` em todas as tabelas de negócio, escopo obrigatório na camada de acesso a dados e políticas por perfil. O Row-Level Security do Postgres fica como evolução (defesa em profundidade).
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Silo (banco por marca) | Isolamento máximo, mas multiplica a operação, e a CloudWalk tem poucas marcas que compartilham equipes |
+| Ponte (esquema por marca) | Migrações por esquema e consultas entre marcas (painel do supervisor) ficam complexas |
+| Row-Level Security desde o início | Exige definir o contexto da sessão a cada requisição e job. Fica para depois do básico funcionar |
+
+**Consequências.**
+
+- (+) Simples de operar. Um supervisor pode ver várias marcas sem consultas entre bancos.
+- (−) O isolamento depende do código aplicar o escopo sempre. Por isso o E6 tem testes adversariais que tentam ler e alterar dados de outra marca por API e por interface.
+
+---
+
+## ADR-015 — Prazos gravados no Postgres com agendador próprio
+
+**Status:** substituído por [ADR-016](#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox) · **Data:** 17/11/2026
+
+**Contexto.** A plataforma depende de prazos curtos e precisos: a janela de agrupamento de 1,5 s (RN-55), o aviso de progresso aos 15 s (RN-57), o timeout do agente aos 30 s, com escalação em até T + 2 s (RN-46, RNF-18), além dos prazos de SLA. O agendador do Sidekiq confere os jobs agendados a cada ~5 s, e eles moram no Redis, que não é fonte da verdade.
+
+**Decisão.** Os prazos são **colunas no Postgres** (`tickets.dispatch_due_at`, `tickets.first_pending_at`, `ai_turns.deadline_at`, prazos de SLA), gravadas na mesma transação que os cria. Um processo `scheduler` consulta, a cada 250 ms, os prazos vencidos por índices parciais, usando `FOR UPDATE SKIP LOCKED`, e enfileira no Sidekiq a ação correspondente. Os jobs conferem de novo o estado com a linha travada antes de agir.
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Jobs agendados do Sidekiq (`perform_in`) | Precisão de ~5 s e estado no Redis. Reduzir o intervalo de verificação do Sidekiq aumenta a carga no Redis e continua sem fonte da verdade |
+| Cronômetro em memória no consumer | Some se o processo cair |
+
+**Consequências.**
+
+- (+) O prazo sobrevive à perda do Redis e a reinícios. A precisão (~250 ms) cabe na janela de 1,5 s e na meta de T + 2 s.
+- (+) O atraso do `scheduler` vira métrica mensurável sob carga no E1.
+- (−) Mais um processo e uma consulta frequente ao banco. A consulta é por índice parcial e devolve poucas linhas.
+
+---
+
+## ADR-016 — Prazos do atendimento e ações duráveis no outbox
+
+**Aceito em 17/11/2026.** Substitui [ADR-015](#adr-015--prazos-gravados-no-postgres-com-agendador-próprio).
+
+O prazo para escalação precisa existir mesmo quando o agente ou broker está indisponível antes do primeiro envio. A passagem da ação do scheduler para o worker também precisa sobreviver a uma queda entre o commit no Postgres e o enqueue no Redis.
+
+**Decisão.** O atendimento guarda o início do ciclo, a janela de envio, o aviso e o timeout. O prazo de timeout é a referência para validar a resposta sob o lock do ticket. O turno leva uma cópia do prazo no contrato com a IA. A cópia permite que o agente ignore trabalho vencido.
+
+O `scheduler` consulta prazos vencidos a cada 250 ms. Sob o lock da linha, registra no outbox a ação com chave única e usa o próprio registro como marcador da emissão. O timeout continua consultável até a conclusão do ciclo. O Compose roda uma réplica por padrão. Se houver mais réplicas, `FOR UPDATE SKIP LOCKED` divide as linhas entre elas. As chaves únicas e a revalidação sob o lock garantem um efeito por ação.
+
+O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbox na mesma transação em que aplica o efeito ou registra o descarte. O publisher reoferece ações abertas após uma falha de enqueue, perda do job ou vencimento da reserva. A recuperação preserva a chave da ação e o prazo original.
+
+**Alternativa considerada.** Enfileirar diretamente do scheduler deixa a conclusão do prazo e o enqueue em sistemas diferentes. Uma falha entre eles pode perder a ação ou enfileirá-la de novo a cada varredura.
+
+**Consequências.** Há uma escrita durável por prazo emitido. O intervalo de 250 ms é de consulta. A latência até o efeito inclui espera por lock, fila e execução. E1 mede esse atraso sob carga, e E2 verifica recuperação e rejeição de respostas tardias. Ver [07, seção 3.4](07-arquitetura.md#34-cliente-que-escreve-enquanto-a-ia-responde-turnos).
+
+---
+
+## Referências
+
+- TAPI "Help Desk Integrado a Agentes de IA", seções 7 a 10.
+- [AWS Builders' Library: estratégias de isolamento entre inquilinos em SaaS](https://aws.amazon.com/builders-library/saas-tenant-isolation-strategies/)
+- [Apache Kafka 4.3: notas de atualização (apenas KRaft)](https://kafka.apache.org/43/getting-started/upgrade/)
+- [Karafka: documentação](https://karafka.io/docs)
+- [Redpanda: licenciamento](https://docs.redpanda.com/23.3/get-started/licenses)
+- [Rails 8: Solid stack vs Redis/Sidekiq em produção](https://rubylearning.com/blog/2026/03/16/rails-8-solid-stack-vs-redis-sidekiq-production)
+- [Chatwoot: stack (Rails, Vue, ActionCable, Sidekiq, Redis)](https://openapps.pro/apps/chatwoot)
+- [Chatwoot no Railway: dimensionamento dos serviços](https://railway.com/deploy/chatwoot-intercom-alternative-sidekiq-worker-2fa-included--chatwoot-or-intercom-alternative-sidekiq)

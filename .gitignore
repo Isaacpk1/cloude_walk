@@ -1,0 +1,11 @@
+# Rascunhos e cópias geradas fora da documentação oficial
+Claude outputs/
+
+# Ambiente local
+.env
+.env.*
+!.env.example
+
+# Sistema
+.DS_Store
+Thumbs.db
