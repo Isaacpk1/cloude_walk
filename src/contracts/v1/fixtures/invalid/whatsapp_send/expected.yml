@@ -1,0 +1,5 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+sem_messaging_product.json: { pointer: "/messaging_product", type: required }
+sem_to.json: { pointer: "/to", type: required }
+texto_acima_de_4096.json: { pointer: "/text/body", type: maxLength }
+tipo_template.json: { pointer: "/type", type: const }

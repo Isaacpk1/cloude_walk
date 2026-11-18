@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/chat.json",
+  "title": "Webhook de entrada do chat no app (RF-01)",
+  "description": "Formato próprio, porque o app é da CloudWalk (07, seção 5.0; ADR-018). Marca e conta do provedor vêm da URL e da configuração da conta, não do corpo.",
+  "type": "object",
+  "required": [
+    "message_id",
+    "account_id",
+    "customer_ref",
+    "text",
+    "sent_at"
+  ],
+  "properties": {
+    "message_id": {
+      "description": "Vira external_id na mensagem normalizada.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "account_id": {
+      "description": "Conta do app do cliente (RF-07).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "customer_ref": {
+      "description": "Referência do cliente no app. É o destino da resposta (saída: customer_ref).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sent_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

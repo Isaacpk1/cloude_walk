@@ -1,0 +1,25 @@
+{
+  "schema": "helpdesk.agent_action.v1",
+  "event_id": "a91c5f0e-2b7d-4c43-9d55-1f0e6b7a3c21",
+  "in_reply_to": "0b7e4c1e-6a0e-4f0e-9a51-7c1d2f1e9a10",
+  "conversation_id": "tkt_01JD3K8ZQ4V6",
+  "brand": "infinitepay",
+  "turn": 2,
+  "context_until_seq": 5,
+  "assignment_version": 1,
+  "action": "reply",
+  "tool_calls": [],
+  "agent": {
+    "model": "mock-deterministico",
+    "version": "0.3.0",
+    "config_hash": "sha256:9f1c2e"
+  },
+  "timing": {
+    "received_at": "2026-11-17T13:40:01.760Z",
+    "responded_at": "2026-11-17T13:40:03.770Z",
+    "agent_ms": 2010
+  },
+  "reply": {
+    "text": "   "
+  }
+}

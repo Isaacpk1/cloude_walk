@@ -1,0 +1,9 @@
+{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "5511900000021",
+  "type": "template",
+  "text": {
+    "body": "Seu repasse cai hoje até as 18h."
+  }
+}

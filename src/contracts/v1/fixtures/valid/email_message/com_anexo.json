@@ -1,0 +1,59 @@
+{
+  "id": "18c2f0a1b2c3d4e5",
+  "threadId": "18c2f0a1b2c3d4e5",
+  "historyId": "9876543210",
+  "internalDate": "1763386800000",
+  "labelIds": [
+    "INBOX",
+    "UNREAD"
+  ],
+  "payload": {
+    "mimeType": "multipart/mixed",
+    "filename": "",
+    "headers": [
+      {
+        "name": "From",
+        "value": "Loja Exemplo <loja.exemplo@example.com>"
+      },
+      {
+        "name": "To",
+        "value": "support@jim.example"
+      },
+      {
+        "name": "Subject",
+        "value": "Repasse não recebido"
+      },
+      {
+        "name": "Message-ID",
+        "value": "<a1b2c3@mail.example.com>"
+      },
+      {
+        "name": "Date",
+        "value": "Tue, 17 Nov 2026 10:40:00 -0300"
+      }
+    ],
+    "body": {
+      "size": 0
+    },
+    "parts": [
+      {
+        "partId": "0",
+        "mimeType": "text/plain",
+        "filename": "",
+        "body": {
+          "size": 31,
+          "data": "U2VndWUgbyBjb21wcm92YW50ZSBkbyByZXBhc3NlLg"
+        }
+      },
+      {
+        "partId": "1",
+        "mimeType": "application/pdf",
+        "filename": "comprovante.pdf",
+        "body": {
+          "attachmentId": "ANGjdJ8wAbC1",
+          "size": 48211
+        }
+      }
+    ]
+  }
+}

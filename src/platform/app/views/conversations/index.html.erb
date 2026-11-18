@@ -1,0 +1,4 @@
+<% content_for :title, "Conversas" %>
+<h1>Conversas</h1>
+<p class="muted">Os tickets reais chegam no bloco 02. Até lá, as conversas abaixo são exemplos sintéticos com os mesmos campos.</p>
+<%= render "conversations/list", conversations: @conversations, link_for: ->(c) { conversation_path(c.id) } %>

@@ -1,0 +1,29 @@
+# Configuração local do bundler
+/.bundle
+
+# Variáveis de ambiente
+/.env*
+!/.env.example
+
+# Chaves das credenciais: nunca vão para o git
+/config/master.key
+/config/credentials/*.key
+
+# Logs, arquivos temporários e pids
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+/tmp/pids/*
+!/tmp/pids/
+!/tmp/pids/.keep
+/storage/*
+!/storage/.keep
+
+# Assets gerados
+/public/assets
+/app/assets/builds/*
+!/app/assets/builds/.keep
+
+# Relatório de cobertura (SimpleCov)
+/coverage

@@ -1,0 +1,53 @@
+# CI de cada serviço (RNF-27, RNF-26). Roda a cada push e pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  platform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/platform
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: helpdesk
+          POSTGRES_PASSWORD: helpdesk
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U helpdesk" --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: postgres://helpdesk:helpdesk@localhost:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: src/platform
+          bundler-cache: true
+      - name: Instala o cliente do Postgres (structure.sql)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - run: bin/rails db:prepare
+      - run: bundle exec rspec
+      - run: bundle exec rubocop
+      - run: bundle exec brakeman -q --no-pager
+
+  contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3.6"
+          working-directory: src/contracts
+          bundler-cache: true
+      - run: bundle exec rspec
+      - run: bundle exec rubocop

@@ -1,0 +1,27 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+acao_refund.json: { pointer: "/action", type: enum }
+acao_tool_calls.json: { pointer: "/action", type: enum }
+acao_update_customer.json: { pointer: "/action", type: enum }
+assignment_version_como_texto.json: { pointer: "/assignment_version", type: integer }
+brand_com_quebra_de_linha.json: { pointer: "/brand", type: pattern }
+brand_fora_do_slug.json: { pointer: "/brand", type: pattern }
+escalate_sem_escalation.json: { pointer: "/escalation", type: required }
+prioridade_desconhecida.json: { pointer: "/classification/priority", type: enum }
+reply_com_texto_vazio.json:
+  - { pointer: "/reply/text", type: minLength }
+  - { pointer: "/reply/text", type: pattern }
+reply_sem_reply.json: { pointer: "/reply", type: required }
+reply_sem_reply_text.json: { pointer: "/reply/text", type: required }
+reply_so_com_espacos.json: { pointer: "/reply/text", type: pattern }
+resolve_reason_so_com_espacos.json: { pointer: "/resolution/reason", type: pattern }
+resolve_sem_resolution.json: { pointer: "/resolution", type: required }
+resolve_sem_resolution_reason.json: { pointer: "/resolution/reason", type: required }
+resumo_handoff_sem_pendente.json: { pointer: "/escalation/summary/pendente", type: required }
+sem_agent.json: { pointer: "/agent", type: required }
+sem_assignment_version.json: { pointer: "/assignment_version", type: required }
+sem_brand.json: { pointer: "/brand", type: required }
+sem_context_until_seq.json: { pointer: "/context_until_seq", type: required }
+sem_in_reply_to.json: { pointer: "/in_reply_to", type: required }
+sem_turn.json: { pointer: "/turn", type: required }
+turn_zero.json: { pointer: "/turn", type: minimum }
+versao_desconhecida.json: { pointer: "/schema", type: schema_desconhecido }

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/chat_status.json",
+  "title": "Callback de status de entrega do chat do app",
+  "description": "Formato próprio do app da CloudWalk (07, seção 5.0; ADR-018). message_id é o id da mensagem enviada pela plataforma; o status vai para deliveries.status pela provider_message_id.",
+  "type": "object",
+  "required": [
+    "message_id",
+    "status",
+    "timestamp"
+  ],
+  "properties": {
+    "message_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "status": {
+      "enum": [
+        "sent",
+        "delivered",
+        "read",
+        "failed"
+      ]
+    },
+    "timestamp": {
+      "description": "ISO 8601, como sent_at na entrada do chat.",
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

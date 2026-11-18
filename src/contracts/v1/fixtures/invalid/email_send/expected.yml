@@ -1,0 +1,4 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+raw_com_quebra_de_linha.json: { pointer: "/raw", type: pattern }
+raw_fora_do_base64url.json: { pointer: "/raw", type: pattern }
+sem_thread_id.json: { pointer: "/threadId", type: required }

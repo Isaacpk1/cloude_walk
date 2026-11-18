@@ -1,0 +1,19 @@
+# Postgres é a fonte da verdade (07, P2; ADR-006).
+# A conexão vem de DATABASE_URL (sem o nome do banco); o nome fica aqui por ambiente.
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  url: <%= ENV.fetch("DATABASE_URL", "postgres://helpdesk:helpdesk@localhost:5432") %>
+  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+development:
+  <<: *default
+  database: helpdesk_development
+
+test:
+  <<: *default
+  database: helpdesk_test<%= ENV["TEST_ENV_NUMBER"] %>
+
+production:
+  <<: *default
+  database: <%= ENV.fetch("POSTGRES_DB", "helpdesk_production") %>

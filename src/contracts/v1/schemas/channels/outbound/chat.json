@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/outbound/chat.json",
+  "title": "Envio pelo chat do app: POST /messages",
+  "description": "Formato próprio do app da CloudWalk (07, seção 5.0; ADR-018).",
+  "type": "object",
+  "required": [
+    "customer_ref",
+    "text"
+  ],
+  "properties": {
+    "customer_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reply_to": {
+      "description": "message_id da mensagem do cliente respondida. O 07 não diz se é obrigatório.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    }
+  }
+}

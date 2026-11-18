@@ -1,0 +1,36 @@
+{
+  "schema": "helpdesk.agent_event.v1",
+  "event_id": "0b7e4c1e-6a0e-4f0e-9a51-7c1d2f1e9a10",
+  "event_type": "ticket.returned_to_agent",
+  "occurred_at": "2026-11-17T13:40:01.620Z",
+  "conversation_id": "tkt_01JD3K8ZQ4V6",
+  "brand": "infinitepay",
+  "locale": "pt-BR",
+  "ticket": {
+    "state": "com_ia",
+    "channel": "whatsapp",
+    "category": "repasses",
+    "priority": "alta",
+    "queue": "repasses-ip",
+    "ai_turns": 2
+  },
+  "customer": {
+    "id": "cus_8F2A",
+    "verified": true,
+    "display_name": "Loja Exemplo"
+  },
+  "context": {
+    "pending_messages": [],
+    "history": [
+      {
+        "seq": 7,
+        "author": "analyst",
+        "text": "Devolvendo para a IA."
+      }
+    ]
+  },
+  "turn": 1,
+  "context_until_seq": 7,
+  "assignment_version": 3,
+  "deadline_at": "2026-11-17T13:40:30.120Z"
+}

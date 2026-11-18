@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/email_push.json",
+  "title": "Notificação push do Gmail no envelope do Pub/Sub (RF-03)",
+  "description": "Primeiro passo da entrada de e-mail (07, seção 5.0; ADR-018). message.data é base64 de um JSON com emailAddress e historyId. O adaptador busca as mensagens novas em users.history.list e o conteúdo em users.messages.get (ver email_message.json). O validador decodifica message.data e confere contra $defs/notificacao.",
+  "type": "object",
+  "required": [
+    "message",
+    "subscription"
+  ],
+  "properties": {
+    "message": {
+      "type": "object",
+      "required": [
+        "data",
+        "messageId"
+      ],
+      "properties": {
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9+/_-]+={0,2}$",
+          "contentEncoding": "base64",
+          "contentMediaType": "application/json",
+          "contentSchema": {
+            "$ref": "#/$defs/notificacao"
+          }
+        },
+        "messageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publishTime": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "subscription": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "notificacao": {
+      "description": "Conteúdo decodificado de message.data.",
+      "type": "object",
+      "required": [
+        "emailAddress",
+        "historyId"
+      ],
+      "properties": {
+        "emailAddress": {
+          "description": "Caixa que recebeu o e-mail.",
+          "type": "string",
+          "format": "email"
+        },
+        "historyId": {
+          "description": "Ponto de partida do users.history.list. A documentação do Gmail mostra texto; aceita também número.",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            {
+              "type": "integer",
+              "minimum": 0
+            }
+          ]
+        }
+      }
+    }
+  }
+}

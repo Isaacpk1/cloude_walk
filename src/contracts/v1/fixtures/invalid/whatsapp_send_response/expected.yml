@@ -1,0 +1,5 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+contato_sem_wa_id.json: { pointer: "/contacts/0/wa_id", type: required }
+mensagem_sem_id.json: { pointer: "/messages/0/id", type: required }
+produto_errado.json: { pointer: "/messaging_product", type: const }
+sem_mensagem.json: { pointer: "/messages", type: minItems }

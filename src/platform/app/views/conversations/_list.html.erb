@@ -1,0 +1,19 @@
+<ul class="conversation-list">
+  <% conversations.each do |conversation| %>
+    <% first = conversation.first_customer_message %>
+    <li class="card conversation-list__item">
+      <div class="conversation-list__main">
+        <%= link_to conversation.title, link_for.call(conversation), class: "conversation-list__link" %>
+        <% if first %><p class="conversation-list__preview">“<%= first.body %>”</p><% end %>
+        <p class="muted">
+          <%= conversation.ticket_id %> · <%= conversation.customer_name %> · <%= conversation.brand_name %> · <%= conversation.channel %>
+        </p>
+      </div>
+      <div class="conversation-list__meta">
+        <span class="badge badge--state"><%= conversation.state %></span>
+        <span class="muted"><%= conversation.assignee.kind_label %>: <%= conversation.assignee.name %></span>
+        <%= source_badge(conversation.source) %>
+      </div>
+    </li>
+  <% end %>
+</ul>

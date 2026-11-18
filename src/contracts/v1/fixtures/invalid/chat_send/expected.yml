@@ -1,0 +1,3 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+sem_customer_ref.json: { pointer: "/customer_ref", type: required }
+texto_vazio.json: { pointer: "/text", type: minLength }

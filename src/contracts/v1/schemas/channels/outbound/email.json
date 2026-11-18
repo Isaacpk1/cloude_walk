@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/outbound/email.json",
+  "title": "Envio de e-mail pelo Gmail: users.messages.send",
+  "description": "Corpo que o adaptador de saída envia (07, seção 5.0; ADR-018). raw é a mensagem MIME em base64url; threadId mantém a thread. Subject com Re:, In-Reply-To e References ficam dentro do MIME e não são conferidos aqui.",
+  "type": "object",
+  "required": [
+    "raw",
+    "threadId"
+  ],
+  "properties": {
+    "raw": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+={0,2}$",
+      "description": "Mensagem MIME (RFC 5322) em base64url."
+    },
+    "threadId": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

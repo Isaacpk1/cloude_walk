@@ -1,0 +1,84 @@
+# Gerador de dados sintéticos reprodutível por semente (RF-61, RNF-25).
+# Nenhum dado real: e-mails no domínio reservado .test (RFC 2606) e telefones
+# com DDD 00, que não existe no Brasil.
+#
+#   Seeds::Synthetic.call(seed: 42, customers_per_brand: 5)
+#
+# Idempotente: rodar de novo com a mesma semente não duplica registros.
+require "faker"
+
+module Seeds
+  class Synthetic
+    BRANDS = [
+      { slug: "infinitepay", name: "InfinitePay", locale: "pt-BR" },
+      { slug: "jim", name: "JIM", locale: "en" } # RN-42
+    ].freeze
+    # Capacidade padrão do agente de IA (06, parâmetros). As réplicas do agent-mock dão a vazão.
+    BOT_CAPACITY = 1_000
+
+    def self.call(...) = new(...).call
+
+    def initialize(seed: 42, customers_per_brand: 5)
+      @seed = seed
+      @customers_per_brand = customers_per_brand
+    end
+
+    def call
+      Faker::Config.random = Random.new(@seed)
+      Faker::Config.locale = "pt-BR"
+
+      ActiveRecord::Base.transaction do
+        bot = upsert_user(name: "Agente de IA", email: "agente-ia@helpdesk.test", kind: "bot", role: "agent", status: "online",
+                        capacity: BOT_CAPACITY)
+        supervisor = upsert_user(name: "Supervisora Sintética", email: "supervisora@helpdesk.test", role: "supervisor")
+
+        BRANDS.each do |attrs|
+          brand = Brand.find_or_create_by!(slug: attrs[:slug]) { _1.assign_attributes(attrs) }
+          team = Team.find_or_create_by!(brand:, name: "Suporte N1")
+          [ bot, supervisor, *analysts_for(brand) ].each { |user| TeamMembership.find_or_create_by!(user:, team:) }
+          default_queue_for(brand, team, created_by: supervisor)
+          customers_for(brand)
+        end
+      end
+    ensure
+      Faker::Config.random = nil
+    end
+
+    private
+
+    def upsert_user(email:, **attrs)
+      User.find_or_create_by!(email:) { |user| user.assign_attributes(attrs) }
+    end
+
+    def analysts_for(brand)
+      Array.new(2) do |i|
+        upsert_user(name: "Analista #{i + 1} #{brand.name}", email: "analista#{i + 1}.#{brand.slug}@helpdesk.test")
+      end
+    end
+
+    def default_queue_for(brand, team, created_by:)
+      queue = HelpdeskQueue.find_or_create_by!(brand:, is_default: true) { _1.team = team }
+      queue.publish_version!(name: "Geral", ai_first: true, created_by:) if queue.current_version.nil?
+      queue
+    end
+
+    def customers_for(brand)
+      Array.new(@customers_per_brand) do |i|
+        name = Faker::Name.name
+        phone = format("+5500%09d", Faker::Number.unique.number(digits: 9))
+        local = I18n.transliterate(Faker::Internet.username(specifier: name, separators: %w[.]))
+        email = "#{local}.#{i}@#{brand.slug}.example.test"
+
+        identity = CustomerIdentity.find_by(brand:, channel: "whatsapp", external_id: phone)
+        next identity.customer if identity
+
+        customer = Customer.create!(brand:, display_name: name, verified: i.even?)
+        customer.identities.create!(brand:, channel: "whatsapp", external_id: phone)
+        customer.identities.create!(brand:, channel: "email", external_id: email)
+        customer
+      end
+    ensure
+      Faker::Number.unique.clear
+    end
+  end
+end
