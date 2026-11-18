@@ -25,6 +25,14 @@ Abra http://localhost:3000. A tela inicial lista as conversas de exemplo.
 | `make reset` | Recria o banco e carrega o seed |
 | `make down` | Para o ambiente |
 
+**No Windows:** se o clone foi feito antes do `.gitattributes` existir, os arquivos podem ter fim de linha CRLF e o contêiner `web` cai com `: invalid option`. Corrija uma vez na pasta do projeto:
+
+```powershell
+git config core.autocrlf input
+git rm -rq --cached .
+git reset --hard
+```
+
 Para rodar sem Docker, com Postgres e Redis locais, veja a seção "Comandos" do [AGENTS.md](AGENTS.md). Onde fica cada coisa: [docs/10](docs/10-organizacao-do-repositorio.md).
 
 ## Índice

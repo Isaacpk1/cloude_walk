@@ -46,6 +46,25 @@ O [ROADMAP.md](ROADMAP.md) mostra sempre onde o projeto está. Atualize-o **no m
 4. Se o "pronto quando" não pôde ser comprovado por inteiro, escreva o que faltou numa linha **Situação** do bloco. Não marque como pronto sem dizer o que ficou de fora.
 5. Decisões tomadas durante o bloco entram como link para o ADR ou a seção do doc.
 
+## Fim de cada rodada
+
+Ao terminar uma rodada de trabalho (um bloco, uma parte de bloco ou uma decisão grande), entregue um relatório com estas seções, nesta ordem:
+
+1. **O que foi feito:** explicação detalhada, em linguagem simples. O que existe agora que não existia antes, por que foi feito assim e qual requisito ou ADR atende.
+2. **Onde está:** só no clone do agente, já no GitHub ou já na máquina do usuário (seção abaixo).
+3. **Decisões pendentes:** o que falta decidir para fechar aquela parte. Para cada uma: a pergunta, as opções, a recomendação do agente com o motivo, e o bloco que fica travado sem ela.
+4. **Riscos e impactos:** o que pode afetar outras partes (contratos já em uso, blocos futuros, dados, desempenho) e o que não foi comprovado (ex.: rodou sem Docker).
+5. **Próximo passo:** o próximo bloco ou tarefa, e o que ele precisa para começar.
+
+## Avaliação crítica
+
+O agente avalia toda ideia antes de aplicar, venha ela do usuário, dos docs ou de outro agente. Não trate nada como verdade só porque foi dito.
+
+- **Ao concordar**, diga por quê: qual requisito, ADR ou prática de mercado sustenta a ideia, e quais cuidados faltam nela.
+- **Ao discordar**, diga o motivo, o risco concreto e uma alternativa. A decisão final é do usuário, mas ela deve ser tomada com o contra-argumento na mesa.
+- **Se um doc estiver errado ou desatualizado**, aponte e proponha o texto novo, em vez de seguir o erro.
+- Quando não houver informação para avaliar, diga isso e pesquise (doc oficial do provedor, referência do 05 ou do 08) antes de opinar.
+
 ## Onde o agente trabalha
 
 Um agente pode trabalhar num clone do repositório fora da máquina do usuário (por exemplo, num ambiente na nuvem). Nesse caso:
