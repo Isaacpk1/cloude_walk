@@ -24,6 +24,8 @@ Formato: ADR curto (contexto → decisão → alternativas → consequências). 
 | Versionamento das regras | Conjunto de regras da marca versionado inteiro | [ADR-013](#adr-013--versionar-o-conjunto-de-regras-inteiro) |
 | Isolamento entre marcas | Lógico, por `brand_id` em todas as tabelas de negócio | [ADR-014](#adr-014--isolamento-lógico-por-marca) |
 | Prazos e cronômetros | Gravados no Postgres e executados a partir de ações duráveis no outbox | [ADR-016](#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox) |
+| Organização do repositório | Monorepo com o código em `src/`, um diretório por fronteira de rede | [ADR-017](#adr-017--monorepo-com-o-código-em-src) |
+| Formato dos canais simulados | Subconjunto fiel da Cloud API do WhatsApp e da API do Gmail, com adaptador de entrada e de saída por canal | [ADR-018](#adr-018--canais-simulados-no-formato-dos-provedores-reais) |
 
 ### Orçamento de memória (RNF-29: 4 vCPU, 8 GB)
 
@@ -395,6 +397,57 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 
 ---
 
+## ADR-017 — Monorepo com o código em `src/`
+
+**Status:** aceito · **Data:** 18/11/2026
+
+**Contexto.** O ADR-011 define sete contêineres de aplicação, mas nenhum documento diz onde fica o código de cada um. Sem essa regra, cada bloco do roadmap inventaria um lugar para migrations, configuração do Redis, tópicos do Kafka e esquemas. Os serviços também precisam compartilhar os contratos (RNF-28) sem compartilhar models.
+
+**Decisão.** Um único repositório. Todo o código que roda fica em `src/`: `platform/` (Rails, de onde saem `web`, `worker`, `consumer` e `scheduler`), `broker/`, `agent-mock/`, `channels-mock/` e `contracts/` (gem local com os JSON Schemas). Cada serviço tem o próprio `Gemfile`, `Dockerfile` e `spec/`. Fora de `src/` ficam `tests/e2e/`, `infra/` (Postgres, Kafka e observabilidade), `bench/`, `scripts/` e o CI. Os tópicos do Kafka são declarados em `infra/kafka/topics.yml` e criados por um contêiner de uso único, `kafka-init`. O detalhe de cada pasta está no [10](10-organizacao-do-repositorio.md).
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Um repositório por serviço | Projeto individual de um mês. Mudanças de contrato tocariam três repositórios e três pull requests ao mesmo tempo |
+| Tudo dentro do app Rails (broker e agente como engines ou pastas do Rails) | O broker e o agente poderiam importar os models e ler o Postgres, o que viola o ADR-007 e a fronteira do agente. A separação deixaria de ser testada |
+| Plataforma na raiz e serviços em subpastas | Mistura código com docs, infraestrutura e experimentos na raiz. `src/` deixa claro o que roda |
+| Tópicos criados pelo `karafka topics migrate` de um dos serviços | Daria a um serviço a posse de tópicos que pertencem à integração. Um arquivo neutro em `infra/` serve a todos |
+
+**Consequências.**
+
+- (+) Um pull request muda contrato, produtor e consumidor juntos, e o CI testa os três.
+- (+) A fronteira de rede vira fronteira de pasta: o agente não tem como acessar o banco.
+- (+) Uma resposta única para "onde fica?", registrada no 10.
+- (−) Quatro `Gemfile` para manter. As versões comuns (Karafka, WaterDrop, json_schemer) precisam andar juntas.
+- (−) Um serviço que usa `contracts/` precisa de `src/` como contexto de build do Docker, para a imagem copiar a gem. Enquanto não usa, o contexto é a própria pasta do serviço.
+
+---
+
+## ADR-018 — Canais simulados no formato dos provedores reais
+
+**Status:** aceito · **Data:** 18/11/2026 · Complementa o [ADR-012](#adr-012--canais-simulados-como-provedores-externos).
+
+**Contexto.** O ADR-012 diz que o `channels-mock` envia webhooks "no formato de cada canal", mas não diz qual formato. A RF-02 pede o formato de cada canal documentado. Um formato inventado é mais simples, mas esconde o que muda num provedor real: o WhatsApp manda o texto aninhado em `entry[].changes[]` e só aceita texto livre dentro da janela de 24 h; o Gmail avisa por push só com um `historyId` e exige cabeçalhos de thread na resposta.
+
+**Decisão.** O `channels-mock` imita um subconjunto fiel da Cloud API do WhatsApp e da API do Gmail, na entrada, na saída e nos status de entrega. O chat do app usa formato próprio, porque o app é da CloudWalk. Cada canal tem um adaptador de entrada (webhook → mensagem normalizada) e um de saída (resposta interna → chamada do provedor), que aplica a política do canal: tamanho do texto, janela de 24 h e thread do e-mail. O webhook cru fica em `messages.provider_payload`. Os formatos estão no [07, seção 5.0](07-arquitetura.md#50-webhooks-dos-canais-entrada-e-saída).
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Formato inventado e igual para todos os canais | O adaptador ficaria sem teste real. A troca por um provedor de verdade mudaria o adaptador inteiro, não só a configuração |
+| Usar os provedores reais (sandbox da Meta e uma conta Gmail) | Exige contas, aprovação e dados reais, o que fere a LGPD e o escopo sintético (RNF-25). Fica como evolução |
+
+**Consequências.**
+
+- (+) O adaptador é testado contra o formato verdadeiro de cada provedor. Trocar o mock por um provedor real muda a URL e a credencial da conta.
+- (+) A política de saída (4.096 caracteres, janela de 24 h, thread do e-mail) aparece já nos testes.
+- (−) O mock do Gmail precisa de três rotas (push, `history.list` e `messages.get`), mais trabalho que um webhook único.
+- (−) O subconjunto precisa ser mantido em dia com a documentação dos provedores. Só os campos usados entram no mock.
+
+---
+
 ## Referências
 
 - TAPI "Help Desk Integrado a Agentes de IA", seções 7 a 10.
@@ -405,3 +458,6 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - [Rails 8: Solid stack vs Redis/Sidekiq em produção](https://rubylearning.com/blog/2026/03/16/rails-8-solid-stack-vs-redis-sidekiq-production)
 - [Chatwoot: stack (Rails, Vue, ActionCable, Sidekiq, Redis)](https://openapps.pro/apps/chatwoot)
 - [Chatwoot no Railway: dimensionamento dos serviços](https://railway.com/deploy/chatwoot-intercom-alternative-sidekiq-worker-2fa-included--chatwoot-or-intercom-alternative-sidekiq)
+- [WhatsApp Cloud API: mensagens de serviço e janela de 24 h](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)
+- [Gmail API: notificações push via Pub/Sub](https://developers.google.com/gmail/api/guides/push)
+- [Gmail API: recurso `users.messages` (thread, `In-Reply-To`, `References`)](https://developers.google.com/workspace/gmail/api/v1/reference/users/messages)

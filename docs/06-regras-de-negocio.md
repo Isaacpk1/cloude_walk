@@ -158,6 +158,7 @@ Todos são configuráveis. Os de origem *proposta* são escolhas deste projeto, 
 | Prazo de reabertura | 72 h | Proposta | RN-08 |
 | Gatilho de alerta de SLA | 80% do prazo | Proposta | RN-25 |
 | Capacidade por analista | 5 atendimentos simultâneos | Proposta | RN-30 |
+| Capacidade do agente de IA (bot) | 1.000 atendimentos simultâneos, configurável pelo supervisor | Proposta | RN-30 |
 | Offline antes de devolver casos à fila | 10 min | Proposta | RN-31 |
 | Trocas da IA sem resolução antes de escalar | 10 mensagens | Proposta | RN-33 |
 | Tempo limite do agente | 30 s desde a primeira mensagem pendente, sem reiniciar | RNF-18 | RN-46 |

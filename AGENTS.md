@@ -19,6 +19,7 @@ Help desk próprio, AI first, multi-marca (InfinitePay, JIM) e multi-equipe, do 
 | [docs/07](docs/07-arquitetura.md) | Componentes, fluxos, turnos (seção 3.4), dados, contratos, falhas (seção 6) |
 | [docs/08](docs/08-decisoes-de-arquitetura.md) | ADRs vigentes. Siga sempre o substituto de um ADR substituído |
 | [docs/09](docs/09-evolucao-da-integracao-com-ia.md) | **Proposta de evolução.** Não implemente sem pedido explícito |
+| [docs/10](docs/10-organizacao-do-repositorio.md) | Onde fica cada coisa: pastas, migrations, configuração do Redis e do Kafka, contratos e testes |
 
 Nunca implemente a partir da memória da conversa. Releia as linhas dos IDs antes de cada tarefa. Se a documentação estiver ambígua, contraditória ou não cobrir o caso, **pare e proponha a mudança no documento** (texto exato) antes de escrever código.
 
@@ -49,7 +50,7 @@ Não negociáveis. Confira cada item que a tarefa toca.
 8. **Regra crítica vira restrição de banco** (índice único, atualização condicional), não só validação em Ruby.
 9. **Configuração versionada:** filas e conjuntos de regras ganham versão nova a cada mudança. Versões antigas nunca são editadas.
 10. **Contratos** validados por JSON Schema versionado na entrada e na saída. Inválido vai para a DLQ, sem retentativa.
-11. **A IA só faz o que o contrato permite:** `reply`, `escalate`, `resolve` e `tool_calls`. Nada que movimente dinheiro ou altere cadastro (RN-35).
+11. **A IA só faz o que o contrato permite:** as ações `reply`, `escalate` e `resolve`, com as consultas registradas em `tool_calls` (07, seção 5.3). Nada que movimente dinheiro ou altere cadastro (RN-35).
 12. **O agente nunca acessa o Postgres direto:** recebe o contexto no evento e, se precisar de mais, usa a API com escopo por marca.
 13. **Logs em JSON**, com `trace_id` e dados pessoais mascarados (RN-51). Só dados sintéticos.
 
@@ -70,13 +71,28 @@ Não negociáveis. Confira cada item que a tarefa toca.
 
 ## Comandos
 
-A preencher no bloco 01 do roadmap, quando o esqueleto existir:
+Com Docker (na raiz do repositório):
 
 ```bash
-make up        # sobe o ambiente
-make seed      # dados sintéticos
+make up        # cria o .env a partir do .env.example, sobe postgres, redis e web, e prepara o banco
+make seed      # dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
+make check     # rspec + rubocop + brakeman da plataforma
+make help      # lista todos os alvos
+```
+
+Sem Docker, com Postgres e Redis locais (`DATABASE_URL` sem o nome do banco):
+
+```bash
+cd src/platform
+bin/rails db:prepare db:seed
+bin/rails server               # http://localhost:3000
 bundle exec rspec
 bundle exec rubocop
-bundle exec brakeman -q
-make bench     # experimentos
+bundle exec brakeman -q --no-pager
+
+cd src/contracts
+bundle exec rspec
+bundle exec rubocop
 ```
+
+`make bench` (experimentos) entra no bloco 19.

@@ -295,7 +295,7 @@ erDiagram
 | --- | --- | --- |
 | `brands` | `id`, `slug`, `locale`, `timezone` | Toda a plataforma é multi-marca. O idioma decide as mensagens padrão (RN-42) |
 | `teams` | `brand_id`, `name` | Agrupam analistas e filas (RF-58) |
-| `users` | `kind` (`human`, `bot`), `role` (`supervisor`, `analyst`), `status` (`online`, `pausa`, `offline`), `capacity`, `active_count` | O agente é um `user` do tipo `bot` (P4). A atribuição e a liberação de vagas atualizam `active_count` na mesma transação da alteração no atendimento (RN-30, RN-31) |
+| `users` | `kind` (`human`, `bot`), `role` (`supervisor`, `analyst`, `agent`), `status` (`online`, `pausa`, `offline`), `capacity`, `active_count` | O agente é um `user` do tipo `bot` com papel `agent` (P4). A atribuição e a liberação de vagas atualizam `active_count` na mesma transação da alteração no atendimento (RN-30, RN-31). A capacidade do bot é configurável, com padrão próprio (06, parâmetros): ela limita quantos casos a IA segura ao mesmo tempo, enquanto a vazão vem das réplicas do `agent-mock` e das partições (seção 7) |
 | `team_memberships` | `user_id`, `team_id` | Um analista pode atender mais de uma equipe. Daqui sai o escopo de acesso (RN-52) |
 | `customers` | `brand_id`, `display_name`, `verified` | Cliente pertence a uma marca (RN-01). `verified` limita o que a IA consulta (RN-05) |
 | `customer_identities` | `brand_id`, `channel`, `external_id` (único por marca e canal), `customer_id` | Liga telefone, e-mail e conta ao mesmo cliente (RN-02). A unicidade impede que um identificador pertença a dois clientes |
@@ -303,8 +303,8 @@ erDiagram
 | `queue_versions` | `queue_id`, `version`, `name`, `ai_first`, `sla_policy` (JSONB por prioridade), `business_hours`, `created_by` | Cada edição cria uma linha nova e imutável (RF-18, RN-20) |
 | `routing_rulesets` | `brand_id`, `version`, `rules` (JSONB: lista ordenada de regras em forma normal disjuntiva), `created_by`, `created_at` | Ver [ADR-013](08-decisoes-de-arquitetura.md#adr-013--versionar-o-conjunto-de-regras-inteiro) |
 | `tickets` | `brand_id`, `customer_id`, `channel`, `state`, `category`, `priority`, `queue_id`, `queue_version`, `ruleset_version`, `assignee_id`, prazos de SLA, `sla_paused_at`, `sla_breached`, `linked_ticket_id`, `ai_turns_count`, `current_turn`, `latest_customer_seq`, `first_pending_seq`, `first_pending_at`, `dispatch_due_at`, `progress_due_at`, `ai_deadline_at`, `assignment_version`, `lock_version` | Guarda estado, atribuição e prazos. `ruleset_version` rastreia a decisão de roteamento. `ai_turns_count` conta as trocas da IA (RN-33, item 6) |
-| `messages` | `brand_id`, `ticket_id`, `provider_account`, `channel`, `direction`, `author_type` (`customer`, `bot`, `analyst`, `system`), `author_id`, `body`, `internal`, `external_id`, `seq`, `trace_id` | `internal` marca notas internas (RN-50). A conta do provedor delimita a deduplicação. `seq` ordena mensagens e entregas |
-| `ai_turns` | `ticket_id`, `turn` (único por atendimento), `context_until_seq`, `assignment_version`, `context` (JSONB enviado), `event_id`, `status`, `deadline_at`, `applied_event_id` | Guarda exatamente o que a IA recebeu em cada turno. Permite republicar o mesmo conteúdo e auditar o que a IA tinha visto quando respondeu |
+| `messages` | `brand_id`, `ticket_id`, `provider_account`, `channel`, `direction`, `author_type` (`customer`, `bot`, `analyst`, `system`), `author_id`, `body`, `internal`, `external_id`, `seq`, `trace_id`, `subject`, `attachments` (JSONB, só metadados), `provider_payload` (JSONB) | `internal` marca notas internas (RN-50). A conta do provedor delimita a deduplicação. `seq` ordena mensagens e entregas. `subject` e `attachments` guardam o assunto e os anexos do e-mail (RF-03). `provider_payload` guarda o webhook cru do provedor, para depuração e auditoria do adaptador (seção 5.0) |
+| `ai_turns` | `ticket_id`, `turn` (único por atendimento), `context_until_seq`, `assignment_version`, `context` (JSONB enviado), `event_id`, `status`, `deadline_at`, `applied_event_id`, `response` (JSONB), `response_received_at` | Guarda exatamente o que a IA recebeu em cada turno e o que ela devolveu. `response` é a primeira ação recebida para o turno, **aplicada ou descartada** (por exemplo, a resposta superada na corrida da seção 3.4). Assim a linha do tempo e os evals mostram o que a IA teria dito mesmo quando nada chegou ao cliente. Ações repetidas para o mesmo turno ficam só na auditoria |
 | `ticket_summaries` | `ticket_id`, `kind` (`handoff`, `resolution`), `content` (JSONB com os 5 campos), `generated_by` | Resumo do handoff (RN-39) e da resolução (RF-52), reaproveitados como memória (RN-49) |
 | `deliveries` | `delivery_id` (estável), `ticket_id`, `message_id`, `seq`, `channel`, `kind`, `ai_assignment_version` (saídas da IA), `ai_first_pending_seq` (aviso de progresso), `status` (`pending`, `sending`, `delivered`, `cancelled`, `failed`), `attempts`, `lease_until`, `provider_message_id` | Controla a ordem de saída e a conciliação do resultado no canal (seção 3.2) |
 | `outbox_events` | `id` (= `event_id`, UUID), `ticket_id`, `event_type`, `dedup_key` (quando aplicável), `payload`, `trace_id`, `created_at`, `next_attempt_at`, `lease_until`, `published_at`, `completed_at` | `published_at` registra confirmação da publicação externa. `completed_at` encerra o item após o efeito durável, a publicação confirmada ou o descarte justificado ([ADR-016](08-decisoes-de-arquitetura.md#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox)) |
@@ -338,7 +338,28 @@ erDiagram
 
 ## 5. Contratos
 
-Todos os contratos têm **nome e versão** (`schema`) e são validados por JSON Schema na entrada e na saída (RNF-28). Mensagem fora do contrato é falha permanente: não é repetida e vai à DLQ (RN-44).
+Os contratos internos têm **nome e versão** (`schema`). Os formatos dos canais seguem o provedor e são versionados pela pasta `vN/` da gem de contratos. Todos são validados por JSON Schema na entrada e na saída (RNF-28). Mensagem fora do contrato é falha permanente: não é repetida e vai à DLQ (RN-44).
+
+### 5.0 Webhooks dos canais (entrada e saída)
+
+Cada canal tem um **adaptador** com duas funções: converter o webhook do provedor na mensagem normalizada (5.1) e converter a resposta interna na chamada que a API do provedor espera. O núcleo da plataforma não conhece o formato de nenhum canal. O `channels-mock` imita um **subconjunto fiel** dos provedores reais ([ADR-018](08-decisoes-de-arquitetura.md#adr-018--canais-simulados-no-formato-dos-provedores-reais)), então trocar o mock por um provedor real mexe só na configuração da conta.
+
+A marca e a conta do provedor vêm da URL de entrada (`/webhooks/:channel/:provider_account`) e da configuração dessa conta, nunca do corpo. O webhook cru é guardado em `messages.provider_payload`.
+
+| Canal | Entrada (provedor → plataforma) | Saída (plataforma → provedor) | Status de entrega |
+| --- | --- | --- | --- |
+| WhatsApp | Webhook da Cloud API da Meta: `entry[].changes[].value.messages[]` com `from`, `id` (`wamid`), `timestamp`, `type` e, quando `type` é `text`, `text.body`; `metadata.phone_number_id` identifica a conta | `POST /:phone_number_id/messages` com `messaging_product: "whatsapp"`, `to`, `type: "text"`, `text.body`. A resposta traz `messages[0].id`, que vira `deliveries.provider_message_id` | Mesmo webhook, em `value.statuses[]` (`sent`, `delivered`, `read`, `failed`) |
+| E-mail | Formato da API do Gmail: notificação push com `emailAddress` e `historyId` (base64 no envelope do Pub/Sub); o adaptador busca as mensagens novas em `users.history.list` e o conteúdo em `users.messages.get` (`From` e `Message-ID` obrigatórios; `To`, `Subject`, corpo e anexos quando existirem) | `users.messages.send` com `raw` (MIME em base64url) e `threadId`. `Subject` igual ao original com `Re:`, `In-Reply-To` e `References` apontando para o `Message-ID` do cliente | Aceite pelo `send` vira `delivered`. Falha da API vira `failed` |
+| Chat do app | Formato próprio, porque o app é da CloudWalk: `message_id`, `account_id` (a conta do provedor), `customer_ref` (o cliente), `text`, `sent_at` | `POST /messages` com `customer_ref`, `text` e `reply_to` opcional | Callback com `message_id`, `status` e `timestamp` |
+
+**Política de saída por canal.** O adaptador aplica as regras do canal antes de enviar:
+
+- **WhatsApp:** texto de até 4.096 caracteres. Texto livre só dentro da janela de atendimento de 24 h aberta pela última mensagem do cliente; fora dela, o provedor só aceita template aprovado (ver seção 9).
+- **E-mail:** mantém a thread (`threadId`, `In-Reply-To`, `References`, `Subject`). A janela de agrupamento é 0 (RN-55).
+- **Tipos de mensagem fora de texto (WhatsApp):** imagem, áudio, reação e outros passam no contrato, porque são formatos válidos do provedor e podem vir no mesmo lote de mensagens de texto. O adaptador grava a mensagem com o webhook cru e registra na auditoria que o tipo não é suportado, sem processá-la (seção 9). Assim uma imagem não leva o lote inteiro para a DLQ.
+- **Status de entrega:** os três canais normalizam o status em `deliveries.status` (seção 3.2), pela `provider_message_id`.
+
+**Por quê.** Normalizar na entrada e desnormalizar na saída mantém as regras de negócio, turnos e handoff iguais para todos os canais. Simular o formato real, em vez de um formato inventado, testa o adaptador contra o que um provedor de verdade envia.
 
 ### 5.1 Mensagem normalizada (interna, RF-05)
 
@@ -356,7 +377,18 @@ Todos os contratos têm **nome e versão** (`schema`) e são validados por JSON 
 }
 ```
 
-**Por quê.** Os adaptadores convertem os formatos dos canais em um envelope interno. `brand` e `provider_account` vêm da configuração da conta que recebe o webhook e delimitam a deduplicação.
+No e-mail, `content` traz também `subject` e `attachments` (opcionais):
+
+```json
+"content": {
+  "type": "text",
+  "text": "Segue o comprovante do repasse.",
+  "subject": "Repasse não recebido",
+  "attachments": [ { "filename": "comprovante.pdf", "content_type": "application/pdf", "size_bytes": 48211 } ]
+}
+```
+
+**Por quê.** Os adaptadores convertem os formatos dos canais em um envelope interno. `brand` e `provider_account` vêm da configuração da conta que recebe o webhook e delimitam a deduplicação. `subject` e `attachments` cumprem a RF-03; os anexos chegam só como metadados, sem o arquivo.
 
 ### 5.2 Webhook plataforma → broker e evento em `agent.inbound`
 
@@ -419,6 +451,7 @@ Tipos de evento: `message.created`, `ticket.assigned_to_agent`, `ticket.returned
   "event_id": "a91c...",
   "in_reply_to": "0b7e4c1e-6a0e-4f0e-9a51-7c1d2f1e9a10",
   "conversation_id": "tkt_01JD3K...",
+  "brand": "infinitepay",
   "turn": 2,
   "context_until_seq": 5,
   "assignment_version": 1,
@@ -444,10 +477,20 @@ Tipos de evento: `message.created`, `ticket.assigned_to_agent`, `ticket.returned
 
 Ações permitidas (RN-35): `reply`, `escalate`, `resolve` (só com confirmação do cliente, RN-36). Consultas aparecem em `tool_calls`. Ações que movimentam dinheiro ou alteram cadastro não existem no contrato.
 
+Cada ação leva o seu conteúdo:
+
+| Ação | Campo obrigatório | Exemplo |
+| --- | --- | --- |
+| `reply` | `reply.text`: a mensagem ao cliente | `"reply": { "text": "Seu repasse cai hoje até as 18h." }` |
+| `escalate` | `escalation.reason` e `escalation.summary` (RN-39) | como no exemplo acima |
+| `resolve` | `resolution.reason`; `resolution.text` opcional, a mensagem de encerramento | `"resolution": { "reason": "duvida_respondida", "text": "Fico à disposição." }` |
+
 **Por quê de cada campo.**
 
 - `in_reply_to`, `turn`, `context_until_seq` e `assignment_version`: o consumer confere a correlação com os dados persistidos, sob o lock do atendimento. A elegibilidade e o prazo também vêm do banco (seção 3.4).
-- `tool_calls`: as consultas da IA entram na auditoria (RF-54). O analista vê o que a IA já verificou, e isso alimenta o campo "ações já tomadas" do resumo.
+- `brand`: o consumer compara com a marca do atendimento encontrado pelo `conversation_id`. Se divergir, a ação vai para a DLQ sem efeito (invariante de isolamento, ADR-014). Pega um agente que misturou conversas de marcas diferentes.
+- `reply.text` e `resolution`: o que o cliente vai ler e por que o caso foi encerrado (RF-48). A ação inteira é guardada em `ai_turns.response`, mesmo quando é descartada (seção 4).
+- `tool_calls`: **registro** das consultas que a IA já fez, não pedido de execução. A consulta acontece antes, pela API com escopo por marca, que é quem limita as ferramentas permitidas (RN-35, invariante 12). As consultas entram na auditoria (RF-54). O analista vê o que a IA já verificou, e isso alimenta o campo "ações já tomadas" do resumo.
 - `escalation.summary`: os cinco campos da RN-39. Quando `escalate` é aplicada, a plataforma registra seu próprio aviso de transferência (RN-42), ordenado pelo fluxo da seção 3.2.
 - `classification`: o agente pode refinar categoria e prioridade (RF-12: "ou pela classificação do agente"). A prioridade só sobe automaticamente (RN-14).
 - `agent`: modelo, versão e configuração em toda resposta (RF-38, RN-37).
@@ -535,3 +578,5 @@ Com o broker ou o agente fora do ar por mais de 30 s, **todos os casos novos esc
 - O agente real gera o resumo do handoff? Se não, o resumo fica todo com a plataforma.
 - O agente real aceita um `deadline_at` e consegue ignorar eventos vencidos?
 - Formato real dos webhooks do help desk atual, para aproximar o contrato 5.2.
+- Mensagens do WhatsApp que não são texto (imagem, áudio, documento): a plataforma passa a processá-las como anexo ou responde ao cliente que só aceita texto?
+- WhatsApp fora da janela de 24 h: a resposta do analista ou da IA usa um template aprovado, muda de canal ou fica pendente até o cliente escrever (seção 5.0)?
