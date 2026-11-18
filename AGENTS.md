@@ -36,6 +36,24 @@ Priorize os requisitos **M** e os blocos do roadmap na ordem. MCP, base de conhe
 5. Antes de dizer que terminou: `bundle exec rspec`, `bundle exec rubocop` e `bundle exec brakeman -q` passando. Cobertura do domínio ≥ 70% (RNF-27).
 6. Mudanças em turnos, idempotência, outbox, isolamento entre marcas ou contratos: rode a skill [`cloudwalk-architecture-review`](.agents/skills/cloudwalk-architecture-review/SKILL.md) antes de propor o merge.
 
+## Acompanhamento do roadmap
+
+O [ROADMAP.md](ROADMAP.md) mostra sempre onde o projeto está. Atualize-o **no mesmo pull request** que muda a situação de um bloco:
+
+1. Marque `[x]` nos itens de backend e frontend concluídos.
+2. Atualize a tabela **"Onde estamos"**: situação de cada bloco tocado, o que ficou pendente e qual é o próximo bloco.
+3. Se algo de um bloco futuro foi adiantado, marque no bloco dele (ex.: ~~item~~ feito no bloco 01).
+4. Se o "pronto quando" não pôde ser comprovado por inteiro, escreva o que faltou numa linha **Situação** do bloco. Não marque como pronto sem dizer o que ficou de fora.
+5. Decisões tomadas durante o bloco entram como link para o ADR ou a seção do doc.
+
+## Onde o agente trabalha
+
+Um agente pode trabalhar num clone do repositório fora da máquina do usuário (por exemplo, num ambiente na nuvem). Nesse caso:
+
+- O que o agente muda só chega à máquina do usuário pelo GitHub: commit e push, com pedido do usuário, e depois `git fetch` e `git switch` ou `git pull` do lado dele.
+- Ao terminar uma tarefa, diga **onde** está cada mudança: só no clone do agente, já no GitHub ou já na máquina do usuário.
+- Não deixe trabalho pronto só no clone sem avisar: diga o que falta subir e peça o ok para o commit e o push.
+
 ## Invariantes da arquitetura
 
 Não negociáveis. Confira cada item que a tarefa toca.
