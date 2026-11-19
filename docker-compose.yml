@@ -1,6 +1,6 @@
 # Ambiente local do Help Desk CloudWalk (ADR-011, RNF-29).
-# Bloco 02: postgres, redis, web e channels-mock. Os demais serviços entram nos blocos seguintes
-# (worker e broker no 03, consumer e agent-mock no 04, scheduler no 08).
+# Bloco 03: postgres, redis, kafka (+ kafka-init), web, worker, broker e channels-mock.
+# Os demais serviços entram nos blocos seguintes (consumer e agent-mock no 04, scheduler no 08).
 name: helpdesk
 
 x-platform: &platform
@@ -11,9 +11,10 @@ x-platform: &platform
   env_file:
     - path: .env
       required: false
-  environment:
+  environment: &platform-env
     DATABASE_URL: postgres://${POSTGRES_USER:-helpdesk}:${POSTGRES_PASSWORD:-helpdesk}@postgres:5432
     REDIS_URL: redis://redis:6379/0
+    BROKER_URL: http://broker:4100/webhooks
   depends_on:
     postgres:
       condition: service_healthy
@@ -57,6 +58,85 @@ services:
       - bundle:/usr/local/bundle
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/up"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Sidekiq: publica o outbox no broker e retenta com backoff (ADR-005; 07, seção 2).
+  # Espera o web, que prepara o banco e instala as gems no volume compartilhado.
+  worker:
+    <<: *platform
+    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+    volumes:
+      - ./src/platform:/rails
+      - ./src/contracts:/contracts
+      - bundle:/usr/local/bundle
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # Kafka 4 em modo KRaft, nó único (ADR-004). Heap limitado (08, orçamento de memória).
+  # Dentro do Compose: kafka:29092. Na máquina: localhost:9092.
+  kafka:
+    image: apache/kafka:4.1.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Os tópicos vêm só de infra/kafka/topics.yml (kafka-init).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_HEAP_OPTS: -Xms768m -Xmx768m
+    # Sem volume: o Kafka não é fonte da verdade, o outbox no Postgres republica (P2, ADR-016).
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  # Cria os tópicos de infra/kafka/topics.yml e sai (docs/10, seções 3.7 e 6).
+  kafka-init:
+    image: apache/kafka:4.1.1
+    command: ["sh", "/infra/kafka/create-topics.sh"]
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+    volumes:
+      - ./infra/kafka:/infra/kafka:ro
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Broker de webhooks: valida HMAC e contrato e publica em agent.inbound (ADR-007): http://localhost:4100
+  broker:
+    build:
+      context: ./src
+      dockerfile: broker/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      KAFKA_BROKERS: kafka:29092
+    ports:
+      - "4100:4100"
+    # Só leitura: o teste de configuração confere os tópicos declarados (make test).
+    volumes:
+      - ./infra/kafka:/infra/kafka:ro
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4100/up"]
       interval: 5s
       timeout: 3s
       retries: 30

@@ -51,6 +51,20 @@ jobs:
       - run: bundle exec rspec
       - run: bundle exec rubocop
 
+  broker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/broker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: src/broker
+          bundler-cache: true
+      - run: bundle exec rspec
+      - run: bundle exec rubocop
+
   channels-mock:
     runs-on: ubuntu-latest
     defaults:
