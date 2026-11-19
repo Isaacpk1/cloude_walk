@@ -1,6 +1,6 @@
 # Ambiente local do Help Desk CloudWalk (ADR-011, RNF-29).
-# Bloco 03: postgres, redis, kafka (+ kafka-init), web, worker, broker e channels-mock.
-# Os demais serviços entram nos blocos seguintes (consumer e agent-mock no 04, scheduler no 08).
+# Bloco 03: postgres, redis, kafka (+ kafka-init), web, worker, scheduler, broker e channels-mock.
+# Os demais serviços entram nos blocos seguintes (consumer e agent-mock no 04).
 name: helpdesk
 
 x-platform: &platform
@@ -72,6 +72,29 @@ services:
       - ./src/contracts:/contracts
       - bundle:/usr/local/bundle
     depends_on:
+      web:
+        condition: service_healthy
+
+  # Prazos do atendimento (ADR-016; 07, seção 2): a cada 250 ms registra no outbox as ações vencidas
+  # (bloco 03: abertura do turno ao fim da janela, RN-55) e acorda o worker. Uma réplica por padrão;
+  # réplicas extras dividem o lote com SKIP LOCKED. Espera o web pelo mesmo motivo do worker.
+  scheduler:
+    <<: *platform
+    command: ["bin/scheduler"]
+    environment:
+      <<: *platform-env
+      SCHEDULER_INTERVAL: "0.25"
+      SCHEDULER_BATCH: "100"
+    volumes:
+      - ./src/platform:/rails
+      - ./src/contracts:/contracts
+      - bundle:/usr/local/bundle
+    stop_signal: SIGTERM
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
       web:
         condition: service_healthy
 
