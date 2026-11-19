@@ -1,0 +1,4 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+sem_message_id.json: { pointer: "/message_id", type: required }
+status_desconhecido.json: { pointer: "/status", type: enum }
+timestamp_sem_formato.json: { pointer: "/timestamp", type: format }

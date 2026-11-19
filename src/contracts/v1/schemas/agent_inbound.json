@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/agent_inbound.json",
+  "title": "Evento para o agente em helpdesk.agent.inbound.v1 (helpdesk.agent_event.v1)",
+  "description": "Corpo do webhook plataforma → broker e da mensagem publicada no tópico de entrada (07, seção 5.2; ADR-004, ADR-007). event_id e traceparent também vão nos cabeçalhos.",
+  "type": "object",
+  "required": [
+    "schema",
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "conversation_id",
+    "brand",
+    "locale",
+    "ticket",
+    "customer",
+    "context",
+    "turn",
+    "context_until_seq",
+    "assignment_version",
+    "deadline_at"
+  ],
+  "properties": {
+    "schema": {
+      "const": "helpdesk.agent_event.v1"
+    },
+    "event_id": {
+      "$ref": "#/$defs/uuid",
+      "description": "Chave de idempotência em todos os consumidores (RN-47)."
+    },
+    "event_type": {
+      "enum": [
+        "message.created",
+        "ticket.assigned_to_agent",
+        "ticket.returned_to_agent"
+      ]
+    },
+    "occurred_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "conversation_id": {
+      "$ref": "#/$defs/conversation_id"
+    },
+    "brand": {
+      "$ref": "#/$defs/brand"
+    },
+    "locale": {
+      "description": "Idioma da marca (RN-42), BCP 47.",
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$"
+    },
+    "ticket": {
+      "type": "object",
+      "required": [
+        "state",
+        "channel",
+        "ai_turns"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "novo",
+            "em_triagem",
+            "com_ia",
+            "aguardando_humano",
+            "com_analista",
+            "aguardando_cliente",
+            "resolvido",
+            "fechado"
+          ]
+        },
+        "channel": {
+          "$ref": "#/$defs/channel"
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "queue": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ai_turns": {
+          "description": "Trocas da IA já feitas no atendimento (RN-33).",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "customer": {
+      "type": "object",
+      "required": [
+        "id",
+        "verified"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verified": {
+          "description": "Sem verificação, nada de consulta de dados de conta (RN-05).",
+          "type": "boolean"
+        },
+        "display_name": {
+          "type": "string"
+        }
+      }
+    },
+    "message": {
+      "description": "Mensagem que gerou o evento. Obrigatória em message.created.",
+      "type": "object",
+      "required": [
+        "id",
+        "seq",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seq": {
+          "$ref": "#/$defs/seq"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "context": {
+      "description": "Tudo o que o agente precisa para decidir (RF-33, RF-53, RN-49).",
+      "type": "object",
+      "required": [
+        "pending_messages",
+        "history"
+      ],
+      "properties": {
+        "pending_messages": {
+          "description": "Todas as mensagens do cliente ainda sem resposta, por inteiro.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "seq",
+              "text"
+            ],
+            "properties": {
+              "seq": {
+                "$ref": "#/$defs/seq"
+              },
+              "text": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "seq",
+              "author",
+              "text"
+            ],
+            "properties": {
+              "seq": {
+                "$ref": "#/$defs/seq"
+              },
+              "author": {
+                "enum": [
+                  "customer",
+                  "bot",
+                  "analyst",
+                  "system"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "summary": {
+          "type": "object",
+          "required": [
+            "text",
+            "covers_until_seq"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "covers_until_seq": {
+              "description": "Até qual seq o resumo cobre: prova que não há vão até o histórico.",
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "previous_tickets": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "summary"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "resolved_at": {
+                "type": "string",
+                "format": "date"
+              },
+              "summary": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "prior_tool_results": {
+          "description": "Consultas de turnos anteriores já gravadas. Formato dos itens não definido no 07.",
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "turn": {
+      "$ref": "#/$defs/turn"
+    },
+    "context_until_seq": {
+      "$ref": "#/$defs/seq"
+    },
+    "assignment_version": {
+      "$ref": "#/$defs/assignment_version"
+    },
+    "deadline_at": {
+      "$ref": "#/$defs/timestamp",
+      "description": "Cópia do ai_deadline_at na abertura do turno (RN-46)."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "message.created"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "message"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "brand": {
+      "description": "Slug da marca (brands.slug), ex.: infinitepay, jim. Isolamento por marca (invariante 6).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "maxLength": 64
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "chat",
+        "whatsapp",
+        "email"
+      ]
+    },
+    "seq": {
+      "description": "Posição da mensagem no atendimento (messages.seq).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "conversation_id": {
+      "description": "Identificador do atendimento exposto ao agente. Chave da partição no Kafka (RNF-13).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "priority": {
+      "description": "RN-12. Valores ASCII, sem acento.",
+      "type": "string",
+      "enum": [
+        "baixa",
+        "media",
+        "alta",
+        "critica"
+      ]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "turn": {
+      "description": "Número do turno (07, seção 3.4).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "assignment_version": {
+      "description": "Versão da atribuição do atendimento (07, seção 3.4).",
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

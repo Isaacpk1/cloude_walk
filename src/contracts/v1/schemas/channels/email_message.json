@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/email_message.json",
+  "title": "Mensagem do Gmail retornada por users.messages.get (RF-03)",
+  "description": "Recurso users.messages no formato full (07, seção 5.0; ADR-018). Só os campos usados: thread, cabeçalhos From e Message-ID (obrigatórios), To e Subject (opcionais), corpo em texto e anexos só como metadados (filename, mimeType, body.size), sem o arquivo. Nomes de cabeçalho são comparados sem diferenciar maiúsculas (RFC 5322).",
+  "type": "object",
+  "required": [
+    "id",
+    "threadId",
+    "internalDate",
+    "payload"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "threadId": {
+      "description": "Thread do Gmail. A resposta usa o mesmo threadId (saída: users.messages.send).",
+      "type": "string",
+      "minLength": 1
+    },
+    "internalDate": {
+      "description": "Epoch em milissegundos, em texto.",
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "payload": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/part"
+        }
+      ],
+      "required": [
+        "headers"
+      ],
+      "properties": {
+        "headers": {
+          "allOf": [
+            {
+              "contains": {
+                "$ref": "#/$defs/header_from"
+              }
+            },
+            {
+              "contains": {
+                "$ref": "#/$defs/header_message_id"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "headers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "header_from": {
+      "description": "Cabeçalho From, sem diferenciar maiúsculas.",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[Ff][Rr][Oo][Mm]$"
+        }
+      }
+    },
+    "header_message_id": {
+      "description": "Cabeçalho Message-ID, sem diferenciar maiúsculas (o Gmail devolve o nome como veio: Message-ID, Message-Id...).",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[Mm][Ee][Ss][Ss][Aa][Gg][Ee]-[Ii][Dd]$"
+        }
+      }
+    },
+    "part": {
+      "description": "Parte MIME. Partes multipart/* trazem parts; as demais trazem body. Anexo é a parte com filename não vazio: só metadados, o arquivo fica no provedor (attachmentId).",
+      "type": "object",
+      "required": [
+        "mimeType",
+        "body"
+      ],
+      "properties": {
+        "partId": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "filename": {
+          "type": "string"
+        },
+        "headers": {
+          "$ref": "#/$defs/headers"
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "size"
+          ],
+          "properties": {
+            "size": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "data": {
+              "description": "Conteúdo da parte em base64url (texto do e-mail).",
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]*={0,2}$"
+            },
+            "attachmentId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/part"
+          }
+        }
+      }
+    }
+  }
+}

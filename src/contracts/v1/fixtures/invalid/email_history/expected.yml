@@ -1,0 +1,4 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+history_sem_id.json: { pointer: "/history/0/id", type: required }
+mensagem_sem_thread_id.json: { pointer: "/history/0/messagesAdded/0/message/threadId", type: required }
+sem_history_id.json: { pointer: "/historyId", type: required }

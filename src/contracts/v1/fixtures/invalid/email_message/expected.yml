@@ -1,0 +1,7 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+anexo_sem_tamanho.json: { pointer: "/payload/parts/1/body/size", type: required }
+internal_date_fora_do_formato.json: { pointer: "/internalDate", type: pattern }
+sem_corpo.json: { pointer: "/payload/body", type: required }
+sem_from.json: { pointer: "/payload/headers", type: contains }
+sem_message_id.json: { pointer: "/payload/headers", type: contains }
+sem_thread_id.json: { pointer: "/threadId", type: required }

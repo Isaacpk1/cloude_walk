@@ -1,0 +1,14 @@
+# Fim de linha LF em todos os arquivos de texto, em qualquer sistema.
+# Os arquivos rodam dentro de contêineres Linux pelo bind mount do Compose:
+# com CRLF (padrão do Git no Windows), scripts como bin/docker-entrypoint quebram.
+* text=auto eol=lf
+
+# Binários: nunca converter
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

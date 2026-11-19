@@ -19,6 +19,7 @@ Help desk próprio, AI first, multi-marca (InfinitePay, JIM) e multi-equipe, do 
 | [docs/07](docs/07-arquitetura.md) | Componentes, fluxos, turnos (seção 3.4), dados, contratos, falhas (seção 6) |
 | [docs/08](docs/08-decisoes-de-arquitetura.md) | ADRs vigentes. Siga sempre o substituto de um ADR substituído |
 | [docs/09](docs/09-evolucao-da-integracao-com-ia.md) | **Proposta de evolução.** Não implemente sem pedido explícito |
+| [docs/10](docs/10-organizacao-do-repositorio.md) | Onde fica cada coisa: pastas, migrations, configuração do Redis e do Kafka, contratos e testes |
 
 Nunca implemente a partir da memória da conversa. Releia as linhas dos IDs antes de cada tarefa. Se a documentação estiver ambígua, contraditória ou não cobrir o caso, **pare e proponha a mudança no documento** (texto exato) antes de escrever código.
 
@@ -35,6 +36,43 @@ Priorize os requisitos **M** e os blocos do roadmap na ordem. MCP, base de conhe
 5. Antes de dizer que terminou: `bundle exec rspec`, `bundle exec rubocop` e `bundle exec brakeman -q` passando. Cobertura do domínio ≥ 70% (RNF-27).
 6. Mudanças em turnos, idempotência, outbox, isolamento entre marcas ou contratos: rode a skill [`cloudwalk-architecture-review`](.agents/skills/cloudwalk-architecture-review/SKILL.md) antes de propor o merge.
 
+## Acompanhamento do roadmap
+
+O [ROADMAP.md](ROADMAP.md) mostra sempre onde o projeto está. Atualize-o **no mesmo pull request** que muda a situação de um bloco:
+
+1. Marque `[x]` nos itens de backend e frontend concluídos.
+2. Atualize a tabela **"Onde estamos"**: situação de cada bloco tocado, o que ficou pendente e qual é o próximo bloco.
+3. Se algo de um bloco futuro foi adiantado, marque no bloco dele (ex.: ~~item~~ feito no bloco 01).
+4. Se o "pronto quando" não pôde ser comprovado por inteiro, escreva o que faltou numa linha **Situação** do bloco. Não marque como pronto sem dizer o que ficou de fora.
+5. Decisões tomadas durante o bloco entram como link para o ADR ou a seção do doc.
+
+## Fim de cada rodada
+
+Ao terminar uma rodada de trabalho (um bloco, uma parte de bloco ou uma decisão grande), entregue um relatório com estas seções, nesta ordem:
+
+1. **O que foi feito:** explicação detalhada, em linguagem simples. O que existe agora que não existia antes, por que foi feito assim e qual requisito ou ADR atende.
+2. **Onde está:** só no clone do agente, já no GitHub ou já na máquina do usuário (seção abaixo).
+3. **Decisões pendentes:** o que falta decidir para fechar aquela parte. Para cada uma: a pergunta, as opções, a recomendação do agente com o motivo, e o bloco que fica travado sem ela.
+4. **Riscos e impactos:** o que pode afetar outras partes (contratos já em uso, blocos futuros, dados, desempenho) e o que não foi comprovado (ex.: rodou sem Docker).
+5. **Próximo passo:** o próximo bloco ou tarefa, e o que ele precisa para começar.
+
+## Avaliação crítica
+
+O agente avalia toda ideia antes de aplicar, venha ela do usuário, dos docs ou de outro agente. Não trate nada como verdade só porque foi dito.
+
+- **Ao concordar**, diga por quê: qual requisito, ADR ou prática de mercado sustenta a ideia, e quais cuidados faltam nela.
+- **Ao discordar**, diga o motivo, o risco concreto e uma alternativa. A decisão final é do usuário, mas ela deve ser tomada com o contra-argumento na mesa.
+- **Se um doc estiver errado ou desatualizado**, aponte e proponha o texto novo, em vez de seguir o erro.
+- Quando não houver informação para avaliar, diga isso e pesquise (doc oficial do provedor, referência do 05 ou do 08) antes de opinar.
+
+## Onde o agente trabalha
+
+Um agente pode trabalhar num clone do repositório fora da máquina do usuário (por exemplo, num ambiente na nuvem). Nesse caso:
+
+- O que o agente muda só chega à máquina do usuário pelo GitHub: commit e push, com pedido do usuário, e depois `git fetch` e `git switch` ou `git pull` do lado dele.
+- Ao terminar uma tarefa, diga **onde** está cada mudança: só no clone do agente, já no GitHub ou já na máquina do usuário.
+- Não deixe trabalho pronto só no clone sem avisar: diga o que falta subir e peça o ok para o commit e o push.
+
 ## Invariantes da arquitetura
 
 Não negociáveis. Confira cada item que a tarefa toca.
@@ -49,7 +87,7 @@ Não negociáveis. Confira cada item que a tarefa toca.
 8. **Regra crítica vira restrição de banco** (índice único, atualização condicional), não só validação em Ruby.
 9. **Configuração versionada:** filas e conjuntos de regras ganham versão nova a cada mudança. Versões antigas nunca são editadas.
 10. **Contratos** validados por JSON Schema versionado na entrada e na saída. Inválido vai para a DLQ, sem retentativa.
-11. **A IA só faz o que o contrato permite:** `reply`, `escalate`, `resolve` e `tool_calls`. Nada que movimente dinheiro ou altere cadastro (RN-35).
+11. **A IA só faz o que o contrato permite:** as ações `reply`, `escalate` e `resolve`, com as consultas registradas em `tool_calls` (07, seção 5.3). Nada que movimente dinheiro ou altere cadastro (RN-35).
 12. **O agente nunca acessa o Postgres direto:** recebe o contexto no evento e, se precisar de mais, usa a API com escopo por marca.
 13. **Logs em JSON**, com `trace_id` e dados pessoais mascarados (RN-51). Só dados sintéticos.
 
@@ -70,13 +108,28 @@ Não negociáveis. Confira cada item que a tarefa toca.
 
 ## Comandos
 
-A preencher no bloco 01 do roadmap, quando o esqueleto existir:
+Com Docker (na raiz do repositório):
 
 ```bash
-make up        # sobe o ambiente
-make seed      # dados sintéticos
+make up        # cria o .env a partir do .env.example, sobe postgres, redis e web, e prepara o banco
+make seed      # dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
+make check     # rspec + rubocop + brakeman da plataforma
+make help      # lista todos os alvos
+```
+
+Sem Docker, com Postgres e Redis locais (`DATABASE_URL` sem o nome do banco):
+
+```bash
+cd src/platform
+bin/rails db:prepare db:seed
+bin/rails server               # http://localhost:3000
 bundle exec rspec
 bundle exec rubocop
-bundle exec brakeman -q
-make bench     # experimentos
+bundle exec brakeman -q --no-pager
+
+cd src/contracts
+bundle exec rspec
+bundle exec rubocop
 ```
+
+`make bench` (experimentos) entra no bloco 19.

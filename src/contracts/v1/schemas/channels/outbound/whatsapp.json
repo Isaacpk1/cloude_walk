@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/outbound/whatsapp.json",
+  "title": "Envio de texto pela Cloud API do WhatsApp: POST /:phone_number_id/messages",
+  "description": "Corpo que o adaptador de saída envia (07, seção 5.0; ADR-018). Texto de até 4.096 caracteres. A janela de 24 h depende do estado do atendimento e fica no adaptador, não no esquema.",
+  "type": "object",
+  "required": [
+    "messaging_product",
+    "to",
+    "type",
+    "text"
+  ],
+  "properties": {
+    "messaging_product": {
+      "const": "whatsapp"
+    },
+    "recipient_type": {
+      "const": "individual"
+    },
+    "to": {
+      "description": "wa_id do cliente. A Cloud API aceita com ou sem o +.",
+      "type": "string",
+      "pattern": "^\\+?[1-9][0-9]{7,14}$"
+    },
+    "type": {
+      "const": "text"
+    },
+    "text": {
+      "type": "object",
+      "required": [
+        "body"
+      ],
+      "properties": {
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      }
+    }
+  }
+}

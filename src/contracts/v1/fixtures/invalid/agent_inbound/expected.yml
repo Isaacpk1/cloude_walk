@@ -1,0 +1,12 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+event_id_nao_uuid.json: { pointer: "/event_id", type: format }
+event_type_desconhecido.json: { pointer: "/event_type", type: enum }
+message_created_sem_message.json: { pointer: "/message", type: required }
+schema_de_outro_contrato.json: { pointer: "/schema", type: schema_de_outro_contrato }
+sem_assignment_version.json: { pointer: "/assignment_version", type: required }
+sem_brand.json: { pointer: "/brand", type: required }
+sem_context_until_seq.json: { pointer: "/context_until_seq", type: required }
+sem_turn.json: { pointer: "/turn", type: required }
+summary_sem_covers_until_seq.json: { pointer: "/context/summary/covers_until_seq", type: required }
+turn_como_texto.json: { pointer: "/turn", type: integer }
+versao_desconhecida.json: { pointer: "/schema", type: schema_desconhecido }

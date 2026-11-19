@@ -1,0 +1,4 @@
+<% content_for :title, "Linha do tempo" %>
+<h1>Linha do tempo</h1>
+<p class="muted">Escolha uma conversa para ver as etapas do fluxo, com duração calculada a partir dos tempos registrados.</p>
+<%= render "conversations/list", conversations: @conversations, link_for: ->(c) { timeline_path(c.id) } %>

@@ -4,6 +4,16 @@ Plano de quatro semanas para um projeto individual. Os 20 blocos indicam a ordem
 
 Referências do projeto: [escopo](docs/02-escopo.md), [requisitos funcionais](docs/04-requisitos-funcionais.md), [requisitos não funcionais e experimentos](docs/05-requisitos-nao-funcionais.md) e [arquitetura](docs/07-arquitetura.md).
 
+## Onde estamos
+
+| Bloco | Situação | Observação |
+| --- | --- | --- |
+| 01. Ambiente e dados iniciais | **Feito, falta validar o Compose** | Código e testes prontos (branch `feat/01-ambiente-seed`). O "pronto quando" foi comprovado sem Docker; falta rodar `make up` numa máquina com Docker (RNF-29) |
+| 03. Publicação no broker e Kafka | Adiantado em parte | Os esquemas JSON dos eventos (`src/contracts/v1`) já existem, com testes. O resto do bloco segue a ordem |
+| 02 em diante | A fazer | Próximo: **02. Entrada e gravação de uma mensagem** |
+
+Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](docs/08-decisoes-de-arquitetura.md#adr-017--monorepo-com-o-código-em-src), [docs/10](docs/10-organizacao-do-repositorio.md)), canais no formato real dos provedores ([ADR-018](docs/08-decisoes-de-arquitetura.md#adr-018--canais-simulados-no-formato-dos-provedores-reais)) e o conteúdo das ações do agente (07, seção 5.3).
+
 ## Como desenvolver o backend e o painel juntos
 
 - **Começar pela tela de conversa.** Enquanto a integração é construída, usar exemplos sintéticos que representem mensagem recebida, turno em andamento, resposta aplicada e escalação. Marcar a origem dos dados na tela e ligar cada evento à fonte real assim que ela ficar disponível no ambiente local.
@@ -21,9 +31,10 @@ Referências do projeto: [escopo](docs/02-escopo.md), [requisitos funcionais](do
 
 ### 01. Ambiente e dados iniciais
 
-- [ ] **Backend:** confirmar que o engine do Docker está disponível, criar o scaffold Rails e subir o mínimo de serviços pelo Compose. Criar migrações iniciais e um seed reprodutível com uma marca, fila, cliente sintético e usuário do tipo bot.
-- [ ] **Frontend:** criar a navegação inicial no Rails e as telas de conversa e linha do tempo com dados sintéticos identificados.
+- [x] **Backend:** confirmar que o engine do Docker está disponível, criar o scaffold Rails e subir o mínimo de serviços pelo Compose. Criar migrações iniciais e um seed reprodutível com uma marca, fila, cliente sintético e usuário do tipo bot.
+- [x] **Frontend:** criar a navegação inicial no Rails e as telas de conversa e linha do tempo com dados sintéticos identificados.
 - **Pronto quando:** o ambiente sobe e a conversa de exemplo abre no navegador após carregar o seed. **Referências** RF-22, RF-23, RF-58, RF-61, RNF-29.
+- **Situação:** comprovado com Postgres e Redis locais. Pendente: `make up` com Docker, que o ambiente de desenvolvimento não conseguiu baixar.
 
 ### 02. Entrada e gravação de uma mensagem
 
@@ -33,7 +44,7 @@ Referências do projeto: [escopo](docs/02-escopo.md), [requisitos funcionais](do
 
 ### 03. Publicação no broker e Kafka
 
-- [ ] **Backend:** definir os esquemas JSON dos eventos, publicar o outbox com assinatura HMAC, validar no broker e confirmar a publicação no Kafka. Propagar o rastreio e usar a conversa como chave da partição.
+- [ ] **Backend:** ~~definir os esquemas JSON dos eventos~~ (feito no bloco 01, `src/contracts/v1`), publicar o outbox com assinatura HMAC, validar no broker e confirmar a publicação no Kafka. Propagar o rastreio e usar a conversa como chave da partição.
 - [ ] **Frontend:** acrescentar a etapa de publicação e mostrar a origem de um erro ao escolher o evento na linha do tempo.
 - **Pronto quando:** a mensagem do simulador gera um evento válido no tópico de entrada, visível pela sua correlação. Um webhook mal assinado é rejeitado. **Referências** RF-29, RF-30, RF-33, RF-56, RNF-23, RNF-28.
 

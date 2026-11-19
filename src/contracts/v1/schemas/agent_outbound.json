@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/agent_outbound.json",
+  "title": "Ação do agente em helpdesk.agent.outbound.v1 (helpdesk.agent_action.v1)",
+  "description": "Ação final do agente para um turno (07, seção 5.3). Só existem reply, escalate e resolve (RN-35, invariante 11): ações que movimentam dinheiro ou alteram cadastro não cabem no contrato. Consultas vão em tool_calls. Cada ação leva o seu conteúdo: reply.text, escalation ou resolution.reason.",
+  "type": "object",
+  "required": [
+    "schema",
+    "event_id",
+    "in_reply_to",
+    "conversation_id",
+    "brand",
+    "turn",
+    "context_until_seq",
+    "assignment_version",
+    "action",
+    "agent"
+  ],
+  "properties": {
+    "schema": {
+      "const": "helpdesk.agent_action.v1"
+    },
+    "event_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "in_reply_to": {
+      "$ref": "#/$defs/uuid",
+      "description": "event_id do turno respondido (RN-56)."
+    },
+    "conversation_id": {
+      "$ref": "#/$defs/conversation_id"
+    },
+    "brand": {
+      "$ref": "#/$defs/brand",
+      "description": "Marca do atendimento. O consumer compara com a marca do atendimento achado pelo conversation_id; se divergir, vai para a DLQ sem efeito (07, seção 5.3; ADR-014)."
+    },
+    "turn": {
+      "$ref": "#/$defs/turn"
+    },
+    "context_until_seq": {
+      "$ref": "#/$defs/seq"
+    },
+    "assignment_version": {
+      "$ref": "#/$defs/assignment_version"
+    },
+    "action": {
+      "description": "Catálogo fechado (RN-35). resolve só com confirmação do cliente (RN-36).",
+      "enum": [
+        "reply",
+        "escalate",
+        "resolve"
+      ]
+    },
+    "reply": {
+      "description": "Conteúdo de action=reply: a mensagem ao cliente (07, seção 5.3; RF-48).",
+      "type": "object",
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "resolution": {
+      "description": "Conteúdo de action=resolve: motivo do encerramento e, opcional, a mensagem de encerramento (07, seção 5.3; RF-48).",
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "tool_calls": {
+      "description": "Consultas feitas pela IA, auditadas (RF-54).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "tool",
+          "args"
+        ],
+        "properties": {
+          "tool": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "args": {
+            "type": "object"
+          },
+          "result": {
+            "type": "object"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "required": [
+        "reason",
+        "summary"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "description": "Os cinco campos obrigatórios do resumo do handoff (RN-39).",
+          "type": "object",
+          "required": [
+            "problema",
+            "dados_cliente",
+            "acoes_tomadas",
+            "motivo",
+            "pendente"
+          ],
+          "properties": {
+            "problema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dados_cliente": {
+              "type": "string",
+              "minLength": 1
+            },
+            "acoes_tomadas": {
+              "type": "string",
+              "minLength": 1
+            },
+            "motivo": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pendente": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "classification": {
+      "description": "Refino de categoria e prioridade (RF-12, RN-14).",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        }
+      }
+    },
+    "agent": {
+      "description": "Modelo, versão e configuração em toda resposta (RF-38, RN-37).",
+      "type": "object",
+      "required": [
+        "model",
+        "version",
+        "config_hash"
+      ],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_hash": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "timing": {
+      "description": "agent_ms é descontado do overhead da plataforma (RNF-03).",
+      "type": "object",
+      "required": [
+        "agent_ms"
+      ],
+      "properties": {
+        "received_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "responded_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "agent_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "reply"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "required": [
+          "reply"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "escalate"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "required": [
+          "escalation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "resolve"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "then": {
+        "required": [
+          "resolution"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "brand": {
+      "description": "Slug da marca (brands.slug), ex.: infinitepay, jim. Isolamento por marca (invariante 6).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "maxLength": 64
+    },
+    "seq": {
+      "description": "Posição da mensagem no atendimento (messages.seq).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "conversation_id": {
+      "description": "Identificador do atendimento exposto ao agente. Chave da partição no Kafka (RNF-13).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "text": {
+      "description": "Texto para o cliente: não vazio e não só espaços.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "priority": {
+      "description": "RN-12. Valores ASCII, sem acento.",
+      "type": "string",
+      "enum": [
+        "baixa",
+        "media",
+        "alta",
+        "critica"
+      ]
+    },
+    "turn": {
+      "description": "Número do turno (07, seção 3.4).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "assignment_version": {
+      "description": "Versão da atribuição do atendimento (07, seção 3.4).",
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

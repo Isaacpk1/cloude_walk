@@ -1,0 +1,36 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "102290129340398",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "551130000001",
+              "phone_number_id": "106540352242922"
+            },
+            "contacts": [
+              {
+                "wa_id": "5511900000021"
+              }
+            ],
+            "messages": [
+              {
+                "from": "5511900000021",
+                "id": "wamid.HBgNNTUxMTkwMDAwMDAyMRUCABIYFjNFQjBDNkI1",
+                "timestamp": "1763386800",
+                "type": "text",
+                "text": {
+                  "body": "Meu repasse de ontem não caiu"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

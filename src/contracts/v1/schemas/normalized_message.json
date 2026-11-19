@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/normalized_message.json",
+  "title": "Mensagem normalizada (helpdesk.normalized_message.v1)",
+  "description": "Envelope interno que os adaptadores de canal produzem (07, seção 5.1; RF-05). brand e provider_account vêm da configuração da conta que recebeu o webhook e delimitam a deduplicação.",
+  "type": "object",
+  "required": [
+    "schema",
+    "channel",
+    "brand",
+    "provider_account",
+    "external_id",
+    "sender",
+    "content",
+    "received_at",
+    "trace_id"
+  ],
+  "properties": {
+    "schema": {
+      "const": "helpdesk.normalized_message.v1"
+    },
+    "channel": {
+      "$ref": "#/$defs/channel"
+    },
+    "brand": {
+      "$ref": "#/$defs/brand"
+    },
+    "provider_account": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "external_id": {
+      "description": "ID da mensagem no provedor. Deduplicação por (brand_id, provider_account, channel, external_id).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "sender": {
+      "type": "object",
+      "required": [
+        "channel_identity"
+      ],
+      "properties": {
+        "channel_identity": {
+          "description": "Telefone, e-mail ou conta do app (RF-07).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "required": [
+        "type",
+        "text"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "text"
+          ]
+        },
+        "text": {
+          "$ref": "#/$defs/text"
+        },
+        "subject": {
+          "description": "Assunto do e-mail (RF-03). Opcional; pode ser vazio.",
+          "type": "string"
+        },
+        "attachments": {
+          "description": "Anexos do e-mail só como metadados, sem o arquivo (RF-03; 07, seção 5.1).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "filename",
+              "content_type",
+              "size_bytes"
+            ],
+            "properties": {
+              "filename": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "size_bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "received_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "trace_id": {
+      "description": "trace-id do W3C Trace Context (RNF-20).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    }
+  },
+  "$defs": {
+    "channel": {
+      "type": "string",
+      "enum": [
+        "chat",
+        "whatsapp",
+        "email"
+      ]
+    },
+    "brand": {
+      "description": "Slug da marca (brands.slug), ex.: infinitepay, jim. Isolamento por marca (invariante 6).",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "maxLength": 64
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

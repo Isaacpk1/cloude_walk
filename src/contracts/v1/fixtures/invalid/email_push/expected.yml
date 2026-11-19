@@ -1,0 +1,6 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+data_fora_do_base64.json: { pointer: "/message/data", type: pattern }
+data_nao_e_json.json: { pointer: "/message/data", type: conteudo_invalido }
+data_sem_history_id.json: { pointer: "/message/data/historyId", type: required }
+sem_message_id.json: { pointer: "/message/messageId", type: required }
+sem_subscription.json: { pointer: "/subscription", type: required }

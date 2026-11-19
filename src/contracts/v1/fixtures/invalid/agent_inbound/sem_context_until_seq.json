@@ -1,0 +1,57 @@
+{
+  "schema": "helpdesk.agent_event.v1",
+  "event_id": "0b7e4c1e-6a0e-4f0e-9a51-7c1d2f1e9a10",
+  "event_type": "message.created",
+  "occurred_at": "2026-11-17T13:40:01.620Z",
+  "conversation_id": "tkt_01JD3K8ZQ4V6",
+  "brand": "infinitepay",
+  "locale": "pt-BR",
+  "ticket": {
+    "state": "com_ia",
+    "channel": "whatsapp",
+    "category": "repasses",
+    "priority": "alta",
+    "queue": "repasses-ip",
+    "ai_turns": 2
+  },
+  "customer": {
+    "id": "cus_8F2A",
+    "verified": true,
+    "display_name": "Loja Exemplo"
+  },
+  "message": {
+    "id": "msg_3",
+    "seq": 5,
+    "text": "Meu repasse de ontem não caiu"
+  },
+  "context": {
+    "pending_messages": [
+      {
+        "seq": 5,
+        "text": "Meu repasse de ontem não caiu"
+      }
+    ],
+    "history": [
+      {
+        "seq": 4,
+        "author": "bot",
+        "text": "Posso ajudar com mais alguma coisa?"
+      }
+    ],
+    "summary": {
+      "text": "Cliente relatou repasse pendente de R$ 1.200 do dia 16.",
+      "covers_until_seq": 3
+    },
+    "previous_tickets": [
+      {
+        "id": "tkt_01JC0000",
+        "resolved_at": "2026-11-10",
+        "summary": "Dúvida sobre taxa resolvida pela IA."
+      }
+    ],
+    "prior_tool_results": []
+  },
+  "turn": 2,
+  "assignment_version": 1,
+  "deadline_at": "2026-11-17T13:40:30.120Z"
+}

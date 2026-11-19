@@ -1,0 +1,16 @@
+{
+  "schema": "helpdesk.normalized_message.v1",
+  "channel": "email",
+  "brand": "jim",
+  "provider_account": "jim-email-mock",
+  "external_id": "<a1b2c3@mail.jim.example>",
+  "sender": {
+    "channel_identity": "loja.exemplo@example.com"
+  },
+  "content": {
+    "type": "text",
+    "text": "My settlement did not arrive"
+  },
+  "received_at": "2026-11-17T13:40:00.120Z",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+}

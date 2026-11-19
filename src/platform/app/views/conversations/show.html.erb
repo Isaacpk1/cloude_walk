@@ -1,0 +1,96 @@
+<% c = @conversation %>
+<% content_for :title, "Conversa #{c.ticket_id}" %>
+
+<div class="page-header">
+  <div>
+    <h1>Conversa <span class="muted"><%= c.ticket_id %></span></h1>
+    <p class="page-header__subtitle"><%= c.title %> · <%= c.customer_name %> · <%= c.brand_name %> · <%= c.channel %> · estado <code><%= c.state %></code></p>
+  </div>
+  <div class="page-header__actions">
+    <%= source_badge(c.source) %>
+    <%= link_to "Ver linha do tempo", timeline_path(c.id), class: "button" %>
+  </div>
+</div>
+
+<div class="conversation">
+  <section class="conversation__messages" aria-label="Mensagens">
+    <h2>Mensagens <span class="muted">(ordem do seq)</span></h2>
+    <ol class="messages">
+      <% c.messages.each do |message| %>
+        <li class="message message--<%= message.author_type %>" id="seq-<%= message.seq %>">
+          <div class="message__header">
+            <span class="seq">seq <%= message.seq %></span>
+            <%= author_badge(message) %>
+            <strong><%= message.author_name %></strong>
+            <time class="muted" datetime="<%= message.occurred_at.iso8601(3) %>"><%= panel_time(message.occurred_at) %></time>
+          </div>
+          <p class="message__body"><%= message.body %></p>
+          <div class="message__footer">
+            <%= delivery_badge(message) %>
+            <% c.turns_covering(message.seq).each do |turn| %>
+              <span class="chip chip--<%= turn.status %>">Turno <%= turn.number %></span>
+            <% end %>
+            <% if message.delivery_id %><code class="muted"><%= message.delivery_id %></code><% end %>
+            <code class="muted" title="trace_id"><%= message.trace_id.first(8) %></code>
+            <%= source_badge(c.source) %>
+          </div>
+        </li>
+      <% end %>
+    </ol>
+  </section>
+
+  <aside class="conversation__side">
+    <section class="card">
+      <h2>Responsável atual</h2>
+      <p><strong><%= c.assignee.name %></strong> <span class="badge badge--assignee-<%= c.assignee.kind %>"><%= c.assignee.kind_label %></span></p>
+      <p class="muted">assignment_version <%= c.assignment_version %> · latest_customer_seq <%= c.latest_customer_seq %></p>
+    </section>
+
+    <section class="card">
+      <h2>Histórico de escalação</h2>
+      <% if c.escalations.empty? %>
+        <p class="muted">Nenhuma escalação. O caso segue com <%= c.assignee.name %>.</p>
+      <% else %>
+        <ol class="escalations">
+          <% c.escalations.each do |escalation| %>
+            <li>
+              <strong><%= escalation.from %></strong> → <strong><%= escalation.to %></strong>
+              <div class="muted"><%= escalation.trigger %> · <%= panel_time(escalation.occurred_at) %> · versão <%= escalation.assignment_version %></div>
+              <div><%= escalation.reason %></div>
+            </li>
+          <% end %>
+        </ol>
+      <% end %>
+    </section>
+
+    <section class="card">
+      <h2>Turnos da IA</h2>
+      <% if c.turns.empty? %>
+        <p class="muted">Nenhum turno enviado ao agente.</p>
+      <% end %>
+      <ol class="turns">
+        <% c.turns.each do |turn| %>
+          <li class="turn turn--<%= turn.status %>">
+            <div class="turn__header">
+              <strong>Turno <%= turn.number %></strong>
+              <%= turn_status_badge(turn) %>
+              <span><%= covered_seqs_text(turn) %></span>
+            </div>
+            <ul class="turn__messages">
+              <% c.messages_in(turn).each do |message| %>
+                <li><a href="#seq-<%= message.seq %>">seq <%= message.seq %></a>: <%= message.body %></li>
+              <% end %>
+            </ul>
+            <dl class="turn__facts">
+              <dt>context_until_seq</dt><dd><%= turn.context_until_seq %><%= " (não cobre a última mensagem)" unless c.covers_latest_customer_seq?(turn) %></dd>
+              <dt>ação</dt><dd><code><%= turn.action %></code></dd>
+              <% if turn.tool_calls.any? %><dt>tools</dt><dd><%= turn.tool_calls.join(", ") %></dd><% end %>
+              <dt>event_id</dt><dd><code><%= turn.event_id.first(8) %></code></dd>
+            </dl>
+            <% if turn.note %><p class="muted"><%= turn.note %></p><% end %>
+          </li>
+        <% end %>
+      </ol>
+    </section>
+  </aside>
+</div>

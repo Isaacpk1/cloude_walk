@@ -1,0 +1,16 @@
+{
+  "schema": "helpdesk.normalized_message.v1",
+  "channel": "whatsapp",
+  "brand": "infinitepay",
+  "provider_account": "infinitepay-whatsapp-mock",
+  "external_id": "wamid.HBgMNTUxMTkwMDAwMDAyMRUCABIYFjNFQjA",
+  "sender": {
+    "channel_identity": "+5511900000021"
+  },
+  "content": {
+    "type": "text",
+    "text": "Meu repasse de ontem não caiu"
+  },
+  "received_at": "ontem",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+}

@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/channels/whatsapp.json",
+  "title": "Webhook de entrada do WhatsApp (Cloud API da Meta, RF-02)",
+  "description": "Subconjunto fiel do webhook da Cloud API (07, seção 5.0; ADR-018). Só os campos usados pelo adaptador. Cada value traz mensagens recebidas (messages) ou status de entrega (statuses). Marca e conta vêm da URL e da configuração da conta, não do corpo; metadata.phone_number_id confere a conta.",
+  "type": "object",
+  "required": [
+    "object",
+    "entry"
+  ],
+  "properties": {
+    "object": {
+      "const": "whatsapp_business_account"
+    },
+    "entry": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "changes"
+        ],
+        "properties": {
+          "id": {
+            "description": "ID da conta WhatsApp Business (WABA).",
+            "$ref": "#/$defs/id"
+          },
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/change"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "wa_id": {
+      "description": "Telefone no formato do WhatsApp: E.164 só com dígitos, sem o +.",
+      "type": "string",
+      "pattern": "^[1-9][0-9]{7,14}$"
+    },
+    "epoch": {
+      "description": "Epoch em segundos, em texto.",
+      "type": "string",
+      "pattern": "^[0-9]{10}$"
+    },
+    "change": {
+      "type": "object",
+      "required": [
+        "field",
+        "value"
+      ],
+      "properties": {
+        "field": {
+          "const": "messages"
+        },
+        "value": {
+          "type": "object",
+          "required": [
+            "messaging_product",
+            "metadata"
+          ],
+          "properties": {
+            "messaging_product": {
+              "const": "whatsapp"
+            },
+            "metadata": {
+              "type": "object",
+              "required": [
+                "display_phone_number",
+                "phone_number_id"
+              ],
+              "properties": {
+                "display_phone_number": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "phone_number_id": {
+                  "description": "Identifica a conta do provedor que recebeu a mensagem.",
+                  "$ref": "#/$defs/id"
+                }
+              }
+            },
+            "contacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "wa_id"
+                ],
+                "properties": {
+                  "wa_id": {
+                    "$ref": "#/$defs/wa_id"
+                  },
+                  "profile": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "messages": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/message"
+              }
+            },
+            "statuses": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/status"
+              }
+            }
+          },
+          "oneOf": [
+            {
+              "required": [
+                "messages"
+              ]
+            },
+            {
+              "required": [
+                "statuses"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "message": {
+      "description": "Mensagem recebida. type é livre (text, image, reaction, interactive...): o adaptador decide o que fazer com cada tipo. Só type=text exige text.body.",
+      "type": "object",
+      "required": [
+        "from",
+        "id",
+        "timestamp",
+        "type"
+      ],
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/wa_id"
+        },
+        "id": {
+          "description": "wamid: vira external_id na mensagem normalizada.",
+          "$ref": "#/$defs/id"
+        },
+        "timestamp": {
+          "$ref": "#/$defs/epoch"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "object",
+          "required": [
+            "body"
+          ],
+          "properties": {
+            "body": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "text"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "text"
+            ]
+          }
+        }
+      ]
+    },
+    "status": {
+      "description": "Status de entrega, normalizado em deliveries.status pela provider_message_id (07, seção 5.0).",
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "timestamp",
+        "recipient_id"
+      ],
+      "properties": {
+        "id": {
+          "description": "wamid da mensagem enviada (provider_message_id).",
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "enum": [
+            "sent",
+            "delivered",
+            "read",
+            "failed"
+          ]
+        },
+        "timestamp": {
+          "$ref": "#/$defs/epoch"
+        },
+        "recipient_id": {
+          "$ref": "#/$defs/wa_id"
+        }
+      }
+    }
+  }
+}

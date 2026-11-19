@@ -1,0 +1,8 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+anexo_sem_filename.json: { pointer: "/content/attachments/0/filename", type: required }
+canal_desconhecido.json: { pointer: "/channel", type: enum }
+received_at_sem_formato.json: { pointer: "/received_at", type: format }
+sem_brand.json: { pointer: "/brand", type: required }
+sem_external_id.json: { pointer: "/external_id", type: required }
+trace_id_com_quebra_de_linha.json: { pointer: "/trace_id", type: pattern }
+versao_desconhecida.json: { pointer: "/schema", type: schema_desconhecido }
