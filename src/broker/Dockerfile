@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Broker de webhooks: plataforma → Kafka (ADR-007; docs/10, seção 3.2). Contexto de build: src/.
-ARG RUBY_VERSION=3.3.6
+# Mantenha igual ao .ruby-version (docs/10, seção 4).
+ARG RUBY_VERSION=4.0.10
 FROM docker.io/library/ruby:$RUBY_VERSION-slim
 
 WORKDIR /app
