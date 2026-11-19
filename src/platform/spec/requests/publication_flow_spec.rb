@@ -1,7 +1,8 @@
 require "rails_helper"
 
 # ROADMAP 03, "pronto quando": a mensagem do simulador gera um evento válido no tópico de entrada,
-# visível pela correlação. Aqui o broker é o stub de spec/support/broker.rb, que confere assinatura e
+# visível pela correlação. O turno abre pela ação "turn.dispatch" do scheduler no fim da janela
+# (RN-55, ADR-016); aqui o helper due_dispatch faz o papel do scheduler. Aqui o broker é o stub de spec/support/broker.rb, que confere assinatura e
 # contrato como o broker real; a publicação no Kafka é testada em src/broker.
 RSpec.describe "RF-29, RF-30, RF-56: do webhook do canal ao webhook assinado para o broker" do
   include ActiveJob::TestHelper
@@ -19,10 +20,17 @@ RSpec.describe "RF-29, RF-30, RF-56: do webhook do canal ao webhook assinado par
     }
   end
 
-  it "a mensagem vira um evento assinado, no contrato, com a conversa como chave e o mesmo trace_id" do
+  # O fim da janela vira a ação do scheduler, processada pelo worker (OutboxJob) como em produção.
+  def window_ends
+    perform_enqueued_jobs { OutboxJob.perform_later(due_dispatch(Ticket.sole).id) }
+  end
+
+  it "RN-55: a mensagem não abre turno sozinha; no fim da janela vira um evento assinado, no contrato e com o mesmo trace_id" do
     stub_broker
 
     perform_enqueued_jobs { post_chat("meu repasse não caiu") }
+    expect(broker_requests).to be_empty
+    window_ends
 
     expect(response).to have_http_status(:accepted)
     request = broker_requests.sole
@@ -43,6 +51,7 @@ RSpec.describe "RF-29, RF-30, RF-56: do webhook do canal ao webhook assinado par
       post_chat("oi", message_id: "chat_msg_1")
       post_chat("oi", message_id: "chat_msg_1")
     end
+    window_ends
 
     expect(response).to have_http_status(:ok)
     expect(broker_requests.size).to eq(1)

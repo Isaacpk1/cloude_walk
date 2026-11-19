@@ -57,7 +57,7 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
 
     def open_and_publish(*responses)
       received = ingest("meu repasse não caiu", trace_id:)
-      event_id = Turns::Open.call(received_item(received).id).turn.event_id
+      event_id = open_turn_for(received).event_id
       stub_broker(*responses)
       responses.size.times do
         Outbox::Publish.call(event_id, jitter: -> { 0.0 })

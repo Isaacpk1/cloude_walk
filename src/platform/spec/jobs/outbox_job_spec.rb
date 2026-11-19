@@ -8,20 +8,44 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
 
   around { |example| travel_to(start) { example.run } }
 
-  it "aviso da ingestão: abre o turno e enfileira a publicação do evento" do
+  it "RN-55, ADR-016: ação turn.dispatch do scheduler abre o turno e enfileira a publicação do evento" do
+    item = due_dispatch(ingest)
+    clear_enqueued_jobs
+
+    described_class.perform_now(item.id)
+
+    turn = AiTurn.sole
+    expect(item.reload.completed_at).to eq(start)
+    expect(described_class).to have_been_enqueued.with(turn.event_id).on_queue("critical")
+  end
+
+  it "ação turn.dispatch descartada não enfileira publicação" do
+    received = ingest
+    item = due_dispatch(received)
+    received.ticket.update_columns(assignment_version: 1)
+    clear_enqueued_jobs
+
+    described_class.perform_now(item.id)
+
+    expect(AiTurn.count).to eq(0)
+    expect(enqueued_jobs).to be_empty
+  end
+
+  it "RN-55: o aviso message.received é encerrado sem abrir turno (a triagem entra no bloco 11)" do
     received = ingest
     clear_enqueued_jobs
 
     described_class.perform_now(received_item(received).id)
 
-    turn = AiTurn.sole
-    expect(described_class).to have_been_enqueued.with(turn.event_id).on_queue("critical")
+    expect(AiTurn.count).to eq(0)
+    expect(OutboxEvent.where(event_type: "agent.event")).to be_empty
+    expect(received_item(received).completed_at).to eq(start)
+    expect(enqueued_jobs).to be_empty
   end
 
   it "evento do agente: publica no broker" do
     stub_broker
-    received = ingest
-    described_class.perform_now(received_item(received).id)
+    described_class.perform_now(due_dispatch(ingest).id)
 
     described_class.perform_now(AiTurn.sole.event_id)
 
@@ -30,8 +54,7 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
 
   it "falha transitória: agenda o despertador para o next_attempt_at gravado no Postgres" do
     stub_broker({ status: 503 })
-    received = ingest
-    described_class.perform_now(received_item(received).id)
+    described_class.perform_now(due_dispatch(ingest).id)
     clear_enqueued_jobs
 
     described_class.perform_now(AiTurn.sole.event_id)
@@ -42,9 +65,8 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
     expect(Time.zone.at(job[:at])).to be_within(0.001).of(item.next_attempt_at)
   end
 
-  it "repetição: item encerrado não faz nada" do
-    received = ingest
-    item = received_item(received)
+  it "repetição: ação encerrada não faz nada" do
+    item = due_dispatch(ingest)
     item.update!(completed_at: start)
 
     described_class.perform_now(item.id)

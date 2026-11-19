@@ -10,7 +10,7 @@ RSpec.describe Outbox::Publish, "RF-30, RNF-23: publicação do evento do outbox
 
   def open_event(text = "meu repasse não caiu", **)
     received = ingest(text, trace_id:, **)
-    OutboxEvent.find(Turns::Open.call(received_item(received).id).turn.event_id)
+    OutboxEvent.find(open_turn_for(received).event_id)
   end
 
   def publish(item) = described_class.call(item.id, jitter:)

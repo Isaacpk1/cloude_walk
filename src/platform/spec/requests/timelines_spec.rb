@@ -49,7 +49,7 @@ RSpec.describe "RF-56 / ROADMAP 01: linha do tempo" do
 
     def failed_ticket
       received = ingest("meu repasse não caiu")
-      event_id = Turns::Open.call(received_item(received).id).turn.event_id
+      event_id = open_turn_for(received).event_id
       stub_request(:post, BrokerHelpers::BROKER_URL).to_raise(Errno::ECONNREFUSED)
       Outbox::Publish.call(event_id)
       received.ticket

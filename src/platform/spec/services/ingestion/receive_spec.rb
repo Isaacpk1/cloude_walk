@@ -174,7 +174,7 @@ RSpec.describe Ingestion::Receive do
   describe "RN-56, invariante 4: a mensagem nova invalida na hora o turno que não a cobre" do
     it "marca superseded, no commit da ingestão, o turno elegível com contexto anterior e audita" do
       first = ingest(normalized(text: "meu repasse não caiu"))
-      turn = Turns::Open.call(OutboxEvent.find_by!(event_type: "message.received").id).turn
+      turn = open_turn_for(first)
 
       second = ingest(normalized(text: "é o de ontem"))
 
@@ -188,7 +188,7 @@ RSpec.describe Ingestion::Receive do
     it "duplicata não invalida nada (repetição)" do
       message = normalized
       ingest(message)
-      turn = Turns::Open.call(OutboxEvent.sole.id).turn
+      turn = open_turn_for(Ticket.sole)
 
       ingest(message)
 
@@ -197,7 +197,7 @@ RSpec.describe Ingestion::Receive do
 
     it "não toca turnos de outro atendimento (marca errada)" do
       ingest(normalized(brand: "jim", identity: "acc_jim_1"))
-      jim_turn = Turns::Open.call(OutboxEvent.sole.id).turn
+      jim_turn = open_turn_for(Ticket.sole)
 
       ingest(normalized(identity: "acc_ip_1"))
 
