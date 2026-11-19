@@ -25,7 +25,7 @@ jobs:
       RAILS_ENV: test
       DATABASE_URL: postgres://helpdesk:helpdesk@localhost:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           working-directory: src/platform
@@ -43,10 +43,9 @@ jobs:
       run:
         working-directory: src/contracts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: "3.3.6"
           working-directory: src/contracts
           bundler-cache: true
       - run: bundle exec rspec

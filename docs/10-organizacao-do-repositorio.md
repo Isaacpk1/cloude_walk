@@ -224,7 +224,7 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | `Makefile` | Os comandos do dia a dia: `up`, `down`, `logs`, `seed`, `reset`, `test`, `lint`, `security`, `check` e `help`. `e2e` entra no bloco 05 e `bench` no bloco 19 |
 | `.env.example` | Todas as variáveis, com valores de desenvolvimento. O `.env` real não vai para o git |
 | `scripts/` | Utilitários de shell que não pertencem a um serviço (ex.: conferir o ambiente). O seed fica no Rails, porque usa os models |
-| `.github/workflows/ci.yml` | CI: um job por serviço (`platform`, `contracts`), em paralelo. Cada serviço novo ganha o próprio job |
+| `.github/workflows/ci.yml` | CI: um job por serviço (`platform`, `contracts`), em paralelo. Cada serviço novo ganha o próprio job, e o `ruby/setup-ruby` lê a versão do `.ruby-version` do serviço (nunca fixa a versão no YAML) |
 
 ## 4. Onde fica?
 
@@ -235,6 +235,7 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Índice único que carrega regra de negócio | Na mesma migration da tabela. A lista de restrições obrigatórias está no 07, seção 4 |
 | Permissões do banco (auditoria só de inserção) | `infra/postgres/init.sql` para os papéis e uma migration para o `REVOKE` |
 | Dados iniciais (marca, fila, cliente, bot) | `src/platform/db/seeds/synthetic.rb`, chamado por `db/seeds.rb`. Rode com `make seed`; a semente vem de `SEED` no `.env` |
+| Versão do Ruby | No `.ruby-version` de cada serviço em `src/` (hoje Ruby 4.0.10, ADR-001). O CI e o `Makefile` leem esse arquivo; o `ARG RUBY_VERSION` do `Dockerfile` e o `TargetRubyVersion` de `src/contracts/.rubocop.yml` repetem o mesmo valor. Ao trocar de versão, mude todos juntos e confira se o `ruby/setup-ruby` já publica a versão para o `ubuntu-latest` |
 | Conexão com o Redis | `src/platform/config/initializers/redis.rb`, com a URL em `REDIS_URL` |
 | Filas e pesos do Sidekiq | `src/platform/config/sidekiq.yml` |
 | ActionCable no Redis | `src/platform/config/cable.yml` |

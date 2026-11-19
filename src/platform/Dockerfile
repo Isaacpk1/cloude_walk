@@ -3,7 +3,8 @@
 # Pensada para rodar localmente com `make up` (RNF-29), em RAILS_ENV=development.
 # Contexto de build: src/ (docker-compose.yml), para a gem local de contratos ficar em /contracts,
 # o mesmo caminho relativo do Gemfile (gem "helpdesk_contracts", path: "../contracts").
-ARG RUBY_VERSION=3.3.6
+# Mantenha igual ao .ruby-version (docs/10, seção 4).
+ARG RUBY_VERSION=4.0.10
 FROM docker.io/library/ruby:$RUBY_VERSION-slim
 
 WORKDIR /rails
