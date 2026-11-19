@@ -26,6 +26,7 @@ Formato: ADR curto (contexto → decisão → alternativas → consequências). 
 | Prazos e cronômetros | Gravados no Postgres e executados a partir de ações duráveis no outbox | [ADR-016](#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox) |
 | Organização do repositório | Monorepo com o código em `src/`, um diretório por fronteira de rede | [ADR-017](#adr-017--monorepo-com-o-código-em-src) |
 | Formato dos canais simulados | Subconjunto fiel da Cloud API do WhatsApp e da API do Gmail, com adaptador de entrada e de saída por canal | [ADR-018](#adr-018--canais-simulados-no-formato-dos-provedores-reais) |
+| Contas e autenticação dos webhooks de entrada | Conta do provedor na URL e cadastrada na tabela `provider_accounts`, com segredo criptografado. Cada canal confere a assinatura do seu provedor | [ADR-019](#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada) |
 
 ### Orçamento de memória (RNF-29: 4 vCPU, 8 GB)
 
@@ -445,6 +446,43 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - (+) A política de saída (4.096 caracteres, janela de 24 h, thread do e-mail) aparece já nos testes.
 - (−) O mock do Gmail precisa de três rotas (push, `history.list` e `messages.get`), mais trabalho que um webhook único.
 - (−) O subconjunto precisa ser mantido em dia com a documentação dos provedores. Só os campos usados entram no mock.
+
+---
+
+## ADR-019 — Contas dos provedores e autenticação dos webhooks de entrada
+
+**Status:** aceito · **Data:** 18/11/2026 · Complementa o [ADR-018](#adr-018--canais-simulados-no-formato-dos-provedores-reais).
+
+**Contexto.** O webhook de entrada (`/webhooks/:channel/:provider_account`) era aberto: quem soubesse a URL podia gravar mensagens como qualquer cliente de qualquer marca. A RNF-23 já exigia HMAC no webhook plataforma → broker, mas não dizia nada sobre a entrada dos canais. A plataforma também precisa saber, pela URL, de qual marca é a conta. Essa ligação estava num arquivo YAML, fora do banco, sem auditoria e sem chave estrangeira.
+
+**Decisão.**
+
+1. **A conta do provedor vem da URL e fica na tabela `provider_accounts`**: marca, canal, `slug` da URL, `phone_number_id` do WhatsApp, segredo e se está ativa. O segredo fica criptografado pelo Active Record Encryption, com as chaves no ambiente. O supervisor cadastra as contas junto com as marcas (RF-58), e a alteração entra na auditoria (RF-54, bloco 12).
+2. **Toda entrada é autenticada antes do parse**, com o segredo da conta da URL. Sem assinatura válida, a resposta é `401` e nada é lido nem gravado. Cada canal usa o esquema do seu provedor:
+
+| Canal | Esquema | Segredo na tabela |
+| --- | --- | --- |
+| Chat do app (CloudWalk) | `X-Helpdesk-Signature: t=<unix>,v1=<HMAC-SHA256("t.corpo")>`, janela de ±5 min. É o mesmo esquema do webhook ao broker (07, seção 5.2), implementado uma vez em `HelpdeskContracts::Signature` | Segredo do HMAC da conta |
+| WhatsApp (Meta) | `X-Hub-Signature-256: sha256=<HMAC-SHA256(corpo)>` com o app secret. O `metadata.phone_number_id` do corpo precisa ser o da conta da URL | App secret |
+| E-mail (Gmail via Pub/Sub) | Token OIDC do Google no `Authorization` do push, com a audiência da conta | Audiência esperada |
+
+**A conta na URL no WhatsApp.** Por padrão a Meta envia tudo para a URL do app, mas permite uma URL própria por WhatsApp Business Account ou por número (`override_callback_uri`). A plataforma usa a URL por número. O corpo sempre traz `metadata.phone_number_id`, e o adaptador recusa o webhook se ele não for o da conta: a URL escolhe a conta e o corpo confirma.
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Contas num arquivo de configuração | Mudar exige deploy, não há auditoria nem chave estrangeira para a marca, e a tela do supervisor (bloco 12) não teria onde gravar |
+| Uma URL única por canal e a conta tirada só do corpo | Funciona no WhatsApp, mas a marca passaria a depender do corpo antes de autenticar. Com a conta na URL, o segredo certo é escolhido antes de ler o corpo |
+| Um só segredo para toda a plataforma | Vazar o segredo de uma marca exporia as outras. Um segredo por conta mantém o isolamento (ADR-014) |
+| Esquema próprio do chat diferente do broker | Dois códigos de HMAC para manter. O do broker já tem horário e janela anti-replay |
+
+**Consequências.**
+
+- (+) Um webhook com o segredo de outra conta é recusado, inclusive entre marcas (E6).
+- (+) Trocar um segredo ou desativar uma conta não exige deploy.
+- (−) O ambiente local precisa das chaves do Active Record Encryption. Fora de produção, há valores padrão só para desenvolvimento.
+- (−) O seed e o `channels-mock` precisam usar o mesmo segredo de desenvolvimento (`PROVIDER_SECRET_<CONTA>` ou `dev-secret-<conta>`).
 
 ---
 

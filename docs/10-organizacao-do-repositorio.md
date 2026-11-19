@@ -52,6 +52,7 @@ src/platform/
 ├── app/
 │   ├── models/                 # tabelas do 07, seção 4
 │   ├── services/               # regras de negócio, por contexto
+│   │   ├── channel_adapters/   # webhook do provedor → mensagem normalizada (07, seção 5.0)
 │   │   ├── ingestion/          # entrada da mensagem (invariante 1)
 │   │   ├── turns/              # janela, abertura e validade do turno (RN-55 a RN-57)
 │   │   ├── agent_actions/      # aplicar ou rejeitar a ação do agente
@@ -116,7 +117,7 @@ App Rack/Roda pequeno, com WaterDrop (ADR-007).
 src/broker/
 ├── app.rb                      # rotas
 ├── lib/broker/
-│   ├── signature.rb            # HMAC-SHA256 e janela anti-replay (RNF-23)
+│   ├── signature.rb            # usa HelpdeskContracts::Signature (RNF-23, ADR-019): só lê o segredo e responde 401
 │   └── publisher.rb            # publica em helpdesk.agent.inbound.v1
 ├── config/waterdrop.rb         # produtor Kafka
 ├── spec/
@@ -184,6 +185,7 @@ src/contracts/
 │       └── invalid/<contrato>/           # exemplos que devem ir para a DLQ
 │           └── expected.yml              # motivo esperado (pointer e type) de cada arquivo
 ├── lib/helpdesk_contracts.rb             # validador único (json_schemer)
+├── lib/helpdesk_contracts/signature.rb   # HMAC dos webhooks com janela anti-replay (RNF-23, ADR-019)
 ├── spec/
 └── helpdesk_contracts.gemspec
 ```
@@ -243,6 +245,10 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Prazos (janela, aviso, timeout, SLA) | Colunas na migration de `tickets`; consulta em `app/services/deadlines/`; laço em `bin/scheduler` |
 | Esquema de um evento | `src/contracts/v1/schemas/` |
 | Exemplo de payload para teste | `src/contracts/v1/fixtures/` |
+| Conta de um provedor (qual marca e canal recebem `/webhooks/:channel/:provider_account`) | Tabela `provider_accounts` (model `ProviderAccount`), criada pelo seed. A marca e a conta nunca vêm do corpo do webhook (07, seção 5.0; ADR-019) |
+| Assinatura de webhook (gerar e conferir) | `src/contracts/lib/helpdesk_contracts/signature.rb` (`HelpdeskContracts::Signature`). É usada pela plataforma, pelo `channels-mock` e pelo broker |
+| Chaves do Active Record Encryption | `AR_ENCRYPTION_*` no ambiente, lidas em `src/platform/config/application.rb` |
+| Adaptador de entrada de um canal (webhook → mensagem normalizada) | `src/platform/app/services/channel_adapters/<canal>.rb` (`ChannelAdapters::Chat`). O nome evita confusão com `app/channels/`, que é do ActionCable |
 | Variável de ambiente nova | `.env.example`, com comentário, e no `environment` do serviço no Compose |
 | O que a tela de conversa e a linha do tempo leem | `src/platform/app/read_models/`: `ConversationView` e `TimelineView`, lidos pelo `ConversationReader`. Hoje alimentados por `SyntheticConversations`; o adaptador dos registros reais entra na mesma pasta, com a mesma interface |
 | Teste de regra (RN) | `src/platform/spec/services/<contexto>/`, com o ID no `describe` |
