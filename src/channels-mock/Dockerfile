@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Provedores simulados e simulador do cliente (RF-04, ADR-012). Contexto de build: src/.
-ARG RUBY_VERSION=3.3.6
+# Mantenha igual ao .ruby-version (docs/10, seção 4).
+ARG RUBY_VERSION=4.0.10
 FROM docker.io/library/ruby:$RUBY_VERSION-slim
 
 WORKDIR /app

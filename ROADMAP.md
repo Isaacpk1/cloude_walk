@@ -9,7 +9,7 @@ Referências do projeto: [escopo](docs/02-escopo.md), [requisitos funcionais](do
 | Bloco | Situação | Observação |
 | --- | --- | --- |
 | 01. Ambiente e dados iniciais | **Feito** | Compose validado com `make up` |
-| 02. Entrada e gravação de uma mensagem | **Feito, falta validar o Compose** | Código e testes prontos (branch `feat/02-ingestao-mensagem`). O "pronto quando" foi comprovado sem Docker, com a plataforma e o `channels-mock` rodando localmente; falta `make up` com o serviço novo e o contexto de build em `src/` |
+| 02. Entrada e gravação de uma mensagem | **Feito** | Compose validado com `make up`, com o `channels-mock`. Canal implementado: chat do app (WhatsApp e e-mail no bloco 15) |
 | 03. Publicação no broker e Kafka | Adiantado em parte | Os esquemas JSON dos eventos (`src/contracts/v1`) já existem, com testes. O outbox já recebe `message.received`; falta publicar |
 | 06. Agrupamento de mensagens | Adiantado em parte | A ingestão já grava `seq` e `latest_customer_seq` com a linha travada. Falta a versão do contexto, a janela e o turno |
 | 03 em diante | A fazer | Próximo: **03. Publicação no broker e Kafka** |
@@ -45,7 +45,7 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 - [x] **Backend:** implementar o primeiro canal simulado, normalizar o envelope, identificar marca e cliente, criar ou localizar o ticket e gravar mensagem, auditoria e outbox na mesma transação. Confirmar após o commit.
 - [x] **Frontend:** adicionar o formulário do simulador. Substituir o evento de recebimento da demonstração pela mensagem gravada e mostrar se ela foi confirmada.
 - **Pronto quando:** enviar pelo navegador cria uma mensagem visível no ticket, e reenviar o mesmo ID externo preserva uma única mensagem. **Referências** RF-01, RF-04, RF-05, RF-07, RF-08, RF-10, RF-54, RNF-14.
-- **Situação:** comprovado com Postgres local, a plataforma em `:3000` e o `channels-mock` em `:4000`: duas mensagens confirmadas (`202`) no mesmo ticket, com `seq` 1 e 2, e o reenvio respondido como duplicado (`200`). Canal implementado: chat do app. WhatsApp e e-mail ficam no bloco 15. O webhook do chat já exige assinatura (`401` sem ela), e o simulador tem a opção de enviar com assinatura inválida. Pendente: `make up` com o `channels-mock`; assinatura do WhatsApp (`X-Hub-Signature-256` e conferência do `phone_number_id`) e do Gmail (token do Pub/Sub) junto com os adaptadores do bloco 15; reabertura em 72 h (RN-08, RF-11) e pedido explícito de humano na ingestão (RN-34, bloco 10).
+- **Situação:** comprovado com Postgres local, a plataforma em `:3000` e o `channels-mock` em `:4000`: duas mensagens confirmadas (`202`) no mesmo ticket, com `seq` 1 e 2, e o reenvio respondido como duplicado (`200`). Canal implementado: chat do app. WhatsApp e e-mail ficam no bloco 15. O webhook do chat já exige assinatura (`401` sem ela), e o simulador tem a opção de enviar com assinatura inválida. Validado também com `make up` no Docker, com o `channels-mock`. Fica para outros blocos: assinatura do WhatsApp (`X-Hub-Signature-256` e conferência do `phone_number_id`) e do Gmail (token do Pub/Sub) junto com os adaptadores do bloco 15; reabertura em 72 h (RN-08, RF-11) e pedido explícito de humano na ingestão (RN-34, bloco 10).
 
 ### 03. Publicação no broker e Kafka
 
