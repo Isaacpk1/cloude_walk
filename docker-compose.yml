@@ -61,6 +61,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+      # Na primeira subida (ou depois de trocar o Ruby) o entrypoint instala as gems no volume
+      # `bundle` e roda o db:prepare: pode passar de 150 s. Falhas nesse período não contam.
+      start_period: 600s
 
   # Sidekiq: publica o outbox no broker e retenta com backoff (ADR-005; 07, seção 2).
   # Espera o web, que prepara o banco e instala as gems no volume compartilhado.
