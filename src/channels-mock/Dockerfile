@@ -14,7 +14,7 @@ ENV BUNDLE_PATH="/usr/local/bundle" \
     LANG="C.UTF-8"
 
 COPY contracts /contracts
-COPY channels-mock/Gemfile channels-mock/Gemfile.lock ./
+COPY channels-mock/Gemfile channels-mock/Gemfile.lock channels-mock/.ruby-version ./
 RUN bundle install --jobs 4
 
 COPY channels-mock .
