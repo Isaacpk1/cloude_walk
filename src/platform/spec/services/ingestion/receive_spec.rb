@@ -171,6 +171,70 @@ RSpec.describe Ingestion::Receive do
     end
   end
 
+  describe "RN-56, invariante 4: a mensagem nova invalida na hora o turno que não a cobre" do
+    it "marca superseded, no commit da ingestão, o turno elegível com contexto anterior e audita" do
+      first = ingest(normalized(text: "meu repasse não caiu"))
+      turn = Turns::Open.call(OutboxEvent.find_by!(event_type: "message.received").id).turn
+
+      second = ingest(normalized(text: "é o de ontem"))
+
+      expect(turn.reload.status).to eq("superseded")
+      audit = second.ticket.audit_events.find_by!(event_type: "ai_turn.superseded")
+      expect(audit.data).to include("turns" => [ 1 ], "by_seq" => 2)
+      expect(audit.trace_id).to eq(second.message.trace_id)
+      expect(first.ticket).to eq(second.ticket)
+    end
+
+    it "duplicata não invalida nada (repetição)" do
+      message = normalized
+      ingest(message)
+      turn = Turns::Open.call(OutboxEvent.sole.id).turn
+
+      ingest(message)
+
+      expect(turn.reload.status).to eq("eligible")
+    end
+
+    it "não toca turnos de outro atendimento (marca errada)" do
+      ingest(normalized(brand: "jim", identity: "acc_jim_1"))
+      jim_turn = Turns::Open.call(OutboxEvent.sole.id).turn
+
+      ingest(normalized(identity: "acc_ip_1"))
+
+      expect(jim_turn.reload.status).to eq("eligible")
+    end
+  end
+
+  describe "RNF-14: aviso ao worker depois do commit (07, seção 3.1)" do
+    include ActiveJob::TestHelper
+
+    it "enfileira a publicação do item do outbox só com o ID (docs/10, jobs)" do
+      result = ingest
+
+      expect(OutboxJob).to have_been_enqueued.with(OutboxEvent.sole.id).on_queue("critical")
+      expect(result).to be_created
+    end
+
+    it "não enfileira de novo para a duplicata" do
+      message = normalized
+      ingest(message)
+      clear_enqueued_jobs
+
+      ingest(message)
+
+      expect(OutboxJob).not_to have_been_enqueued
+    end
+
+    it "falha de dependência: Redis fora do ar não desfaz nem recusa a mensagem gravada; a recuperação reoferece" do
+      allow(OutboxJob).to receive(:perform_later).and_raise(RedisClient::CannotConnectError, "redis fora do ar")
+
+      result = ingest
+
+      expect(result).to be_created
+      expect(OutboxEvent.sole.completed_at).to be_nil
+    end
+  end
+
   describe "invariante 10: a entrada precisa estar no contrato" do
     it "recusa mensagem normalizada inválida sem gravar nada" do
       expect { ingest(normalized.except("trace_id")) }.to raise_error(HelpdeskContracts::InvalidPayload)

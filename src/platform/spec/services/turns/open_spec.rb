@@ -143,7 +143,7 @@ RSpec.describe Turns::Open, "RF-29, RF-33: abertura do turno e do evento para o 
   describe "tempo no limite (RN-46)" do
     it "abre o turno a 1 ms do prazo" do
       received = ingest
-      travel_to(start + 30.seconds - 0.001)
+      travel_to(start + 30.seconds - 0.001, with_usec: true)
 
       expect(open_for(received).status).to eq(:opened)
     end

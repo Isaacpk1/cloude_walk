@@ -12,7 +12,7 @@
 # e a deduplicação é refeita com a trava (07, seção 3.4).
 module Ingestion
   class Receive
-    Result = Data.define(:status, :ticket, :message) do
+    Result = Data.define(:status, :ticket, :message, :outbox_event_id) do
       def created? = status == :created
       def duplicate? = status == :duplicate
     end
@@ -25,23 +25,37 @@ module Ingestion
     end
 
     def call
+      result = persist
+      notify_worker(result) if result.created?
+      result
+    end
+
+    private
+
+    def persist
       brand = Brand.find_by!(slug: @msg.fetch("brand"))
 
       ActiveRecord::Base.transaction do
         duplicate = find_duplicate(brand)
-        next Result.new(status: :duplicate, ticket: duplicate.ticket, message: duplicate) if duplicate
+        next Result.new(status: :duplicate, ticket: duplicate.ticket, message: duplicate, outbox_event_id: nil) if duplicate
 
         customer = find_or_create_customer(brand)
         ticket, opened = lock_or_open_ticket(brand, customer)
         # Outra entrega do mesmo webhook pode ter sido gravada enquanto esperávamos a trava.
         duplicate = find_duplicate(brand)
-        next Result.new(status: :duplicate, ticket: duplicate.ticket, message: duplicate) if duplicate
+        next Result.new(status: :duplicate, ticket: duplicate.ticket, message: duplicate, outbox_event_id: nil) if duplicate
 
         record(ticket, opened)
       end
     end
 
-    private
+    # Depois do commit (invariante 2). Se o Redis estiver fora, a mensagem já está gravada e o item
+    # segue aberto no outbox: a recuperação o reoferece (07, seção 6). O provedor recebe o 202.
+    def notify_worker(result)
+      OutboxJob.perform_later(result.outbox_event_id)
+    rescue StandardError => e
+      JsonLog.warn("outbox.enqueue_failed", trace_id:, event_id: result.outbox_event_id, error: e.class.name)
+    end
 
     def channel = @msg.fetch("channel")
     def trace_id = @msg.fetch("trace_id")
@@ -98,16 +112,27 @@ module Ingestion
         received_at: Time.iso8601(@msg.fetch("received_at"))
       )
       ticket.update!(latest_customer_seq: seq)
+      supersede_turns(ticket, seq)
 
       audit(ticket, "ticket.created", state: ticket.state, channel:, linked_ticket_id: ticket.linked_ticket_id) if opened
       audit(ticket, "message.received", message_id: message.id, seq:, channel:,
                                         provider_account: message.provider_account, external_id: message.external_id)
-      OutboxEvent.create!(
+      notice = OutboxEvent.create!(
         brand_id: ticket.brand_id, ticket:, event_type: "message.received", trace_id:, next_attempt_at: Time.current,
         payload: { ticket_id: ticket.id, message_id: message.id, seq: }
       )
 
-      Result.new(status: :created, ticket:, message:)
+      Result.new(status: :created, ticket:, message:, outbox_event_id: notice.id)
+    end
+
+    # RN-56, invariante 4: no mesmo commit, todo turno elegível que não cobre esta mensagem perde a
+    # validade, mesmo antes de o turno seguinte sair (07, seção 3.4).
+    def supersede_turns(ticket, seq)
+      turns = ticket.ai_turns.eligible.where(context_until_seq: ...seq).pluck(:turn)
+      return if turns.empty?
+
+      ticket.ai_turns.where(turn: turns).update_all(status: "superseded", updated_at: Time.current)
+      audit(ticket, "ai_turn.superseded", turns:, by_seq: seq)
     end
 
     def audit(ticket, event_type, **data)
