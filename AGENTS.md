@@ -111,7 +111,7 @@ Não negociáveis. Confira cada item que a tarefa toca.
 Com Docker (na raiz do repositório):
 
 ```bash
-make up        # cria o .env a partir do .env.example, sobe postgres, redis e web, e prepara o banco
+make up        # cria o .env a partir do .env.example, sobe postgres, redis, web e channels-mock, e prepara o banco
 make seed      # dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
 make check     # rspec + rubocop + brakeman da plataforma
 make help      # lista todos os alvos
@@ -128,6 +128,11 @@ bundle exec rubocop
 bundle exec brakeman -q --no-pager
 
 cd src/contracts
+bundle exec rspec
+bundle exec rubocop
+
+cd src/channels-mock           # simulador do cliente: http://localhost:4000
+PLATFORM_URL=http://localhost:3000 bundle exec rackup -p 4000
 bundle exec rspec
 bundle exec rubocop
 ```

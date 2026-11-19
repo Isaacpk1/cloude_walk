@@ -2,6 +2,10 @@
 
 # Ao subir o servidor web: remove o pid de uma execução anterior (bind mount)
 # e cria ou migra o banco antes de aceitar requisições (RNF-29).
+# O volume `bundle` guarda as gems entre builds. Se o Gemfile ganhou gem nova
+# (ex.: helpdesk_contracts no bloco 02), instala antes de subir.
+bundle check >/dev/null || bundle install --jobs 4
+
 if [[ "$*" == *"rails server"* ]]; then
   rm -f tmp/pids/server.pid
   ./bin/rails db:prepare
