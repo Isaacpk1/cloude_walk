@@ -140,6 +140,21 @@ RSpec.describe Turns::Open, "RF-29, RF-33: abertura do turno e do evento para o 
     end
   end
 
+  describe "invariante 10: contrato na saída" do
+    it "evento que sairia fora do contrato não abre turno, encerra o aviso sem retentativa e audita as violações" do
+      received = ingest
+      allow_any_instance_of(Turns::Envelope).to receive(:to_h).and_wrap_original { |m| m.call.except("turn") }
+
+      result = open_for(received)
+
+      expect(result.status).to eq(:invalid)
+      expect(AiTurn.count).to eq(0)
+      expect(OutboxEvent.where(event_type: "agent.event")).to be_empty
+      expect(received_item(received).completed_at).to be_present
+      expect(received.ticket.audit_events.last.data).to include("reason" => "contrato", "violations" => [ "/turn" ])
+    end
+  end
+
   describe "tempo no limite (RN-46)" do
     it "abre o turno a 1 ms do prazo" do
       received = ingest

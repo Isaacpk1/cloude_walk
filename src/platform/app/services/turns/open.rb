@@ -64,7 +64,9 @@ module Turns
       event_id = SecureRandom.uuid
       number = ticket.ai_turns.maximum(:turn).to_i + 1
       payload = Envelope.new(ticket:, event_id:, turn: number, pending:, history:, deadline_at:).to_h
-      HelpdeskContracts.validate!(:agent_inbound, payload)
+      # Invariante 10, RN-44: fora do contrato é falha permanente; nada sai e o aviso não é repetido.
+      violations = HelpdeskContracts.errors(:agent_inbound, payload)
+      return not_opened(:invalid, reason: "contrato", violations: violations.map(&:pointer)) if violations.any?
 
       turn = ticket.ai_turns.create!(
         brand_id: ticket.brand_id, turn: number, context_until_seq: ticket.latest_customer_seq,

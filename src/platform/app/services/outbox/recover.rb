@@ -9,7 +9,7 @@ module Outbox
 
     def self.call(limit: BATCH)
       now = Time.current
-      ids = OutboxEvent.where(completed_at: nil).where(next_attempt_at: ..(now - GRACE))
+      ids = OutboxEvent.where(completed_at: nil, event_type: OutboxJob::HANDLED).where(next_attempt_at: ..(now - GRACE))
                        .where("lease_until IS NULL OR lease_until < ?", now)
                        .order(:next_attempt_at).limit(limit).pluck(:id)
       ids.each { OutboxJob.perform_later(_1) }

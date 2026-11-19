@@ -6,6 +6,8 @@
 class OutboxJob < ApplicationJob
   queue_as :critical
 
+  HANDLED = [ "message.received", Turns::Open::EVENT_TYPE ].freeze
+
   def perform(outbox_event_id)
     item = OutboxEvent.find_by(id: outbox_event_id)
     return unless item && item.completed_at.nil?

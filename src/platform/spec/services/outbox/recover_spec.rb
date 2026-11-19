@@ -30,6 +30,12 @@ RSpec.describe Outbox::Recover, "RNF-14: recuperação dos itens abertos do outb
     expect(described_class.call).to eq([])
   end
 
+  it "só reoferece tipos que o worker sabe processar" do
+    item(event_type: "tipo.de.bloco.futuro")
+
+    expect(described_class.call).to eq([])
+  end
+
   it "tempo no limite: reoferece exatamente na carência de 5 s" do
     at_limit = item(next_attempt_at: now - 5.seconds)
 
