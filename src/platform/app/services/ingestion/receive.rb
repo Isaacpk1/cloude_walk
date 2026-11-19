@@ -4,8 +4,9 @@
 #
 # Uma transação só: identifica o cliente (RF-07, RN-01, RN-02, RN-05), cria ou trava o atendimento
 # aberto do canal (RF-08, RN-03, RN-04, RN-09), deduplica (RNF-15), atribui o próximo `seq`, atualiza
-# `latest_customer_seq` e grava auditoria (RF-54) e outbox (RNF-14). Nada externo acontece aqui dentro
-# (invariante 2): quem chama só confirma ao provedor depois do retorno, isto é, depois do commit.
+# `latest_customer_seq` e os prazos do ciclo pendente (RN-55, RN-46) e grava auditoria (RF-54) e outbox
+# (RNF-14). Nada externo acontece aqui dentro (invariante 2): quem chama só confirma ao provedor depois do
+# retorno, isto é, depois do commit.
 #
 # Concorrência: o índice único da identidade e o do atendimento aberto decidem as corridas de criação.
 # A linha do atendimento fica travada até o commit, então mensagens da mesma conversa entram em fila
@@ -111,7 +112,7 @@ module Ingestion
         external_id: @msg.fetch("external_id"), seq:, trace_id:, provider_payload: @provider_payload,
         received_at: Time.iso8601(@msg.fetch("received_at"))
       )
-      ticket.update!(latest_customer_seq: seq)
+      ticket.update!(latest_customer_seq: seq, **cycle_deadlines(ticket, seq))
       supersede_turns(ticket, seq)
 
       audit(ticket, "ticket.created", state: ticket.state, channel:, linked_ticket_id: ticket.linked_ticket_id) if opened
@@ -123,6 +124,22 @@ module Ingestion
       )
 
       Result.new(status: :created, ticket:, message:, outbox_event_id: notice.id)
+    end
+
+    # RN-55, RN-46 (07, seção 3.4; ADR-016): com a linha travada, a mensagem abre o ciclo pendente, se
+    # não houver um, e empurra o fim da janela de agrupamento até o teto de 4 s. O `scheduler` abre o
+    # turno quando dispatch_due_at vence. Caso fora da IA não ganha prazos da IA.
+    def cycle_deadlines(ticket, seq)
+      return {} unless ticket.with_ai?
+
+      now = Time.current
+      cycle = if ticket.first_pending_seq
+        {}
+      else
+        { first_pending_seq: seq, first_pending_at: now, ai_deadline_at: Turns::Window.ai_deadline_at(first_pending_at: now) }
+      end
+      first_pending_at = cycle.fetch(:first_pending_at, ticket.first_pending_at)
+      cycle.merge(dispatch_due_at: Turns::Window.dispatch_due_at(channel: ticket.channel, now:, first_pending_at:))
     end
 
     # RN-56, invariante 4: no mesmo commit, todo turno elegível que não cobre esta mensagem perde a

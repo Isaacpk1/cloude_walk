@@ -2,6 +2,8 @@
 class Ticket < ApplicationRecord
   STATES = %w[novo em_triagem com_ia aguardando_humano com_analista aguardando_cliente resolvido fechado].freeze
   CHANNELS = CustomerIdentity::CHANNELS
+  # 07, seção 3.3: mensagens nesses estados não vão para a IA.
+  HUMAN_STATES = %w[aguardando_humano com_analista resolvido fechado].freeze
 
   belongs_to :brand
   belongs_to :customer
@@ -16,4 +18,12 @@ class Ticket < ApplicationRecord
   validates :state, inclusion: { in: STATES }
 
   scope :open, -> { where.not(state: "fechado") }
+
+  # O caso está com a IA: fora dos estados humanos e sem responsável ou com o bot. A atribuição ao bot
+  # entra com a triagem (bloco 11): até lá, todo caso que não está com um humano vai para a IA.
+  def with_ai?
+    return false if HUMAN_STATES.include?(state)
+
+    assignee.nil? || assignee.kind == "bot"
+  end
 end
