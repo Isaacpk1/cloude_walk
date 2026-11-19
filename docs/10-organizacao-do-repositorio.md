@@ -62,7 +62,7 @@ src/platform/
 │   │   ├── handoff/            # escalação e resumo (RN-33, RN-39)
 │   │   ├── delivery/           # entrega ao canal com delivery_id estável
 │   │   ├── outbox/             # publicação e recuperação do outbox
-│   │   ├── deadlines/          # consulta de prazos usada pelo scheduler (ADR-016)
+│   │   ├── deadlines/          # consulta de prazos e laço do scheduler (ADR-016)
 │   │   └── rate_limit/         # limite por marca e canal (RNF-33)
 │   ├── jobs/                   # Sidekiq: recebem só o ID e chamam um service
 │   ├── consumers/              # Karafka: helpdesk.agent.outbound.v1
@@ -246,7 +246,7 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Criar um tópico Kafka ou mudar as partições | `infra/kafka/topics.yml` |
 | Consumir um tópico na plataforma | `src/platform/karafka.rb` e `app/consumers/` |
 | Publicar no Kafka | O broker (`src/broker/lib/broker/publisher.rb`) publica em `inbound` e o agente mock em `outbound`. A plataforma envia ao broker por webhook e só publica direto na DLQ, pelo próprio Karafka |
-| Prazos (janela, aviso, timeout, SLA) | Colunas na migration de `tickets`; consulta em `app/services/deadlines/`; laço em `bin/scheduler` |
+| Prazos (janela, aviso, timeout, SLA) | Colunas na migration de `tickets`; consulta e laço em `app/services/deadlines/` (`Deadlines::DispatchDue`, `Deadlines::Loop`); processo em `bin/scheduler` (intervalo e lote em `SCHEDULER_INTERVAL` e `SCHEDULER_BATCH`) |
 | Esquema de um evento | `src/contracts/v1/schemas/` |
 | Exemplo de payload para teste | `src/contracts/v1/fixtures/` |
 | Conta de um provedor (qual marca e canal recebem `/webhooks/:channel/:provider_account`) | Tabela `provider_accounts` (model `ProviderAccount`), criada pelo seed. A marca e a conta nunca vêm do corpo do webhook (07, seção 5.0; ADR-019) |
