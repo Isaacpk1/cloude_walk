@@ -1,7 +1,9 @@
 # Recuperação do outbox (07, seção 6: "o web cai depois do commit"; ADR-016). Reoferece ao worker os
 # itens abertos e vencidos cujo aviso se perdeu: job nunca enfileirado, Redis que perdeu o job ou
 # worker que caiu com a reserva. A carência evita reenfileirar o que o despertador normal ainda vai
-# pegar. Reoferecer duas vezes é seguro: a reserva do item decide quem trabalha (Outbox::Publish).
+# pegar. Vale para os tipos de OutboxJob::HANDLED, inclusive a ação "turn.dispatch" do scheduler.
+# Reoferecer duas vezes é seguro: a reserva do item (Outbox::Publish) ou a trava do atendimento com o
+# item já encerrado (Turns::Open) decide quem trabalha.
 module Outbox
   class Recover
     GRACE = 5.seconds

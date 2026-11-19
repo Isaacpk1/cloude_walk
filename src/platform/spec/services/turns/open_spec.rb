@@ -1,29 +1,39 @@
 require "rails_helper"
 
-RSpec.describe Turns::Open, "RF-29, RF-33: abertura do turno e do evento para o agente" do
+RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pela ação turn.dispatch do scheduler" do
   let!(:infinitepay) { create(:brand, :infinitepay) }
   let!(:jim) { create(:brand, :jim, locale: "pt-BR") }
   let(:start) { Time.zone.parse("2026-11-18T21:00:00Z") }
 
   around { |example| travel_to(start) { example.run } }
 
-  def open_for(result) = described_class.call(received_item(result).id)
+  def open_for(received) = described_class.call(due_dispatch(received).id)
+  def last_audit(ticket) = ticket.audit_events.reload.last
 
   describe "caminho feliz" do
-    it "grava o turno elegível e o evento no outbox, e encerra o aviso da ingestão, na mesma transação" do
-      received = ingest("meu repasse não caiu", trace_id: "4bf92f3577b34da6a3ce929d0e0e4736")
+    it "RN-55: abre com todas as mensagens pendentes, o prazo do atendimento e zera dispatch_due_at, na mesma transação" do
+      ingest("meu repasse não caiu", trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+      travel 1.second
+      second = ingest("é o de ontem, R$ 1.200", trace_id: "4bf92f3577b34da6a3ce929d0e0e4736")
+      ticket = start_cycle(second.ticket, dispatch_due_at: start + 2.5.seconds, ai_deadline_at: start + 30.seconds)
+      travel_to(start + 2.5.seconds, with_usec: true)
+      item = create(:turn_dispatch, for_ticket: ticket)
 
-      result = open_for(received)
+      result = described_class.call(item.id)
 
       turn = result.turn
       expect(result.status).to eq(:opened)
-      expect(turn).to have_attributes(turn: 1, status: "eligible", context_until_seq: 1, assignment_version: 0,
-                                      brand_id: infinitepay.id, ticket_id: received.ticket.id)
-      event = OutboxEvent.find(turn.event_id)
-      expect(event).to have_attributes(event_type: "agent.event", ticket_id: received.ticket.id, brand_id: infinitepay.id,
-                                       trace_id: "4bf92f3577b34da6a3ce929d0e0e4736", completed_at: nil, attempts: 0)
-      expect(event.next_attempt_at).to eq(Time.current)
-      expect(received_item(received).completed_at).to eq(Time.current)
+      expect(turn).to have_attributes(turn: 1, status: "eligible", context_until_seq: 2, assignment_version: 0,
+                                      brand_id: infinitepay.id, ticket_id: ticket.id, deadline_at: start + 30.seconds)
+      payload = OutboxEvent.find(turn.event_id).payload
+      expect(payload.dig("context", "pending_messages")).to eq([ { "seq" => 1, "text" => "meu repasse não caiu" },
+                                                                 { "seq" => 2, "text" => "é o de ontem, R$ 1.200" } ])
+      expect(payload["deadline_at"]).to eq((start + 30.seconds).utc.iso8601(3))
+      expect(OutboxEvent.find(turn.event_id)).to have_attributes(event_type: "agent.event", completed_at: nil, attempts: 0,
+                                                                 trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
+                                                                 next_attempt_at: Time.current)
+      expect(item.reload.completed_at).to eq(Time.current)
+      expect(ticket.reload).to have_attributes(dispatch_due_at: nil, first_pending_seq: 1, ai_deadline_at: start + 30.seconds)
     end
 
     it "RNF-28: o evento sai dentro do contrato agent_inbound, com o event_id igual ao id do outbox" do
@@ -44,48 +54,37 @@ RSpec.describe Turns::Open, "RF-29, RF-33: abertura do turno e do evento para o 
       expect(payload["message"]).to eq("id" => "msg_#{received.message.id}", "seq" => 1, "text" => "meu repasse não caiu")
     end
 
-    it "RN-49: leva todas as mensagens do cliente ainda sem resposta, por inteiro e na ordem do seq" do
-      ingest("meu repasse não caiu")
-      second = ingest("é o de ontem, R$ 1.200")
-
-      payload = OutboxEvent.find(open_for(second).turn.event_id).payload
-
-      expect(payload.dig("context", "pending_messages")).to eq([ { "seq" => 1, "text" => "meu repasse não caiu" },
-                                                                 { "seq" => 2, "text" => "é o de ontem, R$ 1.200" } ])
-      expect(payload.dig("context", "history")).to eq([])
-      expect(payload["context_until_seq"]).to eq(2)
-      expect(payload["message"]).to include("seq" => 2)
-    end
-
-    it "RN-46: o prazo é 30 s desde a primeira mensagem pendente e é o mesmo para os turnos do ciclo" do
+    it "RN-46: o prazo vem de ticket.ai_deadline_at e é o mesmo para os turnos do ciclo" do
       first = ingest("meu repasse não caiu")
       first_turn = open_for(first).turn
       travel 3.seconds
       second_turn = open_for(ingest("é o de ontem")).turn
 
       expect(first_turn.deadline_at).to eq(start + 30.seconds)
-      expect(second_turn).to have_attributes(turn: 2, deadline_at: start + 30.seconds)
+      expect(second_turn).to have_attributes(turn: 2, context_until_seq: 2, deadline_at: start + 30.seconds)
       expect(OutboxEvent.find(second_turn.event_id).payload["deadline_at"]).to eq((start + 30.seconds).utc.iso8601(3))
     end
 
-    it "RF-54, RF-56: audita a abertura com o trace_id da mensagem" do
+    it "RF-54, RF-56: audita a abertura com o trace_id da ação e o fim da janela" do
       received = ingest(trace_id: "4bf92f3577b34da6a3ce929d0e0e4736")
-      turn = open_for(received).turn
+      item = due_dispatch(received)
+      turn = described_class.call(item.id).turn
 
       audit = received.ticket.audit_events.find_by!(event_type: "ai_turn.opened")
       expect(audit).to have_attributes(trace_id: "4bf92f3577b34da6a3ce929d0e0e4736", brand_id: infinitepay.id,
                                        actor_type: "system")
       expect(audit.data).to include("turn" => 1, "event_id" => turn.event_id, "context_until_seq" => 1,
-                                    "pending_seqs" => [ 1 ])
+                                    "pending_seqs" => [ 1 ], "dispatch_id" => item.id, "cover_until_seq" => 1,
+                                    "dispatch_due_at" => start.utc.iso8601(3))
     end
   end
 
   describe "repetição" do
-    it "RNF-15: processar o mesmo aviso de novo não abre outro turno nem outro evento" do
-      received = ingest
-      open_for(received)
+    it "RNF-15: processar a mesma ação de novo não abre outro turno nem outro evento" do
+      item = due_dispatch(ingest)
+      described_class.call(item.id)
 
-      again = open_for(received)
+      again = described_class.call(item.id)
 
       expect(again.status).to eq(:already_done)
       expect(AiTurn.count).to eq(1)
@@ -93,25 +92,91 @@ RSpec.describe Turns::Open, "RF-29, RF-33: abertura do turno e do evento para o 
     end
   end
 
-  describe "ordem" do
-    it "o aviso da mensagem 2 processado antes do da 1: o turno cobre as duas e o aviso da 1 não abre outro" do
+  describe "ordem: job de versão anterior (07, seção 3.4)" do
+    it "RN-55: a ação da mensagem 1 chega com a janela da mensagem 2 aberta e é descartada, preservando a janela" do
       first = ingest("meu repasse não caiu")
+      old_item = due_dispatch(first)
+      travel 1.second
       second = ingest("é o de ontem")
+      window = start + 2.5.seconds
+      start_cycle(second.ticket, dispatch_due_at: window)
 
-      opened = open_for(second)
-      covered = open_for(first)
+      result = described_class.call(old_item.id)
 
-      expect(opened.turn).to have_attributes(turn: 1, context_until_seq: 2)
-      expect(covered.status).to eq(:covered)
+      expect(result.status).to eq(:window_open)
+      expect(AiTurn.count).to eq(0)
+      expect(old_item.reload.completed_at).to eq(Time.current)
+      expect(second.ticket.reload.dispatch_due_at).to eq(window)
+      expect(last_audit(second.ticket)).to have_attributes(event_type: "ai_turn.not_opened")
+      expect(last_audit(second.ticket).data).to include("reason" => "janela_aberta", "dispatch_id" => old_item.id,
+                                                        "dispatch_due_at" => window.utc.iso8601(3))
+    end
+
+    it "RN-55: a ação antiga com o teto de 4 s já vencido abre um turno que cobre a mensagem nova" do
+      first = ingest("meu repasse não caiu")
+      old_item = due_dispatch(first)
+      travel 4.seconds
+      start_cycle(ingest("é o de ontem").ticket, dispatch_due_at: start + 4.seconds)
+
+      result = described_class.call(old_item.id)
+
+      expect(result.turn).to have_attributes(turn: 1, context_until_seq: 2)
+    end
+
+    it "sem janela pendente (dispatch_due_at nulo) a ação é descartada" do
+      received = ingest
+      item = due_dispatch(received)
+      received.ticket.update_columns(dispatch_due_at: nil)
+
+      expect(described_class.call(item.id).status).to eq(:no_window)
+      expect(last_audit(received.ticket).data).to include("reason" => "sem_janela")
+    end
+
+    it "RN-56: turno elegível já cobre a última mensagem: a ação é descartada como coberta" do
+      received = ingest
+      turn = open_for(received).turn
+      duplicate = create(:turn_dispatch, for_ticket: received.ticket.reload, dedup_key: "outra-chave")
+
+      result = described_class.call(duplicate.id)
+
+      expect(result.status).to eq(:covered)
       expect(AiTurn.count).to eq(1)
-      expect(received_item(first).completed_at).to be_present
-      expect(first.ticket.audit_events.where(event_type: "ai_turn.not_opened").last.data)
-        .to include("reason" => "coberto", "covered_by_turn" => 1)
+      expect(duplicate.reload.completed_at).to be_present
+      expect(last_audit(received.ticket).data).to include("reason" => "coberto", "covered_by_turn" => turn.turn)
+    end
+  end
+
+  describe "atribuição" do
+    it "invariante 4: assignment_version mudou depois da ação: descarta com atribuicao_mudou" do
+      received = ingest
+      item = due_dispatch(received)
+      received.ticket.update_columns(assignment_version: 1)
+
+      result = described_class.call(item.id)
+
+      expect(result.status).to eq(:stale_assignment)
+      expect(AiTurn.count).to eq(0)
+      expect(item.reload.completed_at).to be_present
+      expect(last_audit(received.ticket).data).to include("reason" => "atribuicao_mudou", "expected_version" => 0,
+                                                          "current_version" => 1)
+    end
+
+    it "07, seção 3.3: caso com analista não abre turno; a ação é encerrada com auditoria" do
+      received = ingest
+      item = due_dispatch(received)
+      received.ticket.update!(state: "com_analista", assignee: create(:user))
+
+      result = described_class.call(item.id)
+
+      expect(result.status).to eq(:skipped)
+      expect(AiTurn.count).to eq(0)
+      expect(item.reload.completed_at).to be_present
+      expect(last_audit(received.ticket).data).to include("reason" => "fora_da_ia", "state" => "com_analista")
     end
   end
 
   describe "marca errada" do
-    it "ADR-014: o evento leva só a marca e as mensagens do próprio atendimento" do
+    it "ADR-014, invariante 6: o turno, o evento e a auditoria ficam na marca do atendimento, só com as mensagens dele" do
       ingest("mensagem da InfinitePay", identity: "acc_compartilhada")
       jim_received = ingest("mensagem da JIM", brand: "jim", identity: "acc_compartilhada")
 
@@ -119,80 +184,88 @@ RSpec.describe Turns::Open, "RF-29, RF-33: abertura do turno e do evento para o 
 
       expect(payload["brand"]).to eq("jim")
       expect(payload.dig("context", "pending_messages").map { _1["text"] }).to eq([ "mensagem da JIM" ])
-      expect(AiTurn.last.brand_id).to eq(jim.id)
-      expect(OutboxEvent.find(payload["event_id"]).brand_id).to eq(jim.id)
-    end
-  end
-
-  describe "atendimento fora da IA" do
-    it "07, seção 3.3: caso com analista não abre turno; o aviso é encerrado com auditoria" do
-      received = ingest
-      analyst = create(:user)
-      received.ticket.update!(state: "com_analista", assignee: analyst)
-
-      result = open_for(received)
-
-      expect(result.status).to eq(:skipped)
-      expect(AiTurn.count).to eq(0)
-      expect(received_item(received).completed_at).to be_present
-      expect(received.ticket.audit_events.last).to have_attributes(event_type: "ai_turn.not_opened")
-      expect(received.ticket.audit_events.last.data).to include("reason" => "fora_da_ia", "state" => "com_analista")
+      expect(AiTurn.sole.brand_id).to eq(jim.id)
+      expect(OutboxEvent.where(event_type: %w[turn.dispatch agent.event]).pluck(:brand_id).uniq).to eq([ jim.id ])
+      expect(AuditEvent.where(event_type: "ai_turn.opened").pluck(:brand_id)).to eq([ jim.id ])
     end
   end
 
   describe "invariante 10: contrato na saída" do
-    it "evento que sairia fora do contrato não abre turno, encerra o aviso sem retentativa e audita as violações" do
-      received = ingest
+    it "evento que sairia fora do contrato não abre turno, encerra a ação sem retentativa e audita as violações" do
+      item = due_dispatch(received = ingest)
       allow_any_instance_of(Turns::Envelope).to receive(:to_h).and_wrap_original { |m| m.call.except("turn") }
 
-      result = open_for(received)
+      result = described_class.call(item.id)
 
       expect(result.status).to eq(:invalid)
       expect(AiTurn.count).to eq(0)
       expect(OutboxEvent.where(event_type: "agent.event")).to be_empty
-      expect(received_item(received).completed_at).to be_present
-      expect(received.ticket.audit_events.last.data).to include("reason" => "contrato", "violations" => [ "/turn" ])
+      expect(item.reload.completed_at).to be_present
+      expect(last_audit(received.ticket).data).to include("reason" => "contrato", "violations" => [ "/turn" ])
     end
   end
 
-  describe "tempo no limite (RN-46)" do
+  describe "tempo no limite (RN-46, RN-55)" do
     it "abre o turno a 1 ms do prazo" do
-      received = ingest
+      item = due_dispatch(ingest)
       travel_to(start + 30.seconds - 0.001, with_usec: true)
 
-      expect(open_for(received).status).to eq(:opened)
+      expect(described_class.call(item.id).status).to eq(:opened)
     end
 
-    it "não abre o turno com o prazo vencido: o caso segue pelo timeout (bloco 08)" do
+    it "não abre o turno exatamente no prazo: o caso segue pelo timeout (bloco 08)" do
       received = ingest
+      item = due_dispatch(received)
       travel_to(start + 30.seconds)
 
-      result = open_for(received)
+      result = described_class.call(item.id)
 
       expect(result.status).to eq(:expired)
       expect(AiTurn.count).to eq(0)
-      expect(received.ticket.audit_events.last.data).to include("reason" => "prazo_vencido")
+      expect(received.ticket.reload.dispatch_due_at).to eq(start)
+      expect(last_audit(received.ticket).data).to include("reason" => "prazo_vencido",
+                                                          "deadline_at" => (start + 30.seconds).utc.iso8601(3))
+    end
+
+    it "abre exatamente no fim da janela (dispatch_due_at == agora)" do
+      received = ingest
+      start_cycle(received.ticket, dispatch_due_at: start + 1.5.seconds)
+      travel_to(start + 1.5.seconds, with_usec: true)
+
+      expect(described_class.call(create(:turn_dispatch, for_ticket: received.ticket.reload).id).status).to eq(:opened)
+    end
+
+    it "1 ms antes do fim da janela a ação é descartada (janela aberta)" do
+      received = ingest
+      start_cycle(received.ticket, dispatch_due_at: start + 1.5.seconds)
+      item = create(:turn_dispatch, for_ticket: received.ticket.reload)
+      travel_to(start + 1.5.seconds - 0.001, with_usec: true)
+
+      expect(described_class.call(item.id).status).to eq(:window_open)
     end
   end
 
   describe "concorrência", :concurrency do
-    it "dois workers com o mesmo aviso abrem um turno só" do
-      item_id = received_item(ingest).id
+    it "dois workers com a mesma ação abrem um turno só" do
+      item_id = due_dispatch(ingest).id
 
       results = run_concurrently(threads: 2) { described_class.call(item_id) }
 
       expect(results.map(&:status)).to contain_exactly(:opened, :already_done)
       expect(AiTurn.count).to eq(1)
+      expect(OutboxEvent.where(event_type: "agent.event").count).to eq(1)
     end
 
-    it "os avisos de duas mensagens da mesma conversa, juntos, numeram os turnos sem colisão" do
-      ids = [ received_item(ingest("um")).id, received_item(ingest("dois")).id ]
+    it "ações de duas versões da mesma conversa, juntas, abrem um turno que cobre as duas mensagens" do
+      first = ingest("um")
+      old_id = due_dispatch(first).id
+      new_id = due_dispatch(ingest("dois")).id
 
-      results = run_concurrently(threads: 2) { |i| described_class.call(ids[i]) }
+      results = run_concurrently(threads: 2) { |i| described_class.call([ old_id, new_id ][i]) }
 
       expect(results).to all(be_a(Turns::Open::Result))
-      expect(AiTurn.order(:turn).pluck(:turn)).to eq((1..AiTurn.count).to_a)
-      expect(AiTurn.maximum(:context_until_seq)).to eq(2)
+      expect(results.map(&:status)).to contain_exactly(:opened, :covered)
+      expect(AiTurn.sole).to have_attributes(turn: 1, context_until_seq: 2)
     end
   end
 end
