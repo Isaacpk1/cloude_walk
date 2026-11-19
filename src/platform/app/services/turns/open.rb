@@ -19,11 +19,9 @@ module Turns
   class Open
     Result = Data.define(:status, :turn)
 
-    DISPATCH_TYPE = "turn.dispatch".freeze
+    DISPATCH_TYPE = Deadlines::DispatchDue::EVENT_TYPE
     EVENT_TYPE = "agent.event".freeze
     HISTORY_LIMIT = 20 # RN-49
-    # 07, seção 3.3: mensagens nesses estados não vão para a IA.
-    HUMAN_STATES = %w[aguardando_humano com_analista resolvido fechado].freeze
 
     def self.call(...) = new(...).call
 
@@ -50,7 +48,7 @@ module Turns
     attr_reader :ticket, :item
 
     def decide
-      return not_opened(:skipped, reason: "fora_da_ia", state: ticket.state) unless with_ai?
+      return not_opened(:skipped, reason: "fora_da_ia", state: ticket.state) unless ticket.with_ai?
 
       expected = item.payload["assignment_version"]
       if expected != ticket.assignment_version
@@ -62,12 +60,6 @@ module Turns
       return not_opened(:covered, reason: "coberto", covered_by_turn: covering.turn) if covering
 
       window_closed? ? check_deadline : window_still_open
-    end
-
-    def with_ai?
-      return false if HUMAN_STATES.include?(ticket.state)
-
-      ticket.assignee.nil? || ticket.assignee.kind == "bot"
     end
 
     def now = @now ||= Time.current

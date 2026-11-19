@@ -37,6 +37,17 @@ RSpec.describe Ingestion::Receive do
     end
   end
 
+  describe "Invariante 7: a decisão da janela fica na auditoria" do
+    it "RN-55: o message.received auditado traz o ciclo, o fim da janela e o prazo da IA" do
+      result = ingest_at(t0)
+      ingest_at(t0 + 1.second)
+
+      data = AuditEvent.where(ticket: result.ticket, event_type: "message.received").order(:id).last.data
+      expect(data).to include("first_pending_seq" => 1, "dispatch_due_at" => (t0 + 2.5.seconds).iso8601(3),
+                              "ai_deadline_at" => (t0 + 30.seconds).iso8601(3))
+    end
+  end
+
   describe "RN-55: janela de agrupamento com a primeira mensagem ainda pendente" do
     it "mensagem aos 1 s empurra o fim da janela para 2,5 s, sem mexer no início do ciclo" do
       ingest_at(t0)

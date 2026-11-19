@@ -116,8 +116,12 @@ module Ingestion
       supersede_turns(ticket, seq)
 
       audit(ticket, "ticket.created", state: ticket.state, channel:, linked_ticket_id: ticket.linked_ticket_id) if opened
+      # Invariante 7: a decisão de janela (RN-55) fica registrada junto do recebimento.
       audit(ticket, "message.received", message_id: message.id, seq:, channel:,
-                                        provider_account: message.provider_account, external_id: message.external_id)
+                                        provider_account: message.provider_account, external_id: message.external_id,
+                                        first_pending_seq: ticket.first_pending_seq,
+                                        dispatch_due_at: ticket.dispatch_due_at&.iso8601(3),
+                                        ai_deadline_at: ticket.ai_deadline_at&.iso8601(3))
       notice = OutboxEvent.create!(
         brand_id: ticket.brand_id, ticket:, event_type: "message.received", trace_id:, next_attempt_at: Time.current,
         payload: { ticket_id: ticket.id, message_id: message.id, seq: }

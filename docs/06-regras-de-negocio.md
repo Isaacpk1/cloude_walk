@@ -165,7 +165,7 @@ Todos são configuráveis. Os de origem *proposta* são escolhas deste projeto, 
 | Retentativas | 5, com backoff 1, 2, 4, 8, 16 s e jitter | RNF-16 | RN-43 |
 | Retenção mínima da DLQ | 7 dias | RNF-16 (prazo de reentrega do WhatsApp) | RN-48 |
 | Contexto do atendente | Todas as mensagens pendentes + 20 de histórico + 3 atendimentos em 90 dias | Proposta | RN-49 |
-| Janela de agrupamento de mensagens | 1,5 s (chat e WhatsApp), 0 (e-mail), no máximo 4 s após a primeira mensagem pendente | Proposta | RN-55 |
+| Janela de agrupamento de mensagens | 1,5 s (chat e WhatsApp), 0 (e-mail), no máximo 4 s após a primeira mensagem pendente. Com janela 0, `dispatch_due_at` é o horário da gravação e o turno sai na volta seguinte do `scheduler` (até 250 ms) | Proposta | RN-55 |
 | Aviso de progresso ao cliente | 15 s após a primeira mensagem pendente | Proposta | RN-57 |
 | Horário de contagem do SLA | 24/7 | Suporte 24 h da InfinitePay | RN-24 |
 
