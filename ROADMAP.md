@@ -10,9 +10,11 @@ Referências do projeto: [escopo](docs/02-escopo.md), [requisitos funcionais](do
 | --- | --- | --- |
 | 01. Ambiente e dados iniciais | **Feito** | Compose validado com `make up` |
 | 02. Entrada e gravação de uma mensagem | **Feito** | Compose validado com `make up`, com o `channels-mock`. Canal implementado: chat do app (WhatsApp e e-mail no bloco 15) |
-| 03. Publicação no broker e Kafka | Adiantado em parte | Os esquemas JSON dos eventos (`src/contracts/v1`) já existem, com testes. O outbox já recebe `message.received`; falta publicar |
-| 06. Agrupamento de mensagens | Adiantado em parte | A ingestão já grava `seq` e `latest_customer_seq` com a linha travada. Falta a versão do contexto, a janela e o turno |
-| 03 em diante | A fazer | Próximo: **03. Publicação no broker e Kafka** |
+| 03. Publicação no broker e Kafka | **Feito, falta validar com Kafka real** | Código e testes prontos (branch `feat/03-publicacao-broker`). Comprovado até o broker com processos locais; a escrita no Kafka foi testada com o cliente em memória do WaterDrop. Falta `make up` com `kafka`, `kafka-init`, `broker` e `worker` e conferir a mensagem com `make topics` |
+| 06. Agrupamento de mensagens | Adiantado em parte | A ingestão já grava `seq` e `latest_customer_seq` com a linha travada e invalida o turno que não cobre a mensagem nova (bloco 03). O turno existe (`ai_turns`), mas abre logo após cada mensagem. Falta a versão do contexto, a janela e o teto de 4 s |
+| 04 em diante | A fazer | Próximo: **04. Agente mock e ação de retorno** (depois de validar o bloco 03 com Kafka) |
+
+Decisões tomadas durante o bloco 03: respostas do broker (`401` sem publicar, `422` com o corpo na DLQ, `503` para nova tentativa) e colunas `attempts` e `last_error` no outbox ([07, seções 4 e 5.2](docs/07-arquitetura.md#52-webhook-plataforma--broker-e-evento-em-agentinbound)); tópicos declarados em `infra/kafka/topics.yml` ([docs/10, seção 3.7](docs/10-organizacao-do-repositorio.md#37-infra--infraestrutura-sem-código-de-negócio)); turno provisório aberto a cada mensagem, sem janela, até os blocos 06 e 08.
 
 Decisões tomadas durante o bloco 02: contas dos provedores na tabela `provider_accounts`, com segredo criptografado, e webhook de entrada autenticado antes do parse ([ADR-019](docs/08-decisoes-de-arquitetura.md#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada)); `account_id` do chat identifica o cliente ([07, seção 5.0](docs/07-arquitetura.md#50-webhooks-dos-canais-entrada-e-saída)); auditoria imutável também por trigger ([07, seção 4](docs/07-arquitetura.md#índices-e-restrições-que-carregam-regra-de-negócio)); o simulador do cliente nasce no `channels-mock`, como manda o [docs/10](docs/10-organizacao-do-repositorio.md#34-srcchannels-mock--provedores-e-simulador).
 
@@ -49,9 +51,10 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 03. Publicação no broker e Kafka
 
-- [ ] **Backend:** ~~definir os esquemas JSON dos eventos~~ (feito no bloco 01, `src/contracts/v1`), publicar o outbox com assinatura HMAC, validar no broker e confirmar a publicação no Kafka. Propagar o rastreio e usar a conversa como chave da partição.
-- [ ] **Frontend:** acrescentar a etapa de publicação e mostrar a origem de um erro ao escolher o evento na linha do tempo.
+- [x] **Backend:** ~~definir os esquemas JSON dos eventos~~ (feito no bloco 01, `src/contracts/v1`), publicar o outbox com assinatura HMAC, validar no broker e confirmar a publicação no Kafka. Propagar o rastreio e usar a conversa como chave da partição.
+- [x] **Frontend:** acrescentar a etapa de publicação e mostrar a origem de um erro ao escolher o evento na linha do tempo.
 - **Pronto quando:** a mensagem do simulador gera um evento válido no tópico de entrada, visível pela sua correlação. Um webhook mal assinado é rejeitado. **Referências** RF-29, RF-30, RF-33, RF-56, RNF-23, RNF-28.
+- **Situação:** comprovado sem Docker e **sem Kafka real**. Com a plataforma, o `worker` (Sidekiq) e o `broker` rodando localmente, a mensagem do simulador virou um evento assinado e dentro do contrato, com o mesmo `trace_id` na plataforma e no broker; sem Kafka, o broker respondeu `503` e a plataforma retentou com backoff até o prazo do turno, e a linha do tempo mostrou cada falha com a origem "Kafka". Webhook mal assinado: `401` no canal e no broker, sem publicar nada. A publicação no tópico (chave `conversation_id`, cabeçalhos `event_id` e `traceparent`, `acks=all`) e a DLQ foram testadas com o cliente em memória do WaterDrop. **Falta:** `make up` com `kafka`, `kafka-init`, `broker` e `worker` (o Compose novo não rodou), enviar pelo simulador e conferir a mensagem com `make topics`. Fica para depois: DLQ da plataforma, tabela `dead_letters` e escalação pela RN-45 (bloco 09); timeout do ciclo e prazos no atendimento (bloco 08); janela de agrupamento (bloco 06); atribuição ao bot pela triagem (bloco 11). Até o bloco 11, todo caso que não está com um humano vai para a IA.
 
 ### 04. Agente mock e ação de retorno
 
@@ -69,7 +72,7 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 06. Agrupamento de mensagens e contexto do turno
 
-- [ ] **Backend:** gravar ~~sequência~~ (feito no bloco 02: `seq` e `latest_customer_seq`) e versão do contexto no atendimento. Implementar a janela de agrupamento, o teto de espera e a montagem do turno com todas as mensagens pendentes.
+- [ ] **Backend:** gravar ~~sequência~~ (feito no bloco 02: `seq` e `latest_customer_seq`) e versão do contexto no atendimento. A tabela `ai_turns` e a invalidação do turno na ingestão já existem (bloco 03). Implementar a janela de agrupamento, o teto de espera e a montagem do turno com todas as mensagens pendentes.
 - [ ] **Frontend:** mostrar a fase de agrupamento e quais mensagens entraram em cada turno. Adicionar um cenário no simulador que envia a segunda mensagem aos 3 s.
 - **Pronto quando:** uma rajada agrupa as mensagens conforme a política do canal, e o turno persistido corresponde ao contexto enviado. **Referências** RF-09, RF-29, RF-33, RN-49, RN-55.
 

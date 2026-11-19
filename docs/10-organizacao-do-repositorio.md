@@ -118,13 +118,16 @@ src/broker/
 ├── app.rb                      # rotas
 ├── lib/broker/
 │   ├── signature.rb            # usa HelpdeskContracts::Signature (RNF-23, ADR-019): só lê o segredo e responde 401
-│   └── publisher.rb            # publica em helpdesk.agent.inbound.v1
-├── config/waterdrop.rb         # produtor Kafka
+│   ├── publisher.rb            # publica em helpdesk.agent.inbound.v1 e, se fora do contrato, em helpdesk.agent.dlq.v1
+│   ├── dedup.rb                # event_id já publicado, em memória e por réplica
+│   └── log.rb                  # logs em JSON com trace_id
+├── config/waterdrop.rb         # produtor Kafka (acks=all, idempotente)
+├── config/puma.rb              # porta 4100
 ├── spec/
 ├── config.ru · Gemfile · Dockerfile
 ```
 
-Não tem banco. Se o Kafka cair, responde erro e a plataforma retenta pelo outbox.
+Não tem banco. Se o Kafka cair, responde erro e a plataforma retenta pelo outbox. As respostas estão no [07, seção 5.2](07-arquitetura.md#52-webhook-plataforma--broker-e-evento-em-agentinbound) e no `README.md` do serviço.
 
 ### 3.3 `src/agent-mock/` — agente simulado
 
@@ -224,7 +227,7 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | `Makefile` | Os comandos do dia a dia: `up`, `down`, `logs`, `seed`, `reset`, `test`, `lint`, `security`, `check` e `help`. `e2e` entra no bloco 05 e `bench` no bloco 19 |
 | `.env.example` | Todas as variáveis, com valores de desenvolvimento. O `.env` real não vai para o git |
 | `scripts/` | Utilitários de shell que não pertencem a um serviço (ex.: conferir o ambiente). O seed fica no Rails, porque usa os models |
-| `.github/workflows/ci.yml` | CI: um job por serviço (`platform`, `contracts`, `channels-mock`), em paralelo. Cada serviço novo ganha o próprio job, e o `ruby/setup-ruby` lê a versão do `.ruby-version` do serviço (nunca fixa a versão no YAML) |
+| `.github/workflows/ci.yml` | CI: um job por serviço (`platform`, `contracts`, `broker`, `channels-mock`), em paralelo. Cada serviço novo ganha o próprio job, e o `ruby/setup-ruby` lê a versão do `.ruby-version` do serviço (nunca fixa a versão no YAML) |
 
 ## 4. Onde fica?
 
@@ -247,6 +250,11 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Esquema de um evento | `src/contracts/v1/schemas/` |
 | Exemplo de payload para teste | `src/contracts/v1/fixtures/` |
 | Conta de um provedor (qual marca e canal recebem `/webhooks/:channel/:provider_account`) | Tabela `provider_accounts` (model `ProviderAccount`), criada pelo seed. A marca e a conta nunca vêm do corpo do webhook (07, seção 5.0; ADR-019) |
+| Segredo do webhook plataforma → broker | `BROKER_WEBHOOK_SECRET` no `.env`, o mesmo no `worker` e no `broker`. Fora de produção, os dois usam `dev-secret-broker` |
+| Publicação do outbox no broker (reserva, retentativas, descarte) | `src/platform/app/services/outbox/publish.rb` (`Outbox::Publish`), chamado pelo `OutboxJob`. A recuperação dos itens abertos fica em `outbox/recover.rb` e roda no `worker` até o `scheduler` do bloco 08 |
+| Abertura do turno e envelope do evento ao agente | `src/platform/app/services/turns/open.rb` e `turns/envelope.rb` |
+| Ver as mensagens de `helpdesk.agent.inbound.v1` | `make topics` (chave, cabeçalhos e corpo) |
+| Por que um evento não foi publicado | Linha do tempo do atendimento: escolha o evento de falha para ver a origem. O histórico vem de `audit_events` (`agent_event.*`) |
 | Assinatura de webhook (gerar e conferir) | `src/contracts/lib/helpdesk_contracts/signature.rb` (`HelpdeskContracts::Signature`). É usada pela plataforma, pelo `channels-mock` e pelo broker |
 | Chaves do Active Record Encryption | `AR_ENCRYPTION_*` no ambiente, lidas em `src/platform/config/application.rb` |
 | Adaptador de entrada de um canal (webhook → mensagem normalizada) | `src/platform/app/services/channel_adapters/<canal>.rb` (`ChannelAdapters::Chat`). O nome evita confusão com `app/channels/`, que é do ActionCable |

@@ -111,9 +111,10 @@ Não negociáveis. Confira cada item que a tarefa toca.
 Com Docker (na raiz do repositório):
 
 ```bash
-make up        # cria o .env a partir do .env.example, sobe postgres, redis, web e channels-mock, e prepara o banco
+make up        # cria o .env a partir do .env.example, sobe postgres, redis, kafka, web, worker, broker e channels-mock, e prepara o banco
 make seed      # dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
 make check     # rspec + rubocop + brakeman da plataforma
+make topics    # mensagens de helpdesk.agent.inbound.v1, com chave e cabeçalhos
 make help      # lista todos os alvos
 ```
 
@@ -123,12 +124,18 @@ Sem Docker, com Postgres e Redis locais (`DATABASE_URL` sem o nome do banco):
 cd src/platform
 bin/rails db:prepare db:seed
 bin/rails server               # http://localhost:3000
+bundle exec sidekiq -C config/sidekiq.yml   # worker: publica o outbox no broker (BROKER_URL)
 bundle exec rspec
 bundle exec rubocop
 bundle exec brakeman -q --no-pager
 
 cd src/contracts
 bundle exec rspec
+bundle exec rubocop
+
+cd src/broker                  # webhook → Kafka: http://localhost:4100 (KAFKA_BROKERS, padrão localhost:9092)
+bundle exec puma
+bundle exec rspec              # sem Kafka: WaterDrop em memória
 bundle exec rubocop
 
 cd src/channels-mock           # simulador do cliente: http://localhost:4000
