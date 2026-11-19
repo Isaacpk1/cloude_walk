@@ -15,6 +15,8 @@ module Seeds
     ].freeze
     # Capacidade padrão do agente de IA (06, parâmetros). As réplicas do agent-mock dão a vazão.
     BOT_CAPACITY = 1_000
+    # Número de WhatsApp sintético por marca (07, seção 5.0). Ligado à URL da conta.
+    WHATSAPP_PHONE_NUMBER_IDS = { "infinitepay" => "100000000000001", "jim" => "100000000000002" }.freeze
 
     def self.call(...) = new(...).call
 
@@ -37,6 +39,7 @@ module Seeds
           team = Team.find_or_create_by!(brand:, name: "Suporte N1")
           [ bot, supervisor, *analysts_for(brand) ].each { |user| TeamMembership.find_or_create_by!(user:, team:) }
           default_queue_for(brand, team, created_by: supervisor)
+          provider_accounts_for(brand)
           customers_for(brand)
         end
       end
@@ -48,6 +51,20 @@ module Seeds
 
     def upsert_user(email:, **attrs)
       User.find_or_create_by!(email:) { |user| user.assign_attributes(attrs) }
+    end
+
+    # ADR-019: uma conta por canal. O segredo segue a regra do channels-mock: variável
+    # PROVIDER_SECRET_<CONTA> ou, no ambiente local, "dev-secret-<conta>".
+    def provider_accounts_for(brand)
+      CustomerIdentity::CHANNELS.each do |channel|
+        slug = "#{brand.slug}-#{channel}-mock"
+        ProviderAccount.find_or_create_by!(slug:) do |account|
+          account.assign_attributes(
+            brand:, channel:, phone_number_id: (WHATSAPP_PHONE_NUMBER_IDS.fetch(brand.slug) if channel == "whatsapp"),
+            secret: ENV.fetch("PROVIDER_SECRET_#{slug.upcase.tr('-', '_')}", "dev-secret-#{slug}")
+          )
+        end
+      end
     end
 
     def analysts_for(brand)

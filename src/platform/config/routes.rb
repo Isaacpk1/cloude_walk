@@ -9,6 +9,10 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
+  # Entrada dos provedores de canal (bloco 02; 07, seção 5.0). Marca e conta vêm da URL.
+  post "webhooks/:channel/:provider_account" => "webhooks/channels#create", as: :channel_webhook,
+       constraints: { channel: /chat|whatsapp|email/ }
+
   # Painel (bloco 01): telas de conversa e linha do tempo, alimentadas pelo ConversationReader.
   root "conversations#index"
   resources :conversations, path: "conversas", only: %i[index show]

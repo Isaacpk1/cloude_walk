@@ -58,3 +58,15 @@ FactoryBot.define do
     active { true }
   end
 end
+
+FactoryBot.define do
+  # Conta de provedor de canal (07, seção 5.0). O segredo segue o padrão local do simulador.
+  factory :provider_account do
+    brand
+    channel { "chat" }
+    slug { "#{brand.slug}-#{channel}-mock" }
+    secret { "dev-secret-#{slug}" }
+    phone_number_id { channel == "whatsapp" ? "1000000000#{brand.id.to_s.rjust(5, '0')}" : nil }
+    active { true }
+  end
+end
