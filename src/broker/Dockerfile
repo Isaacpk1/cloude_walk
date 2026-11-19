@@ -14,7 +14,7 @@ ENV BUNDLE_PATH="/usr/local/bundle" \
     LANG="C.UTF-8"
 
 COPY contracts /contracts
-COPY broker/Gemfile broker/Gemfile.lock ./
+COPY broker/Gemfile broker/Gemfile.lock broker/.ruby-version ./
 RUN bundle install --jobs 4
 
 COPY broker .
