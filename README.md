@@ -20,6 +20,10 @@ A skill [cloudwalk-architecture-review](.agents/skills/cloudwalk-architecture-re
 | 08 | [Decisões de arquitetura](docs/08-decisoes-de-arquitetura.md) | Stack escolhida e 16 ADRs com alternativas e consequências | Rascunho |
 | 09 | [Evolução da integração com a IA](docs/09-evolucao-da-integracao-com-ia.md) | Fronteira do agente, leitura sob demanda, RAG, desempenho e avaliações | Proposta |
 
+## Como contribuir
+
+As regras de branch, commit, pull request e TDD estão no [CONTRIBUTING.md](CONTRIBUTING.md). Agentes de IA seguem também o [AGENTS.md](AGENTS.md).
+
 ## Convenções
 
 - **IDs:** `RF-XX`, `RNF-XX` e `RN-XX`. Um ID nunca é reaproveitado; um requisito removido fica marcado como *descontinuado*.
