@@ -32,6 +32,13 @@ RSpec.describe "ROADMAP 02: mensagem do simulador visível no ticket" do
     expect(response.body.scan(%(class="message__body")).size).to eq(1)
   end
 
+  it "a lista explica que os registros do sistema vêm antes dos exemplos sintéticos" do
+    get conversations_path
+
+    expect(response.body).to include("Registro do sistema", "Exemplo sintético")
+    expect(response.body).not_to include("chegam no bloco 02")
+  end
+
   it "a linha do tempo mostra recebimento e gravação da mensagem" do
     ticket_id = send_chat["ticket_id"]
 
