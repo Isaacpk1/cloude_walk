@@ -48,4 +48,58 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
       expect(timeline.events.map(&:duration_ms)).to all(be >= 0)
     end
   end
+
+  describe "#timeline: publicação no broker (ROADMAP 03)" do
+    let(:start) { Time.zone.parse("2026-11-18T21:00:00Z") }
+    let(:trace_id) { "4bf92f3577b34da6a3ce929d0e0e4736" }
+
+    around { |example| travel_to(start) { example.run } }
+
+    def open_and_publish(*responses)
+      received = ingest("meu repasse não caiu", trace_id:)
+      event_id = Turns::Open.call(received_item(received).id).turn.event_id
+      stub_broker(*responses)
+      responses.size.times do
+        Outbox::Publish.call(event_id, jitter: -> { 0.0 })
+        travel 1.second
+      end
+      received.ticket
+    end
+
+    it "mostra a publicação do turno, da abertura à confirmação do Kafka, com tópico, partição e offset" do
+      ticket = open_and_publish({ status: 200 })
+
+      event = source.timeline(ticket.id.to_s).events.find { _1.kind == :published }
+
+      # O fim é o horário da auditoria (relógio do banco, clock_timestamp()).
+      confirmed_at = AuditEvent.find_by!(event_type: "agent_event.published").occurred_at
+      expect(event).to have_attributes(turn: 1, seq: 1, trace_id:, ticket_id: ticket.id.to_s, error: nil,
+                                       started_at: start, finished_at: confirmed_at, source: DataSource::SYSTEM)
+      expect(event.detail).to include("helpdesk.agent.inbound.v1", "partição 7", "offset 42", "tentativa 1")
+    end
+
+    it "mostra cada tentativa que falhou com a origem do erro, e a publicação que deu certo depois" do
+      ticket = open_and_publish({ status: 503 }, { status: 200 })
+
+      events = source.timeline(ticket.id.to_s).events
+      failed = events.find { _1.kind == :publish_failed }
+
+      expect(failed.error).to have_attributes(origin: "kafka", http_status: 503, attempt: 1, retry: true)
+      expect(failed.error.origin_label).to include("Kafka")
+      expect(failed).to have_attributes(turn: 1, trace_id:)
+      confirmed_at = AuditEvent.find_by!(event_type: "agent_event.published").occurred_at
+      expect(events.find { _1.kind == :published }).to have_attributes(started_at: start, finished_at: confirmed_at)
+      expect(events.find { _1.kind == :published }.detail).to include("tentativa 2")
+    end
+
+    it "publicação recusada pelo broker fica sem fim e com a origem (assinatura)" do
+      ticket = open_and_publish({ status: 401 })
+
+      events = source.timeline(ticket.id.to_s).events
+
+      expect(events.find { _1.kind == :published }.finished_at).to be_nil
+      expect(events.find { _1.kind == :publish_failed }.error)
+        .to have_attributes(origin: "assinatura", http_status: 401, retry: false)
+    end
+  end
 end

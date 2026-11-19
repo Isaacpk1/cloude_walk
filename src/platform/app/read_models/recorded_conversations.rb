@@ -1,7 +1,8 @@
 # Fonte dos registros reais para as telas de conversa e linha do tempo (ROADMAP 02).
 # Lê tickets, messages e outbox_events (07, seção 4) e devolve os mesmos ConversationView e
-# TimelineView dos exemplos, marcados como DataSource::SYSTEM. Turnos, entregas e escalações
-# entram aqui quando suas tabelas existirem (blocos 04 a 10).
+# TimelineView dos exemplos, marcados como DataSource::SYSTEM. A publicação no broker vem de ai_turns
+# e da auditoria (PublicationEvents, bloco 03). Respostas, entregas e escalações entram aqui quando
+# suas tabelas existirem (blocos 04 a 10).
 class RecordedConversations
   LIMIT = 50
   WAITING = ConversationView::Participant.new(name: "Aguardando triagem", kind: "queue")
@@ -19,6 +20,7 @@ class RecordedConversations
 
     outbox = OutboxEvent.where(ticket:, event_type: "message.received").index_by { _1.payload["message_id"] }
     events = ticket.messages.select { _1.direction == "inbound" }.flat_map { message_events(ticket, _1, outbox[_1.id]) }
+    events += PublicationEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
   end
 

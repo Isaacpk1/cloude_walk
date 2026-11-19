@@ -20,6 +20,10 @@
   <div class="stat"><dt>Eventos</dt><dd><%= t.events.size %></dd></div>
 </dl>
 
+<% if @selected %>
+  <%= render "selected_event", event: @selected, timeline: t %>
+<% end %>
+
 <table class="timeline">
   <thead>
     <tr>
@@ -33,10 +37,10 @@
     </tr>
   </thead>
   <tbody>
-    <% t.events.each do |event| %>
-      <tr class="timeline__row timeline__row--<%= event.kind %>">
+    <% t.events.each.with_index(1) do |event, position| %>
+      <tr class="<%= class_names("timeline__row", "timeline__row--#{event.kind}", "timeline__row--selected" => event.equal?(@selected)) %>">
         <td><span class="mono">+<%= t.offset_ms(event) %> ms</span><div class="muted small"><%= panel_time(event.started_at, precise: true) %></div></td>
-        <td><strong><%= event.label %></strong><% if event.detail %><div class="muted small"><%= event.detail %></div><% end %></td>
+        <td><%= link_to timeline_path(c.id, evento: position), class: "timeline__pick", title: "Escolher o evento" do %><strong><%= event.label %></strong><% end %><% if event.error? %> <span class="badge badge--error">erro</span><% end %><% if event.detail %><div class="muted small"><%= event.detail %></div><% end %></td>
         <td class="mono"><%= duration_text(event.duration_ms) %></td>
         <td class="timeline__bar-col"><div class="bar"><span class="bar__fill bar__fill--<%= event.kind %>" style="<%= timeline_bar_style(t, event) %>"></span></div></td>
         <td class="mono small"><%= event.ticket_id %> · <%= event.seq ? "seq #{event.seq}" : "—" %> · <%= event.turn ? "turno #{event.turn}" : "—" %></td>
