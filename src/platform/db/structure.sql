@@ -40,6 +40,51 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: ai_turns; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_turns (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint NOT NULL,
+    turn integer NOT NULL,
+    context_until_seq integer NOT NULL,
+    assignment_version integer NOT NULL,
+    context jsonb NOT NULL,
+    event_id uuid NOT NULL,
+    status character varying DEFAULT 'eligible'::character varying NOT NULL,
+    deadline_at timestamp(6) without time zone NOT NULL,
+    applied_event_id uuid,
+    response jsonb,
+    response_received_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT ai_turns_context_until_seq_check CHECK ((context_until_seq >= 1)),
+    CONSTRAINT ai_turns_status_check CHECK (((status)::text = ANY ((ARRAY['eligible'::character varying, 'applied'::character varying, 'superseded'::character varying, 'expired'::character varying])::text[]))),
+    CONSTRAINT ai_turns_turn_check CHECK ((turn >= 1))
+);
+
+
+--
+-- Name: ai_turns_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ai_turns_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ai_turns_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ai_turns_id_seq OWNED BY public.ai_turns.id;
+
+
+--
 -- Name: ar_internal_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -255,7 +300,10 @@ CREATE TABLE public.outbox_events (
     next_attempt_at timestamp(6) without time zone NOT NULL,
     lease_until timestamp(6) without time zone,
     published_at timestamp(6) without time zone,
-    completed_at timestamp(6) without time zone
+    completed_at timestamp(6) without time zone,
+    attempts integer DEFAULT 0 NOT NULL,
+    last_error text,
+    CONSTRAINT outbox_events_attempts_check CHECK ((attempts >= 0))
 );
 
 
@@ -273,7 +321,7 @@ CREATE TABLE public.provider_accounts (
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT provider_accounts_channel_check CHECK (((channel)::text = ANY ((ARRAY['chat'::character varying, 'whatsapp'::character varying, 'email'::character varying])::text[]))),
+    CONSTRAINT provider_accounts_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT provider_accounts_whatsapp_phone_check CHECK ((((channel)::text <> 'whatsapp'::text) OR (phone_number_id IS NOT NULL)))
 );
 
@@ -530,6 +578,13 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
+-- Name: ai_turns id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_turns ALTER COLUMN id SET DEFAULT nextval('public.ai_turns_id_seq'::regclass);
+
+
+--
 -- Name: audit_events id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -611,6 +666,14 @@ ALTER TABLE ONLY public.tickets ALTER COLUMN id SET DEFAULT nextval('public.tick
 --
 
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- Name: ai_turns ai_turns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_turns
+    ADD CONSTRAINT ai_turns_pkey PRIMARY KEY (id);
 
 
 --
@@ -731,6 +794,34 @@ ALTER TABLE ONLY public.tickets
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: index_ai_turns_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_turns_on_brand_id ON public.ai_turns USING btree (brand_id);
+
+
+--
+-- Name: index_ai_turns_on_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_ai_turns_on_event_id ON public.ai_turns USING btree (event_id);
+
+
+--
+-- Name: index_ai_turns_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_turns_on_ticket_id ON public.ai_turns USING btree (ticket_id);
+
+
+--
+-- Name: index_ai_turns_on_ticket_id_and_turn; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_ai_turns_on_ticket_id_and_turn ON public.ai_turns USING btree (ticket_id, turn);
 
 
 --
@@ -1035,6 +1126,14 @@ CREATE TRIGGER queue_versions_immutable BEFORE DELETE OR UPDATE ON public.queue_
 
 
 --
+-- Name: ai_turns fk_ai_turns_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_turns
+    ADD CONSTRAINT fk_ai_turns_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
 -- Name: audit_events fk_audit_events_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1187,11 +1286,27 @@ ALTER TABLE ONLY public.customer_identities
 
 
 --
+-- Name: ai_turns fk_rails_82b05d2e53; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_turns
+    ADD CONSTRAINT fk_rails_82b05d2e53 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
 -- Name: outbox_events fk_rails_8e81165da3; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.outbox_events
     ADD CONSTRAINT fk_rails_8e81165da3 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: ai_turns fk_rails_ad9c9534a9; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_turns
+    ADD CONSTRAINT fk_rails_ad9c9534a9 FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
 
 
 --
@@ -1273,6 +1388,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261120000000'),
 ('20261119010000'),
 ('20261119000000'),
 ('20261118190000'),
