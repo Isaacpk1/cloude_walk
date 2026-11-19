@@ -1,6 +1,8 @@
 # Comandos do dia a dia (ADR-011). Detalhes em docs/10-organizacao-do-repositorio.md.
 COMPOSE := docker compose
 PLATFORM := $(COMPOSE) run --rm web
+# Mesma versão do CI (setup-ruby lê o .ruby-version de cada serviço).
+CONTRACTS_RUBY := $(shell sed 's/^ruby-//' src/contracts/.ruby-version)
 
 .PHONY: help up down logs seed reset test lint security check
 
@@ -27,7 +29,7 @@ reset: ## Recria o banco e carrega o seed
 
 test: ## Roda o rspec da plataforma e dos contratos
 	$(PLATFORM) sh -c "RAILS_ENV=test bin/rails db:prepare && bundle exec rspec"
-	docker run --rm -v $(CURDIR)/src/contracts:/contracts -w /contracts ruby:3.3.6-slim sh -c "bundle install --quiet && bundle exec rspec"
+	docker run --rm -v $(CURDIR)/src/contracts:/contracts -w /contracts ruby:$(CONTRACTS_RUBY)-slim sh -c "bundle install --quiet && bundle exec rspec"
 
 lint: ## Roda o rubocop
 	$(PLATFORM) bundle exec rubocop
