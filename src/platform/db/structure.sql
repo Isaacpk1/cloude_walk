@@ -60,7 +60,7 @@ CREATE TABLE public.ai_turns (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT ai_turns_context_until_seq_check CHECK ((context_until_seq >= 1)),
-    CONSTRAINT ai_turns_status_check CHECK (((status)::text = ANY ((ARRAY['eligible'::character varying, 'applied'::character varying, 'superseded'::character varying, 'expired'::character varying])::text[]))),
+    CONSTRAINT ai_turns_status_check CHECK (((status)::text = ANY (ARRAY[('eligible'::character varying)::text, ('applied'::character varying)::text, ('superseded'::character varying)::text, ('expired'::character varying)::text]))),
     CONSTRAINT ai_turns_turn_check CHECK ((turn >= 1))
 );
 
@@ -512,7 +512,14 @@ CREATE TABLE public.tickets (
     lock_version integer DEFAULT 0 NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    first_pending_seq integer,
+    first_pending_at timestamp(6) without time zone,
+    dispatch_due_at timestamp(6) without time zone,
+    ai_deadline_at timestamp(6) without time zone,
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
+    CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
+    CONSTRAINT tickets_first_pending_pair_check CHECK (((first_pending_seq IS NULL) = (first_pending_at IS NULL))),
+    CONSTRAINT tickets_first_pending_seq_check CHECK (((first_pending_seq IS NULL) OR (first_pending_seq >= 1))),
     CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text])))
 );
 
@@ -1056,6 +1063,13 @@ CREATE UNIQUE INDEX index_teams_on_id_and_brand_id ON public.teams USING btree (
 
 
 --
+-- Name: index_tickets_dispatch_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_dispatch_due ON public.tickets USING btree (dispatch_due_at) WHERE (dispatch_due_at IS NOT NULL);
+
+
+--
 -- Name: index_tickets_on_assignee_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1388,6 +1402,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261120010000'),
 ('20261120000000'),
 ('20261119010000'),
 ('20261119000000'),
