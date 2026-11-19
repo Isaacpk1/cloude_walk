@@ -60,6 +60,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+      # Na primeira subida (ou depois de trocar o Ruby) o entrypoint instala as gems no volume
+      # `bundle` e roda o db:prepare: pode passar de 150 s. Falhas nesse período não contam.
+      start_period: 600s
 
   # Provedores simulados e simulador do cliente (RF-04, ADR-012): http://localhost:4000
   channels-mock:
