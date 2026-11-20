@@ -1,0 +1,30 @@
+<%# ROADMAP 03: detalhe do evento escolhido na linha do tempo, com a origem do erro quando houver. %>
+<section class="selected-event" aria-labelledby="selected-event-title">
+  <h2 id="selected-event-title">Evento escolhido: <%= event.label %></h2>
+  <dl class="selected-event__fields">
+    <div><dt>Início</dt><dd><%= panel_time(event.started_at, precise: true) %></dd></div>
+    <div><dt>Duração</dt><dd><%= duration_text(event.duration_ms) %></dd></div>
+    <div><dt>ticket · seq · turno</dt><dd class="mono"><%= event.ticket_id %> · <%= event.seq || "—" %> · <%= event.turn || "—" %></dd></div>
+    <div><dt>trace_id</dt><dd><code><%= event.trace_id || "—" %></code></dd></div>
+    <% if event.detail %><div><dt>Detalhe</dt><dd><%= event.detail %></dd></div><% end %>
+  </dl>
+  <% if (error = event.error) %>
+    <dl class="selected-event__fields selected-event__fields--error">
+      <div><dt>Origem do erro</dt><dd><strong><%= error.origin_label %></strong></dd></div>
+      <div><dt>Resposta HTTP</dt><dd class="mono"><%= error.http_status || "sem resposta" %></dd></div>
+      <div><dt>Tentativa</dt><dd class="mono"><%= error.attempt || "—" %></dd></div>
+      <% if error.message %><div><dt>Mensagem</dt><dd><%= error.message %></dd></div><% end %>
+      <div><dt>Próximo passo</dt><dd>
+        <% if error.retry %>
+          Nova tentativa às <%= panel_time(error.next_attempt_at, precise: true) %>, com o mesmo event_id
+        <% elsif error.outcome %>
+          <%= error.outcome_label %>
+        <% else %>
+          Sem nova tentativa: falha permanente (RN-44)
+        <% end %>
+      </dd></div>
+    </dl>
+  <% else %>
+    <p class="muted">Sem erro registrado nesta etapa.</p>
+  <% end %>
+</section>

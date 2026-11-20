@@ -1,6 +1,6 @@
 # Ambiente local do Help Desk CloudWalk (ADR-011, RNF-29).
-# Bloco 02: postgres, redis, web e channels-mock. Os demais serviços entram nos blocos seguintes
-# (worker e broker no 03, consumer e agent-mock no 04, scheduler no 08).
+# Bloco 03: postgres, redis, kafka (+ kafka-init), web, worker, scheduler, broker e channels-mock.
+# Os demais serviços entram nos blocos seguintes (consumer e agent-mock no 04).
 name: helpdesk
 
 x-platform: &platform
@@ -11,9 +11,13 @@ x-platform: &platform
   env_file:
     - path: .env
       required: false
-  environment:
+  environment: &platform-env
     DATABASE_URL: postgres://${POSTGRES_USER:-helpdesk}:${POSTGRES_PASSWORD:-helpdesk}@postgres:5432
     REDIS_URL: redis://redis:6379/0
+    BROKER_URL: http://broker:4100/webhooks
+    # Log na saída do contêiner (docker compose logs), não em arquivo na pasta montada: no Windows,
+    # cada escrita nela é lenta (config/environments/development.rb).
+    RAILS_LOG_TO_STDOUT: "1"
   depends_on:
     postgres:
       condition: service_healthy
@@ -63,6 +67,133 @@ services:
       # Na primeira subida (ou depois de trocar o Ruby) o entrypoint instala as gems no volume
       # `bundle` e roda o db:prepare: pode passar de 150 s. Falhas nesse período não contam.
       start_period: 600s
+
+  # Sidekiq: publica o outbox no broker e retenta com backoff (ADR-005; 07, seção 2).
+  # Espera o web, que prepara o banco e instala as gems no volume compartilhado.
+  worker:
+    <<: *platform
+    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+    environment:
+      <<: *platform-env
+      # Sem recarga automática do código: mudou o código, `docker compose restart worker`
+      # (config/environments/development.rb).
+      RAILS_ENABLE_RELOADING: "0"
+      SIDEKIQ_HEARTBEAT_FILE: /tmp/sidekiq.alive
+    # Pronto quando o Sidekiq subiu e fala com o Redis: o arquivo é renovado a cada ~10 s.
+    healthcheck:
+      test: ["CMD", "ruby", "-e", "exit(Time.now - File.mtime('/tmp/sidekiq.alive') < 30 ? 0 : 1) rescue exit(1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
+    volumes:
+      - ./src/platform:/rails
+      - ./src/contracts:/contracts
+      - bundle:/usr/local/bundle
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # Prazos do atendimento (ADR-016; 07, seção 2): a cada 250 ms registra no outbox as ações vencidas
+  # (bloco 03: abertura do turno ao fim da janela, RN-55) e acorda o worker. Uma réplica por padrão;
+  # réplicas extras dividem o lote com SKIP LOCKED. Espera o web pelo mesmo motivo do worker.
+  scheduler:
+    <<: *platform
+    command: ["bin/scheduler"]
+    environment:
+      <<: *platform-env
+      SCHEDULER_INTERVAL: "0.25"
+      # A consulta roda 4 vezes por segundo: em debug, o SQL encobriria os eventos do scheduler.
+      RAILS_LOG_LEVEL: info
+      # Sem recarga automática do código: mudou o código, `docker compose restart scheduler`.
+      RAILS_ENABLE_RELOADING: "0"
+      SCHEDULER_HEARTBEAT_FILE: /tmp/scheduler.alive
+    # Pronto quando a primeira volta consultou o banco; travado ou sem banco por 5 s vira unhealthy.
+    healthcheck:
+      test: ["CMD", "ruby", "-e", "exit(Time.now - File.mtime('/tmp/scheduler.alive') < 5 ? 0 : 1) rescue exit(1)"]
+      interval: 2s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
+      SCHEDULER_BATCH: "100"
+    volumes:
+      - ./src/platform:/rails
+      - ./src/contracts:/contracts
+      - bundle:/usr/local/bundle
+    stop_signal: SIGTERM
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+  # Kafka 4 em modo KRaft, nó único (ADR-004). Heap limitado (08, orçamento de memória).
+  # Dentro do Compose: kafka:29092. Na máquina: localhost:9092.
+  kafka:
+    image: apache/kafka:4.1.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Os tópicos vêm só de infra/kafka/topics.yml (kafka-init).
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_HEAP_OPTS: -Xms768m -Xmx768m
+    # Sem volume: o Kafka não é fonte da verdade, o outbox no Postgres republica (P2, ADR-016).
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  # Cria os tópicos de infra/kafka/topics.yml e sai (docs/10, seções 3.7 e 6).
+  kafka-init:
+    image: apache/kafka:4.1.1
+    command: ["sh", "/infra/kafka/create-topics.sh"]
+    environment:
+      KAFKA_BOOTSTRAP: kafka:29092
+    volumes:
+      - ./infra/kafka:/infra/kafka:ro
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Broker de webhooks: valida HMAC e contrato e publica em agent.inbound (ADR-007): http://localhost:4100
+  broker:
+    build:
+      context: ./src
+      dockerfile: broker/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      KAFKA_BROKERS: kafka:29092
+    ports:
+      - "4100:4100"
+    # Só leitura: o teste de configuração confere os tópicos declarados (make test).
+    volumes:
+      - ./infra/kafka:/infra/kafka:ro
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:4100/up"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   # Provedores simulados e simulador do cliente (RF-04, ADR-012): http://localhost:4000
   channels-mock:

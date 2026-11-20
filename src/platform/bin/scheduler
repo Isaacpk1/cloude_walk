@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+# Scheduler dos prazos do atendimento (ADR-016; 07, seção 2; docs/10, seção 6). Mesma imagem da
+# plataforma, outro comando. A cada SCHEDULER_INTERVAL segundos (padrão 0,25) registra no outbox até
+# SCHEDULER_BATCH ações vencidas (padrão 100). TERM ou INT: termina a volta em curso e sai.
+require_relative "../config/environment"
+
+$stdout.sync = true
+# Logs em JSON no stdout do contêiner (invariante 13). Em produção o logger já é o stdout. Nível info
+# por padrão: a consulta roda 4 vezes por segundo e o SQL de debug encobriria os eventos.
+unless Rails.env.production? || ENV["RAILS_LOG_TO_STDOUT"].present?
+  Rails.logger.broadcast_to(ActiveSupport::Logger.new($stdout, level: ENV.fetch("SCHEDULER_LOG_LEVEL", "info")))
+end
+
+scheduler = Deadlines::Loop.from_env
+%w[TERM INT].each { |signal| Signal.trap(signal) { scheduler.stop! } }
+scheduler.run

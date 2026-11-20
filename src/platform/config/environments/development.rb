@@ -5,13 +5,25 @@ Rails.application.configure do
   # Sem isto, a proteção de host do Rails responde 403 a todo webhook vindo do simulador.
   config.hosts << "web"
 
+  # No Docker, o log vai para a saída do contêiner, e não para log/development.log. No Windows, a pasta
+  # montada do host deixa cada escrita lenta, e as escritas somavam ~1,5 s por transação, com o
+  # atendimento travado (medição do bloco 03). RAILS_LOG_LEVEL ajusta o nível (padrão debug).
+  if ENV["RAILS_LOG_TO_STDOUT"].present?
+    $stdout.sync = true
+    config.logger = ActiveSupport::TaggedLogging.logger($stdout)
+    config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "debug")
+  end
+
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Make code changes take effect immediately without server restart.
-  config.enable_reloading = true
+  # RAILS_ENABLE_RELOADING=0 (worker e scheduler no Compose): sem recarga automática e com o código todo
+  # carregado na subida. Antes de cada job, o Rails conferia se algum arquivo mudou, e na pasta montada do
+  # Windows isso custava 1,5 a 3 s por passo (medição do bloco 03). Mudou o código, reinicie o processo.
+  config.enable_reloading = ENV.fetch("RAILS_ENABLE_RELOADING", "1") != "0"
 
-  # Do not eager load code on boot.
-  config.eager_load = false
+  # Do not eager load code on boot (só quando a recarga está ligada).
+  config.eager_load = !config.enable_reloading
 
   # Show full error reports.
   config.consider_all_requests_local = true

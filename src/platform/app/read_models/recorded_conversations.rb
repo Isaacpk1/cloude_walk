@@ -1,7 +1,8 @@
 # Fonte dos registros reais para as telas de conversa e linha do tempo (ROADMAP 02).
 # Lê tickets, messages e outbox_events (07, seção 4) e devolve os mesmos ConversationView e
-# TimelineView dos exemplos, marcados como DataSource::SYSTEM. Turnos, entregas e escalações
-# entram aqui quando suas tabelas existirem (blocos 04 a 10).
+# TimelineView dos exemplos, marcados como DataSource::SYSTEM. A espera da janela de agrupamento
+# (TurnWindowEvents) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03). Respostas, entregas e escalações entram aqui quando
+# suas tabelas existirem (blocos 04 a 10).
 class RecordedConversations
   LIMIT = 50
   WAITING = ConversationView::Participant.new(name: "Aguardando triagem", kind: "queue")
@@ -19,6 +20,8 @@ class RecordedConversations
 
     outbox = OutboxEvent.where(ticket:, event_type: "message.received").index_by { _1.payload["message_id"] }
     events = ticket.messages.select { _1.direction == "inbound" }.flat_map { message_events(ticket, _1, outbox[_1.id]) }
+    events += TurnWindowEvents.new(ticket).events
+    events += PublicationEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
   end
 
@@ -38,7 +41,8 @@ class RecordedConversations
       customer_name: ticket.customer.display_name, channel: ticket.channel, state: ticket.state,
       title: ticket.messages.first&.body.to_s.truncate(60), assignee: WAITING,
       assignment_version: ticket.assignment_version, latest_customer_seq: ticket.latest_customer_seq,
-      messages: ticket.messages.map { message(ticket, _1) }, turns: [], escalations: [], source: DataSource::SYSTEM
+      messages: ticket.messages.map { message(ticket, _1) }, turns: ticket.ai_turns.order(:turn).map { turn(_1) },
+      escalations: [], source: DataSource::SYSTEM
     )
   end
 
@@ -47,6 +51,24 @@ class RecordedConversations
       seq: record.seq, author_type: record.author_type, author_name: author_name(ticket, record), body: record.body,
       direction: record.direction, internal: record.internal, occurred_at: record.received_at,
       trace_id: record.trace_id, delivery_status: nil, delivery_id: nil
+    )
+  end
+
+  TURN_NOTES = {
+    "eligible" => "Publicado e aguardando a resposta do agente (bloco 04).",
+    "superseded" => "Turno superado: uma mensagem nova do cliente chegou antes da resposta (RN-56).",
+    "expired" => "Turno expirado: o prazo da IA venceu (RN-46).",
+    "applied" => "Resposta aplicada."
+  }.freeze
+
+  # Bloco 03: o turno gravado em ai_turns. As mensagens cobertas são as pendentes do contexto enviado.
+  def turn(record)
+    ConversationView::Turn.new(
+      number: record.turn, status: record.status,
+      covered_seqs: Array(record.context["pending_messages"]).map { _1["seq"] },
+      context_until_seq: record.context_until_seq, assignment_version: record.assignment_version,
+      event_id: record.event_id, action: record.response&.dig("action") || "—",
+      note: TURN_NOTES[record.status], tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] }
     )
   end
 

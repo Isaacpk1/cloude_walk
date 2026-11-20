@@ -211,16 +211,16 @@ Uma confirmação perdida mantém a saída em `sending`. O worker consulta o res
 | `latest_customer_seq` | `tickets` | Última mensagem do cliente gravada. Atualizado na transação da ingestão, com a linha travada |
 | `first_pending_seq`, `first_pending_at` | `tickets` | Identidade e horário da primeira mensagem do ciclo pendente. Junto à versão da atribuição, distinguem avisos e timeouts de ciclos diferentes |
 | `dispatch_due_at` | `tickets` | Quando o próximo turno deve sair (fim da janela de agrupamento) |
-| `progress_due_at`, `ai_deadline_at` | `tickets` | Prazos de 15 s e 30 s desde `first_pending_at`. Continuam valendo durante toda a espera, inclusive sem turno publicado |
+| `progress_due_at`, `ai_deadline_at` | `tickets` | Aviso aos 15 s e teto do ciclo aos 60 s desde `first_pending_at`. Continuam valendo durante toda a espera, inclusive sem turno publicado |
 | `assignment_version` | `tickets` | Muda a cada troca de responsável (IA → humano → IA). Invalida respostas de uma atribuição anterior |
-| `ai_turns` | tabela própria | Um registro por turno: `turn`, contexto enviado, `context_until_seq`, `assignment_version`, `event_id`, `status` (`eligible`, `applied`, `superseded`, `expired`) e cópia do prazo do atendimento no envio |
+| `ai_turns` | tabela própria | Um registro por turno: `turn`, contexto enviado, `context_until_seq`, `assignment_version`, `event_id`, `status` (`eligible`, `applied`, `superseded`, `expired`) e `deadline_at`, o prazo do turno: o menor entre a abertura + 20 s e o `ai_deadline_at` do atendimento ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) |
 
 **Condições para aplicar uma resposta.** O consumer trava a linha do atendimento e confere a resposta com o turno registrado no Postgres:
 
 1. A resposta aponta para o turno atual, em `eligible`, e `in_reply_to` corresponde ao `event_id` persistido para ele.
 2. A `assignment_version` devolvida corresponde à versão do turno e à atribuição atual, que continua com a IA.
 3. O `context_until_seq` devolvido corresponde ao do turno persistido. O valor persistido cobre o `latest_customer_seq` do atendimento.
-4. O ciclo ainda está pendente e o relógio do banco, lido após adquirir o lock, está antes de `tickets.ai_deadline_at`. Essa verificação vale mesmo com o job de timeout atrasado.
+4. O ciclo ainda está pendente e o relógio do banco, lido após adquirir o lock, está antes do `deadline_at` do turno (que nunca passa de `tickets.ai_deadline_at`). Essa verificação vale mesmo com o job de timeout atrasado.
 
 O turno fica `eligible` no commit que grava seu evento no outbox. A confirmação do broker atualiza o estado da publicação separadamente. Se todas as condições forem satisfeitas, a mesma transação marca o turno `applied`, registra a ação final, limpa os prazos e cancela o aviso de progresso do ciclo que ainda estiver `pending`. Ao receber outra mensagem, a plataforma abre um novo ciclo com a primeira mensagem ainda pendente. Uma resposta descartada gera auditoria com o motivo e as consultas validadas, preservando o estado do turno. As transições para `superseded` ou `expired` partem de `eligible` quando a ingestão, a troca de atribuição ou o timeout invalidam o turno. `applied`, `superseded` e `expired` são estados terminais.
 
@@ -231,7 +231,9 @@ O turno fica `eligible` no commit que grava seu evento no outbox. A confirmaçã
 | Cada mensagem nova enquanto o caso está com a IA | `dispatch_due_at` é o menor entre a hora da mensagem mais a janela do canal e `first_pending_at` + **4 s**. É o instante de elegibilidade, sujeito ao atraso medido do scheduler e do worker |
 | Pedido explícito de humano | Detectado na ingestão. Aplica a transição da seção 3.2 (RN-34) |
 | 15 s desde `first_pending_at` | O `scheduler` registra uma ação de aviso por ciclo. O worker registra a entrega do aviso somente enquanto o mesmo ciclo estiver pendente, com a IA e antes do timeout |
-| 30 s desde `first_pending_at` | Respostas passam a ser rejeitadas. O `scheduler` registra uma ação de handoff mesmo sem turno elegível. O worker confirma que o mesmo ciclo segue pendente e aplica a escalação com o histórico mais recente (RN-46) |
+| 20 s desde a abertura do turno (`ai_turns.deadline_at`) | Respostas desse turno passam a ser rejeitadas. O `scheduler` registra uma ação de handoff. O worker confirma que o turno segue elegível e o ciclo pendente e aplica a escalação com o histórico mais recente (RN-46) |
+| 60 s desde `first_pending_at` (`ai_deadline_at`, teto do ciclo) | Vale mesmo sem turno publicado ou com o cliente ainda escrevendo. Mesma ação de handoff (RN-46) |
+| Falha definitiva da publicação do turno | Recusa do broker (`401`, `422`), contrato inválido ou retentativas esgotadas: o worker registra a ação de handoff no outbox, na mesma transação que encerra a publicação, sem esperar o prazo (RN-46, [ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) |
 
 **Registro dos prazos.** O registro da ação vencida no outbox é o marcador durável da emissão. A consulta considera prazos com chave ainda ausente no outbox. A chave da abertura identifica o atendimento, a atribuição e a última mensagem a cobrir. As chaves do aviso e do timeout identificam o tipo de ação, o atendimento, a atribuição e `first_pending_seq`. `ai_deadline_at` continua disponível para validação até o encerramento do ciclo. O worker revalida a ação sob o lock e conclui o item do outbox na transação do efeito ou do descarte. Um job de abertura de versão anterior preserva a janela da mensagem mais recente. O job no Redis carrega o ID do item, e a recuperação reoferece itens ainda abertos. Ver [ADR-016](08-decisoes-de-arquitetura.md#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox).
 
@@ -305,10 +307,10 @@ erDiagram
 | `routing_rulesets` | `brand_id`, `version`, `rules` (JSONB: lista ordenada de regras em forma normal disjuntiva), `created_by`, `created_at` | Ver [ADR-013](08-decisoes-de-arquitetura.md#adr-013--versionar-o-conjunto-de-regras-inteiro) |
 | `tickets` | `brand_id`, `customer_id`, `channel`, `state`, `category`, `priority`, `queue_id`, `queue_version`, `ruleset_version`, `assignee_id`, prazos de SLA, `sla_paused_at`, `sla_breached`, `linked_ticket_id`, `ai_turns_count`, `current_turn`, `latest_customer_seq`, `first_pending_seq`, `first_pending_at`, `dispatch_due_at`, `progress_due_at`, `ai_deadline_at`, `assignment_version`, `lock_version` | Guarda estado, atribuição e prazos. `ruleset_version` rastreia a decisão de roteamento. `ai_turns_count` conta as trocas da IA (RN-33, item 6) |
 | `messages` | `brand_id`, `ticket_id`, `provider_account`, `channel`, `direction`, `author_type` (`customer`, `bot`, `analyst`, `system`), `author_id`, `body`, `internal`, `external_id`, `seq`, `trace_id`, `subject`, `attachments` (JSONB, só metadados), `provider_payload` (JSONB) | `internal` marca notas internas (RN-50). A conta do provedor delimita a deduplicação. `seq` ordena mensagens e entregas. `subject` e `attachments` guardam o assunto e os anexos do e-mail (RF-03). `provider_payload` guarda o webhook cru do provedor, para depuração e auditoria do adaptador (seção 5.0) |
-| `ai_turns` | `ticket_id`, `turn` (único por atendimento), `context_until_seq`, `assignment_version`, `context` (JSONB enviado), `event_id`, `status`, `deadline_at`, `applied_event_id`, `response` (JSONB), `response_received_at` | Guarda exatamente o que a IA recebeu em cada turno e o que ela devolveu. `response` é a primeira ação recebida para o turno, **aplicada ou descartada** (por exemplo, a resposta superada na corrida da seção 3.4). Assim a linha do tempo e os evals mostram o que a IA teria dito mesmo quando nada chegou ao cliente. Ações repetidas para o mesmo turno ficam só na auditoria |
+| `ai_turns` | `brand_id`, `ticket_id`, `turn` (único por atendimento), `context_until_seq`, `assignment_version`, `context` (JSONB enviado), `event_id`, `status`, `deadline_at`, `applied_event_id`, `response` (JSONB), `response_received_at` | Guarda exatamente o que a IA recebeu em cada turno e o que ela devolveu. `response` é a primeira ação recebida para o turno, **aplicada ou descartada** (por exemplo, a resposta superada na corrida da seção 3.4). Assim a linha do tempo e os evals mostram o que a IA teria dito mesmo quando nada chegou ao cliente. Ações repetidas para o mesmo turno ficam só na auditoria |
 | `ticket_summaries` | `ticket_id`, `kind` (`handoff`, `resolution`), `content` (JSONB com os 5 campos), `generated_by` | Resumo do handoff (RN-39) e da resolução (RF-52), reaproveitados como memória (RN-49) |
 | `deliveries` | `delivery_id` (estável), `ticket_id`, `message_id`, `seq`, `channel`, `kind`, `ai_assignment_version` (saídas da IA), `ai_first_pending_seq` (aviso de progresso), `status` (`pending`, `sending`, `delivered`, `cancelled`, `failed`), `attempts`, `lease_until`, `provider_message_id` | Controla a ordem de saída e a conciliação do resultado no canal (seção 3.2) |
-| `outbox_events` | `id` (= `event_id`, UUID), `ticket_id`, `event_type`, `dedup_key` (quando aplicável), `payload`, `trace_id`, `created_at`, `next_attempt_at`, `lease_until`, `published_at`, `completed_at` | `published_at` registra confirmação da publicação externa. `completed_at` encerra o item após o efeito durável, a publicação confirmada ou o descarte justificado ([ADR-016](08-decisoes-de-arquitetura.md#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox)) |
+| `outbox_events` | `id` (= `event_id`, UUID), `ticket_id`, `event_type`, `dedup_key` (quando aplicável), `payload`, `trace_id`, `created_at`, `next_attempt_at`, `lease_until`, `attempts`, `last_error`, `published_at`, `completed_at` | `published_at` registra confirmação da publicação externa. `attempts` conta as tentativas (RN-43) e `last_error` guarda o motivo da última falha; o histórico de cada tentativa, com a origem do erro, fica na auditoria. `completed_at` encerra o item após o efeito durável, a publicação confirmada ou o descarte justificado ([ADR-016](08-decisoes-de-arquitetura.md#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox)) |
 | `processed_events` | `consumer`, `event_id` (chave primária composta), `processed_at` | Idempotência: o efeito e a marcação de "processado" entram na mesma transação (RN-47) |
 | `dead_letters` | `event_id`, `topic`, `payload`, `error`, `attempts`, `ticket_id`, `created_at`, `reprocessed_at` | Espelho da DLQ para o supervisor ver e reprocessar (RF-37). Retenção mínima de 7 dias (RN-48) |
 | `audit_events` | `id`, `occurred_at`, `brand_id`, `ticket_id`, `actor_type`, `actor_id`, `event_type`, `data` (JSONB), `trace_id`, `ruleset_version`, `agent_model`, `agent_version` | Só inserção (RN-54, RNF-21) |
@@ -405,6 +407,15 @@ Cabeçalhos HTTP do webhook:
 
 O broker publica **o mesmo envelope** no Kafka, com chave `conversation_id` e os mesmos `event_id` e `traceparent` como cabeçalhos da mensagem.
 
+Respostas do broker (bloco 03). A plataforma trata `5xx` e `429` como falha transitória (RN-43) e os demais `4xx` como permanentes (RN-44):
+
+| Resposta | Quando | Kafka |
+| --- | --- | --- |
+| `200` (`published` ou `duplicate`) | Assinatura e contrato válidos e escrita confirmada (`acks=all`). Repetição do mesmo `event_id` devolve a primeira publicação | Uma mensagem em `agent.inbound` |
+| `401` | Assinatura ausente, inválida ou fora de ±5 min | Nada, nem na DLQ |
+| `422` | Assinado, mas fora do contrato, com `X-Helpdesk-Event-Id` diferente do corpo ou sem `traceparent` válido | Corpo original em `agent.dlq`, com os cabeçalhos `dlq_reason`, `dlq_source`, `dlq_violations`, `event_id` e `traceparent` |
+| `503` | O Kafka não confirmou a escrita, ou outra entrega do mesmo `event_id` está em andamento | Nada confirmado |
+
 ```json
 {
   "schema": "helpdesk.agent_event.v1",
@@ -439,7 +450,7 @@ Tipos de evento: `message.created`, `ticket.assigned_to_agent`, `ticket.returned
 - `conversation_id`: chave da partição, que garante a ordem (RNF-13). É também como o agente identifica a conversa.
 - `context`: o agente é "sem estado" do ponto de vista da plataforma. Tudo o que ele precisa para decidir vai no evento (RF-33, RF-53). `pending_messages` traz **todas** as mensagens do cliente ainda sem resposta, por inteiro. `history` traz o restante dentro do limite da RN-49. `summary.covers_until_seq` prova que não há vão entre o resumo e o histórico.
 - `customer.verified`: o agente não pode consultar dados de conta de cliente não verificado (RN-05).
-- `deadline_at`: cópia do `ai_deadline_at` do atendimento no momento da abertura do turno. O agente usa a cópia para ignorar eventos vencidos. A plataforma decide com o prazo persistido do ciclo atual (RN-46).
+- `deadline_at`: prazo do turno, o menor entre a abertura + 20 s e o `ai_deadline_at` do atendimento (teto do ciclo). O agente usa o valor para ignorar eventos vencidos. A plataforma decide com o prazo persistido no turno (RN-46, [ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)).
 - `ai_turns`: o agente sabe quantas trocas já fez, para respeitar o limite de 10 (RN-33).
 - `turn`: número do turno (seção 3.4). A resposta precisa devolvê-lo para ser aplicada.
 - `context_until_seq`: até qual mensagem o contexto foi montado. O consumer usa o valor do turno persistido para comparar com `latest_customer_seq` e auditar o contexto enviado.
@@ -518,10 +529,10 @@ Os experimentos E2, E4 e E6 verificam os cenários desta tabela.
 | Postgres indisponível | A ingestão responde `503` e **não** confirma. O provedor tenta de novo | Nunca confirmar o que não foi persistido (RPO = 0) | RNF-14, RNF-19 |
 | Scheduler cai após registrar a ação e antes de enfileirar, ou Redis perde o job | A ação permanece aberta no outbox até o commit do efeito ou descarte. A recuperação a reoferece após vencer a reserva, se houver | A emissão do prazo e o registro da ação são atômicos | RNF-14, RNF-15 |
 | Scheduler ou worker processa duas vezes o mesmo prazo | A chave da ação impede duplicar a emissão. O worker confirma a versão do ciclo e grava a conclusão com o efeito, que só é aplicado uma vez | A reserva pode expirar e permitir reexecução | RN-57, RNF-15 |
-| Broker ou Kafka fora do ar | Retenta o webhook com backoff e jitter enquanto o turno e seu prazo permitem. O `ai_deadline_at` do ticket aciona o handoff mesmo sem nenhuma publicação confirmada | O prazo do atendimento independe da integração | RN-43, RN-46, RNF-17, RNF-18 |
+| Broker ou Kafka fora do ar | Retenta o webhook com backoff e jitter enquanto o prazo do turno permite. Retentativas esgotadas ou recusa definitiva escalam na hora. O `ai_deadline_at` do ticket aciona o handoff mesmo sem nenhuma publicação confirmada | O prazo do atendimento independe da integração | RN-43, RN-46, RNF-17, RNF-18 |
 | Broker volta com backlog | Antes de publicar, o worker revalida turno, prazo e atribuição. Encerra itens obsoletos e mantém todo o histórico no Postgres | Só eventos ainda válidos seguem para a IA | RN-38, RNF-17 |
 | Agente lento ou fora do ar | O Kafka mantém os eventos publicados. O timeout encaminha os casos pendentes para humano. Ao voltar, o agente descarta eventos vencidos e o consumer revalida respostas com o estado atual | O backlog pode ser drenado com descartes auditados, sem perder as mensagens do cliente | RN-46, RNF-17, RNF-18 |
-| Resposta chega a partir do prazo com o job de timeout atrasado | O consumer confere `ai_deadline_at` sob o lock e rejeita a ação. O handoff segue pelo prazo do atendimento | A validade muda no prazo, mesmo se o job executar depois | RN-46, RNF-18 |
+| Resposta chega a partir do prazo com o job de timeout atrasado | O consumer confere o `deadline_at` do turno sob o lock e rejeita a ação. O handoff segue pelo prazo do atendimento | A validade muda no prazo, mesmo se o job executar depois | RN-46, RNF-18 |
 | Resposta válida chega antes de a plataforma receber o ACK do broker | O turno já está `eligible`. A resposta pode ser aplicada e o ACK posterior atualiza apenas a publicação | A ordem entre a confirmação HTTP e a resposta pelo Kafka é independente | RN-56 |
 | Evento duplicado no Kafka (reentrega após rebalanceamento) | `processed_events` na mesma transação do efeito: o segundo é ignorado | O Kafka entrega pelo menos uma vez | RN-47, RNF-15 |
 | `consumer` cai no meio do processamento | O offset não foi confirmado, então o evento volta. A idempotência absorve | Confirmar o offset só depois do commit no banco | RNF-14 |
@@ -541,7 +552,7 @@ Os experimentos E2, E4 e E6 verificam os cenários desta tabela.
 
 ### Ponto de atenção: queda longa da integração
 
-Com o broker ou o agente fora do ar por mais de 30 s, **todos os casos novos escalam para humanos** pelo timeout. Nenhuma mensagem se perde (RNF-17), mas a fila de escalas pode lotar.
+Com o broker fora do ar, os casos escalam assim que as retentativas do turno se esgotam. Com o agente mudo, escalam 20 s depois da abertura do turno. Nos dois casos, **todos os casos novos escalam para humanos**. Nenhuma mensagem se perde (RNF-17), mas a fila de escalas pode lotar.
 
 **Por que essa escolha:** é melhor o cliente ser atendido por um humano do que ficar sem resposta. A alternativa, um timeout maior durante quedas, troca carga dos analistas por espera do cliente. **Pergunta para o onboarding:** a operação prefere lotar a fila humana ou segurar o cliente por mais tempo quando a IA cai?
 
@@ -581,6 +592,7 @@ Com o broker ou o agente fora do ar por mais de 30 s, **todos os casos novos esc
 - A janela de agrupamento (1,5 s, até 4 s) e o aviso de progresso aos 15 s são aceitáveis para a operação?
 - O agente real gera o resumo do handoff? Se não, o resumo fica todo com a plataforma.
 - O agente real aceita um `deadline_at` e consegue ignorar eventos vencidos?
+- Qual é o p95 do tempo do agente real por turno, com as consultas às ferramentas? Calibra os 20 s por turno e o teto de 60 s do ciclo ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)).
 - Formato real dos webhooks do help desk atual, para aproximar o contrato 5.2.
 - Mensagens do WhatsApp que não são texto (imagem, áudio, documento): a plataforma passa a processá-las como anexo ou responde ao cliente que só aceita texto?
 - WhatsApp fora da janela de 24 h: a resposta do analista ou da IA usa um template aprovado, muda de canal ou fica pendente até o cliente escrever (seção 5.0)?

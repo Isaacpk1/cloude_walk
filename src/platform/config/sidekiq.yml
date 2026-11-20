@@ -1,0 +1,7 @@
+# Filas e pesos do 07, seção 2 ("Filas do Sidekiq"). Bloco 03 usa só a critical (publicação do outbox).
+:concurrency: <%= ENV.fetch("SIDEKIQ_CONCURRENCY", 5) %>
+:queues:
+  - [critical, 6]
+  - [default, 3]
+  - [timers, 2]
+  - [low, 1]
