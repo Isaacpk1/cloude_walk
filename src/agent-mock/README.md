@@ -11,7 +11,7 @@ Faz o papel do agente de IA da CloudWalk ([ADR-008](../../docs/08-decisoes-de-ar
 | `ticket.ai_turns >= 10` | `escalate` com `limite_de_trocas` (RN-33) |
 | Caso normal | Primeira regra de `config/scenarios.yml` que casar no texto de **todas** as `pending_messages`; sem regra, `reply` padrão |
 
-Regras padrão: pedido de humano → `escalate` (RN-34); estorno, troca de conta ou limite → `escalate` (RN-35); "resolvido", "resolveu", "deu certo" (sem negação) → `resolve` (RN-36); repasse, transação ou taxa → consulta sintética + `reply`. Cliente com `customer.verified: false` não tem consulta de dados de conta: o agente pede identificação (RN-05). A taxa não é dado de conta e segue liberada.
+Regras padrão: pedido de humano → `escalate` (RN-34); estorno, troca de conta ou limite → `escalate` (RN-35); "resolvido", "resolveu", "deu certo" → `resolve` só quando afirmativos (RN-36): negação até 3 palavras antes ("ainda não está resolvido", "nada foi resolvido") ou pergunta ("resolveu?") não confirmam, e a IA segue com `reply` (recursos genéricos de regra `negations` + `negation_window` e `ignore_questions`, validados na subida); repasse, transação ou taxa → consulta sintética + `reply`. Cliente com `customer.verified: false` não tem consulta de dados de conta: o agente pede identificação (RN-05). A taxa não é dado de conta e segue liberada.
 
 As consultas (`get_settlement_status`, `get_transaction_status`, `get_fee`) são locais e sintéticas: o resultado sai de um hash da semente e dos argumentos. Cada uma vira um item de `tool_calls` com `tool`, `args`, `result` e `duration_ms` (sintético). Nenhuma movimenta dinheiro ou altera cadastro (RN-35).
 
@@ -20,7 +20,7 @@ Toda ação é validada contra `agent_outbound` antes de sair. Se não passar, �
 - chave `conversation_id`; cabeçalhos `event_id` (da ação), `traceparent` (o mesmo recebido, RF-56) e `schema`;
 - `in_reply_to`, `conversation_id`, `brand`, `turn`, `context_until_seq` e `assignment_version` iguais aos do evento;
 - `agent`: `model: mock-deterministico`, `version` (`lib/agent_mock/version.rb`) e `config_hash` (`sha256:` do JSON canônico da configuração efetiva, RN-37);
-- `timing`: `received_at`, `responded_at` e `agent_ms` (inclui a latência simulada, RNF-03).
+- `timing`: `received_at`, `responded_at` e `agent_ms` = `responded_at - received_at`, a execução simulada inteira: latência sorteada mais a soma dos `duration_ms` das consultas, que também ocupam a thread (RNF-03). Determinístico para a mesma entrada e semente.
 
 A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Kafka não confirmar, o erro sobe, o Karafka não confirma o offset daquele evento e ele volta (07, seção 6). O offset é marcado evento a evento.
 
@@ -28,7 +28,7 @@ A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Ka
 
 ## Configuração
 
-`config/scenarios.yml` tem a semente, os perfis, as tools, as regras e os textos. As variáveis de ambiente sobrepõem o perfil, e entram no `config_hash`.
+`config/scenarios.yml` tem a semente, os perfis, as tools, as regras e os textos. As variáveis `AGENT_*` do perfil (semente, latência, falha, mudo) sobrepõem o perfil e entram no `config_hash`; as de Kafka e `AGENT_CONCURRENCY` não.
 
 | Variável | Padrão | Para quê |
 | --- | --- | --- |
@@ -40,8 +40,9 @@ A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Ka
 | `AGENT_LATENCY_MS` | do perfil | Fixa (`2000`) ou faixa (`1000-3000`) |
 | `AGENT_FAILURE_RATE` | do perfil | De `0` a `1`: fração de eventos sem resposta |
 | `AGENT_MUTE` | do perfil | `true` ou `false` |
+| `AGENT_CONCURRENCY` | `48` | Threads do Karafka (inteiro ≥ 1). A latência simulada ocupa a thread: vazão ≈ concorrência ÷ latência, ~24 turnos/s com 48 e o agente a 2 s (07, seção 7). Não entra no `config_hash`: muda a vazão, não a decisão |
 
-Mesma entrada + mesma configuração + mesma semente = mesma ação, exceto `event_id` e `timing`. A latência e a falha são sorteadas por `event_id`, então não dependem da ordem de chegada nem da partição. Configuração inválida (perfil desconhecido, taxa fora de 0..1, tool fora do catálogo) derruba a subida.
+Mesma entrada + mesma configuração + mesma semente = mesma ação, exceto `event_id` e `timing`. A latência e a falha são sorteadas por `event_id`, então não dependem da ordem de chegada nem da partição. Configuração inválida (perfil desconhecido, taxa fora de 0..1, tool fora do catálogo, regra mal formada, `AGENT_CONCURRENCY` < 1) derruba a subida.
 
 Os logs saem em JSON no stdout, com `trace_id`, `event_id`, `conversation_id`, decisão, regra e duração. O texto do cliente e o `display_name` nunca vão para o log (RN-51).
 

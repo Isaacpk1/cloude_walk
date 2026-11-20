@@ -26,6 +26,8 @@ module AgentMock
       @max_ai_turns = integer(raw.fetch("max_ai_turns"), "max_ai_turns")
       @tools = raw.fetch("tools")
       @rules = raw.fetch("rules")
+      # Regra inválida derruba a subida aqui, não no primeiro evento.
+      @rules.each { Scenarios::Rule.new(_1) }
       @replies = raw.fetch("replies")
     end
 

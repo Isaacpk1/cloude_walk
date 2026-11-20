@@ -4,13 +4,15 @@ require "karafka"
 require_relative "lib/agent_mock"
 require_relative "app/consumers/inbound_consumer"
 
-# Falha na subida se a configuração for inválida (perfil desconhecido, taxa fora de 0..1).
+# Falha na subida se a configuração for inválida (perfil desconhecido, taxa fora de 0..1, regra inválida).
 AgentMock.config
 
 class KarafkaApp < Karafka::App
   setup do |config|
     config.kafka = AgentMock::Kafka.consumer_config
     config.client_id = "helpdesk-agent-mock"
+    # AGENT_CONCURRENCY (padrão 48, uma thread por partição); inválido derruba a subida.
+    config.concurrency = AgentMock::Kafka.concurrency
     config.logger = AgentMock::Log.karafka_logger
     # Produtor com acks=all e idempotência, o mesmo padrão do broker.
     config.producer = AgentMock::Kafka.producer

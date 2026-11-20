@@ -8,9 +8,14 @@ module AgentMock
     end
 
     # Palavra ou expressão inteira: "pessoa" não casa com "pessoal".
-    def include_term?(normalized_text, term)
-      /(?<![[:alnum:]])#{Regexp.escape(normalize(term))}(?![[:alnum:]])/.match?(normalized_text)
+    def include_term?(normalized_text, term) = term_regexp(term).match?(normalized_text)
+
+    # Posições (índice do caractere) de cada ocorrência do termo inteiro.
+    def term_positions(normalized_text, term)
+      normalized_text.to_enum(:scan, term_regexp(term)).map { Regexp.last_match.begin(0) }
     end
+
+    def term_regexp(term) = /(?<![[:alnum:]])#{Regexp.escape(normalize(term))}(?![[:alnum:]])/
 
     # Formato brasileiro: 1234.5 → "1.234,50".
     def money(amount)
