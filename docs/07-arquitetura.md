@@ -294,6 +294,7 @@ erDiagram
 | Tabela | Campos principais | Por quê |
 | --- | --- | --- |
 | `brands` | `id`, `slug`, `locale`, `timezone` | Toda a plataforma é multi-marca. O idioma decide as mensagens padrão (RN-42) |
+| `provider_accounts` | `brand_id`, `channel`, `slug` (único, é o trecho da URL), `phone_number_id` (WhatsApp, único), `secret` (criptografado), `active` | A URL do webhook aponta para uma conta, que define a marca e o segredo da assinatura ([ADR-019](08-decisoes-de-arquitetura.md#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada)) |
 | `teams` | `brand_id`, `name` | Agrupam analistas e filas (RF-58) |
 | `users` | `kind` (`human`, `bot`), `role` (`supervisor`, `analyst`, `agent`), `status` (`online`, `pausa`, `offline`), `capacity`, `active_count` | O agente é um `user` do tipo `bot` com papel `agent` (P4). A atribuição e a liberação de vagas atualizam `active_count` na mesma transação da alteração no atendimento (RN-30, RN-31). A capacidade do bot é configurável, com padrão próprio (06, parâmetros): ela limita quantos casos a IA segura ao mesmo tempo, enquanto a vazão vem das réplicas do `agent-mock` e das partições (seção 7) |
 | `team_memberships` | `user_id`, `team_id` | Um analista pode atender mais de uma equipe. Daqui sai o escopo de acesso (RN-52) |
@@ -325,7 +326,7 @@ erDiagram
 | Índices parciais nos prazos ativos do atendimento e no `outbox_events (next_attempt_at) WHERE completed_at IS NULL` | Encontra janelas, avisos e timeouts vencidos mesmo sem turno, e recupera ações ainda abertas |
 | `outbox_events.dedup_key` único quando preenchido | Cada prazo produz uma ação durável por versão. A chave continua disponível durante o ciclo correspondente |
 | Chave primária em `processed_events (consumer, event_id)` | Um evento produz efeito uma vez por consumidor (RN-47) |
-| `REVOKE UPDATE, DELETE ON audit_events` do usuário da aplicação | Auditoria imutável (RN-54) |
+| Trigger que recusa `UPDATE` e `DELETE` em `audit_events`, mais `REVOKE UPDATE, DELETE` do usuário da aplicação | Auditoria imutável (RN-54). O trigger vale para qualquer papel, inclusive o dono da tabela. O `REVOKE` entra com os papéis de `infra/postgres` |
 | Índice em `tickets (queue_id, state, priority, sla_due_at)` | Listagem da fila de escalas em p95 ≤ 300 ms com 100 mil casos (RNF-08) |
 | `lock_version` em `tickets` (lock otimista) | Duas ações simultâneas no mesmo caso (analista e consumer) não se sobrescrevem |
 
@@ -344,13 +345,15 @@ Os contratos internos têm **nome e versão** (`schema`). Os formatos dos canais
 
 Cada canal tem um **adaptador** com duas funções: converter o webhook do provedor na mensagem normalizada (5.1) e converter a resposta interna na chamada que a API do provedor espera. O núcleo da plataforma não conhece o formato de nenhum canal. O `channels-mock` imita um **subconjunto fiel** dos provedores reais ([ADR-018](08-decisoes-de-arquitetura.md#adr-018--canais-simulados-no-formato-dos-provedores-reais)), então trocar o mock por um provedor real mexe só na configuração da conta.
 
-A marca e a conta do provedor vêm da URL de entrada (`/webhooks/:channel/:provider_account`) e da configuração dessa conta, nunca do corpo. O webhook cru é guardado em `messages.provider_payload`.
+A marca e a conta do provedor vêm da URL de entrada (`/webhooks/:channel/:provider_account`) e do cadastro dessa conta em `provider_accounts`, nunca do corpo. Antes de ler o corpo, a plataforma confere a assinatura com o segredo da conta e responde `401` se ela não bater ([ADR-019](08-decisoes-de-arquitetura.md#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada)). O webhook cru é guardado em `messages.provider_payload`.
+
+O corpo identifica **quem enviou**, isto é, o cliente: `from` no WhatsApp, `From` no e-mail e `account_id` no chat do app. A URL identifica **quem recebeu**, isto é, a conta da marca no provedor. No WhatsApp, a Meta permite uma URL de callback por número (`override_callback_uri`), e o `metadata.phone_number_id` do corpo precisa ser o número cadastrado na conta.
 
 | Canal | Entrada (provedor → plataforma) | Saída (plataforma → provedor) | Status de entrega |
 | --- | --- | --- | --- |
 | WhatsApp | Webhook da Cloud API da Meta: `entry[].changes[].value.messages[]` com `from`, `id` (`wamid`), `timestamp`, `type` e, quando `type` é `text`, `text.body`; `metadata.phone_number_id` identifica a conta | `POST /:phone_number_id/messages` com `messaging_product: "whatsapp"`, `to`, `type: "text"`, `text.body`. A resposta traz `messages[0].id`, que vira `deliveries.provider_message_id` | Mesmo webhook, em `value.statuses[]` (`sent`, `delivered`, `read`, `failed`) |
 | E-mail | Formato da API do Gmail: notificação push com `emailAddress` e `historyId` (base64 no envelope do Pub/Sub); o adaptador busca as mensagens novas em `users.history.list` e o conteúdo em `users.messages.get` (`From` e `Message-ID` obrigatórios; `To`, `Subject`, corpo e anexos quando existirem) | `users.messages.send` com `raw` (MIME em base64url) e `threadId`. `Subject` igual ao original com `Re:`, `In-Reply-To` e `References` apontando para o `Message-ID` do cliente | Aceite pelo `send` vira `delivered`. Falha da API vira `failed` |
-| Chat do app | Formato próprio, porque o app é da CloudWalk: `message_id`, `account_id` (a conta do provedor), `customer_ref` (o cliente), `text`, `sent_at` | `POST /messages` com `customer_ref`, `text` e `reply_to` opcional | Callback com `message_id`, `status` e `timestamp` |
+| Chat do app | Formato próprio, porque o app é da CloudWalk: `message_id`, `account_id` (a conta do cliente no app, que identifica o cliente pela RF-07), `customer_ref` (o destino da resposta), `text`, `sent_at` | `POST /messages` com `customer_ref`, `text` e `reply_to` opcional | Callback com `message_id`, `status` e `timestamp` |
 
 **Política de saída por canal.** O adaptador aplica as regras do canal antes de enviar:
 
@@ -563,6 +566,7 @@ Com o broker ou o agente fora do ar por mais de 30 s, **todos os casos novos esc
 | Ameaça | Controle | Requisito |
 | --- | --- | --- |
 | Webhook forjado ou repetido | HMAC-SHA256 + janela de ±5 min + `event_id` único | RNF-23 |
+| Webhook de canal forjado, ou com o segredo de outra marca | Assinatura do provedor conferida com o segredo da conta da URL, antes de ler o corpo. Segredo por conta, criptografado no banco | RNF-23, ADR-019 |
 | Analista de uma marca ver dados de outra | Escopo por `brand_id` em toda consulta, políticas por perfil e testes adversariais | RN-52, RNF-24 |
 | Analista mexer em configuração | Só supervisor acessa filas, regras e equipes | RN-53 |
 | Alteração da auditoria | `REVOKE UPDATE, DELETE` no banco | RN-54, RNF-21 |

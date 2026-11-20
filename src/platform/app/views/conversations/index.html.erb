@@ -1,4 +1,4 @@
 <% content_for :title, "Conversas" %>
 <h1>Conversas</h1>
-<p class="muted">Os tickets reais chegam no bloco 02. Até lá, as conversas abaixo são exemplos sintéticos com os mesmos campos.</p>
+<p class="muted">Primeiro os atendimentos gravados pela plataforma (<strong>Registro do sistema</strong>), depois os exemplos fixos que mostram etapas ainda não construídas, como turnos, escalação e entrega (<strong>Exemplo sintético</strong>). A resposta do agente chega nos blocos 03 a 05.</p>
 <%= render "conversations/list", conversations: @conversations, link_for: ->(c) { conversation_path(c.id) } %>

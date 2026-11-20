@@ -1,6 +1,10 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
+  # O channels-mock chama a plataforma pela rede do Compose, com o Host "web:3000".
+  # Sem isto, a proteção de host do Rails responde 403 a todo webhook vindo do simulador.
+  config.hosts << "web"
+
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Make code changes take effect immediately without server restart.

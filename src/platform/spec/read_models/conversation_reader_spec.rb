@@ -3,8 +3,8 @@ require "rails_helper"
 RSpec.describe ConversationReader, "ROADMAP 01: formato de leitura estável" do
   after { described_class.source = nil }
 
-  it "usa os exemplos sintéticos enquanto não existe adaptador dos registros reais" do
-    expect(described_class.source).to be_a(SyntheticConversations)
+  it "usa os registros reais e os exemplos sintéticos por padrão" do
+    expect(described_class.source).to be_a(CompositeSource)
   end
 
   it "delega a qualquer fonte com a mesma interface" do

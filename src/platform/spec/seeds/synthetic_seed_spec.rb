@@ -9,7 +9,8 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
       users: User.order(:email).pluck(:email, :kind, :role),
       customers: Customer.joins(:brand).order("brands.slug", :display_name).pluck("brands.slug", :display_name, :verified),
       identities: CustomerIdentity.order(:external_id).pluck(:channel, :external_id),
-      queues: QueueVersion.order(:name).pluck(:name, :version, :ai_first)
+      queues: QueueVersion.order(:name).pluck(:name, :version, :ai_first),
+      accounts: ProviderAccount.order(:slug).pluck(:slug, :channel, :phone_number_id)
     }
   end
 
@@ -21,6 +22,17 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
     expect(HelpdeskQueue.where(is_default: true).count).to eq(Brand.count)
     expect(Customer.count).to be >= 1
     expect(HelpdeskQueue.all).to all(have_attributes(current_version: be_present))
+  end
+
+  it "ADR-019: cria uma conta de provedor por marca e canal, com o segredo local do simulador" do
+    Seeds::Synthetic.call(seed: 42)
+
+    expect(ProviderAccount.order(:slug).pluck(:slug)).to eq(%w[
+      infinitepay-chat-mock infinitepay-email-mock infinitepay-whatsapp-mock jim-chat-mock jim-email-mock jim-whatsapp-mock
+    ])
+    expect(ProviderAccount.find_by!(slug: "jim-chat-mock")).to have_attributes(brand: Brand.find_by!(slug: "jim"),
+                                                                              secret: "dev-secret-jim-chat-mock")
+    expect(ProviderAccount.where(channel: "whatsapp").pluck(:phone_number_id)).to all(be_present)
   end
 
   it "a mesma semente produz os mesmos dados" do
@@ -35,11 +47,13 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
 
   it "rodar duas vezes não duplica nada (repetição)" do
     Seeds::Synthetic.call(seed: 42)
-    counts = [ Brand.count, Team.count, User.count, Customer.count, CustomerIdentity.count, QueueVersion.count ]
+    counts = [ Brand.count, Team.count, User.count, Customer.count, CustomerIdentity.count, QueueVersion.count,
+               ProviderAccount.count ]
 
     Seeds::Synthetic.call(seed: 42)
 
-    expect([ Brand.count, Team.count, User.count, Customer.count, CustomerIdentity.count, QueueVersion.count ]).to eq(counts)
+    expect([ Brand.count, Team.count, User.count, Customer.count, CustomerIdentity.count, QueueVersion.count,
+             ProviderAccount.count ]).to eq(counts)
   end
 
   it "sementes diferentes produzem clientes diferentes" do

@@ -26,7 +26,7 @@
           </div>
           <p class="message__body"><%= message.body %></p>
           <div class="message__footer">
-            <%= delivery_badge(message) %>
+            <%= delivery_badge(message, c.source) %>
             <% c.turns_covering(message.seq).each do |turn| %>
               <span class="chip chip--<%= turn.status %>">Turno <%= turn.number %></span>
             <% end %>

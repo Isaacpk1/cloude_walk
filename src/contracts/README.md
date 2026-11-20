@@ -118,3 +118,19 @@ bundle install
 bundle exec rspec
 bundle exec rubocop
 ```
+
+## Assinatura dos webhooks (`HelpdeskContracts::Signature`)
+
+Faz parte do contrato, porque quem envia e quem recebe precisam calcular igual (07, seção 5.2; RNF-23; [ADR-019](../../docs/08-decisoes-de-arquitetura.md#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada)). É usada pelo webhook plataforma → broker e pela entrada do chat do app.
+
+```ruby
+header = HelpdeskContracts::Signature.header(corpo_bruto, secret: segredo)  # "t=1763500000,v1=<hex>"
+HelpdeskContracts::Signature.verify!(corpo_bruto, header, secret: segredo)  # true ou Signature::Invalid
+```
+
+- Cabeçalho `X-Helpdesk-Signature` (`HelpdeskContracts::Signature::HEADER`).
+- `v1` é o HMAC-SHA256 de `"t.corpo_bruto"`. O horário entra no HMAC, então trocá-lo invalida a assinatura.
+- Janela de ±5 min. A comparação é em tempo constante.
+- `Invalid#reason`: `:ausente`, `:malformada`, `:fora_da_janela`, `:nao_confere` ou `:sem_segredo`.
+- Confira sempre o **corpo bruto**, antes do parse do JSON.
+

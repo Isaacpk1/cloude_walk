@@ -8,9 +8,13 @@ Referências do projeto: [escopo](docs/02-escopo.md), [requisitos funcionais](do
 
 | Bloco | Situação | Observação |
 | --- | --- | --- |
-| 01. Ambiente e dados iniciais | **Feito, falta validar o Compose** | Código e testes prontos (branch `feat/01-ambiente-seed`). O "pronto quando" foi comprovado sem Docker; falta rodar `make up` numa máquina com Docker (RNF-29) |
-| 03. Publicação no broker e Kafka | Adiantado em parte | Os esquemas JSON dos eventos (`src/contracts/v1`) já existem, com testes. O resto do bloco segue a ordem |
-| 02 em diante | A fazer | Próximo: **02. Entrada e gravação de uma mensagem** |
+| 01. Ambiente e dados iniciais | **Feito** | Compose validado com `make up` |
+| 02. Entrada e gravação de uma mensagem | **Feito** | Compose validado com `make up`, com o `channels-mock`. Canal implementado: chat do app (WhatsApp e e-mail no bloco 15) |
+| 03. Publicação no broker e Kafka | Adiantado em parte | Os esquemas JSON dos eventos (`src/contracts/v1`) já existem, com testes. O outbox já recebe `message.received`; falta publicar |
+| 06. Agrupamento de mensagens | Adiantado em parte | A ingestão já grava `seq` e `latest_customer_seq` com a linha travada. Falta a versão do contexto, a janela e o turno |
+| 03 em diante | A fazer | Próximo: **03. Publicação no broker e Kafka** |
+
+Decisões tomadas durante o bloco 02: contas dos provedores na tabela `provider_accounts`, com segredo criptografado, e webhook de entrada autenticado antes do parse ([ADR-019](docs/08-decisoes-de-arquitetura.md#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada)); `account_id` do chat identifica o cliente ([07, seção 5.0](docs/07-arquitetura.md#50-webhooks-dos-canais-entrada-e-saída)); auditoria imutável também por trigger ([07, seção 4](docs/07-arquitetura.md#índices-e-restrições-que-carregam-regra-de-negócio)); o simulador do cliente nasce no `channels-mock`, como manda o [docs/10](docs/10-organizacao-do-repositorio.md#34-srcchannels-mock--provedores-e-simulador).
 
 Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](docs/08-decisoes-de-arquitetura.md#adr-017--monorepo-com-o-código-em-src), [docs/10](docs/10-organizacao-do-repositorio.md)), canais no formato real dos provedores ([ADR-018](docs/08-decisoes-de-arquitetura.md#adr-018--canais-simulados-no-formato-dos-provedores-reais)) e o conteúdo das ações do agente (07, seção 5.3).
 
@@ -34,13 +38,14 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 - [x] **Backend:** confirmar que o engine do Docker está disponível, criar o scaffold Rails e subir o mínimo de serviços pelo Compose. Criar migrações iniciais e um seed reprodutível com uma marca, fila, cliente sintético e usuário do tipo bot.
 - [x] **Frontend:** criar a navegação inicial no Rails e as telas de conversa e linha do tempo com dados sintéticos identificados.
 - **Pronto quando:** o ambiente sobe e a conversa de exemplo abre no navegador após carregar o seed. **Referências** RF-22, RF-23, RF-58, RF-61, RNF-29.
-- **Situação:** comprovado com Postgres e Redis locais. Pendente: `make up` com Docker, que o ambiente de desenvolvimento não conseguiu baixar.
+- **Situação:** comprovado com Postgres e Redis locais e validado com `make up` no Docker.
 
 ### 02. Entrada e gravação de uma mensagem
 
-- [ ] **Backend:** implementar o primeiro canal simulado, normalizar o envelope, identificar marca e cliente, criar ou localizar o ticket e gravar mensagem, auditoria e outbox na mesma transação. Confirmar após o commit.
-- [ ] **Frontend:** adicionar o formulário do simulador. Substituir o evento de recebimento da demonstração pela mensagem gravada e mostrar se ela foi confirmada.
+- [x] **Backend:** implementar o primeiro canal simulado, normalizar o envelope, identificar marca e cliente, criar ou localizar o ticket e gravar mensagem, auditoria e outbox na mesma transação. Confirmar após o commit.
+- [x] **Frontend:** adicionar o formulário do simulador. Substituir o evento de recebimento da demonstração pela mensagem gravada e mostrar se ela foi confirmada.
 - **Pronto quando:** enviar pelo navegador cria uma mensagem visível no ticket, e reenviar o mesmo ID externo preserva uma única mensagem. **Referências** RF-01, RF-04, RF-05, RF-07, RF-08, RF-10, RF-54, RNF-14.
+- **Situação:** comprovado com Postgres local, a plataforma em `:3000` e o `channels-mock` em `:4000`: duas mensagens confirmadas (`202`) no mesmo ticket, com `seq` 1 e 2, e o reenvio respondido como duplicado (`200`). Canal implementado: chat do app. WhatsApp e e-mail ficam no bloco 15. O webhook do chat já exige assinatura (`401` sem ela), e o simulador tem a opção de enviar com assinatura inválida. Validado também com `make up` no Docker, com o `channels-mock`. Fica para outros blocos: assinatura do WhatsApp (`X-Hub-Signature-256` e conferência do `phone_number_id`) e do Gmail (token do Pub/Sub) junto com os adaptadores do bloco 15; reabertura em 72 h (RN-08, RF-11) e pedido explícito de humano na ingestão (RN-34, bloco 10).
 
 ### 03. Publicação no broker e Kafka
 
@@ -64,7 +69,7 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 06. Agrupamento de mensagens e contexto do turno
 
-- [ ] **Backend:** gravar sequência e versão do contexto no atendimento. Implementar a janela de agrupamento, o teto de espera e a montagem do turno com todas as mensagens pendentes.
+- [ ] **Backend:** gravar ~~sequência~~ (feito no bloco 02: `seq` e `latest_customer_seq`) e versão do contexto no atendimento. Implementar a janela de agrupamento, o teto de espera e a montagem do turno com todas as mensagens pendentes.
 - [ ] **Frontend:** mostrar a fase de agrupamento e quais mensagens entraram em cada turno. Adicionar um cenário no simulador que envia a segunda mensagem aos 3 s.
 - **Pronto quando:** uma rajada agrupa as mensagens conforme a política do canal, e o turno persistido corresponde ao contexto enviado. **Referências** RF-09, RF-29, RF-33, RN-49, RN-55.
 

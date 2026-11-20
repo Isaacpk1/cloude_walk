@@ -26,6 +26,9 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 
+# Contratos versionados (07, seção 5; invariante 10). Mesma gem do broker, do agente e dos canais.
+gem "helpdesk_contracts", path: "../contracts"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"

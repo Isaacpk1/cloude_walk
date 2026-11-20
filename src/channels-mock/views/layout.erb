@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Simulador do cliente · canais simulados</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; color: #1f2933; background: #f5f7fa; }
+      body { margin: 0; }
+      header { background: #102a43; color: #fff; padding: .75rem 1.5rem; }
+      main { max-width: 64rem; margin: 1.5rem auto; padding: 0 1.5rem; display: grid; gap: 1.5rem; }
+      .card { background: #fff; border: 1px solid #d9e2ec; border-radius: .5rem; padding: 1rem 1.25rem; }
+      label { display: block; font-size: .85rem; margin: .5rem 0 .2rem; color: #486581; }
+      input, select, textarea { width: 100%; box-sizing: border-box; padding: .45rem; font: inherit; border: 1px solid #bcccdc; border-radius: .3rem; }
+      label.inline { display: flex; gap: .5rem; align-items: center; margin-top: .75rem; }
+      label.inline input { width: auto; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+      button { margin-top: .75rem; padding: .5rem 1rem; font: inherit; border: 0; border-radius: .3rem; background: #2680c2; color: #fff; cursor: pointer; }
+      button.secondary { background: #829ab1; margin: 0; padding: .3rem .6rem; font-size: .85rem; }
+      table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+      th, td { text-align: left; padding: .45rem .4rem; border-bottom: 1px solid #e4e7eb; vertical-align: top; }
+      code { font-size: .8rem; }
+      .muted { color: #829ab1; font-size: .85rem; }
+      .badge { display: inline-block; padding: .1rem .5rem; border-radius: 1rem; font-size: .8rem; font-weight: 600; }
+      .badge--ok { background: #e3f9e5; color: #207227; }
+      .badge--dup { background: #fff3c4; color: #8d2b0b; }
+      .badge--err { background: #ffe3e3; color: #a61b1b; }
+    </style>
+  </head>
+  <body>
+    <header><strong>Canais simulados</strong> · faz o papel dos provedores (ADR-012). O histórico fica só em memória.</header>
+    <main><%== yield %></main>
+  </body>
+</html>

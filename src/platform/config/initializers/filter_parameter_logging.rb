@@ -6,3 +6,9 @@
 Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc
 ]
+
+# RN-51: identificadores do cliente e conteúdo das mensagens não vão para o log.
+# Regex exatas para não esconder campos como `context` ou `account_version`.
+Rails.application.config.filter_parameters += [
+  /\Aaccount_id\z/, /\Acustomer_ref\z/, /\Atext\z/, /\Abody\z/, /\Afrom\z/, /\Ato\z/, /\Achannel_identity\z/
+]

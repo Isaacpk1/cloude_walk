@@ -40,5 +40,13 @@ module Platform
 
     # Don't generate system test files.
     config.generators.system_tests = nil
+
+    # ADR-019: segredos das contas de canal criptografados no banco (Active Record Encryption).
+    # As chaves vêm do ambiente. Os valores padrão só existem para desenvolvimento e testes.
+    encryption = config.active_record.encryption
+    dev_key = ->(name) { Rails.env.production? ? ENV.fetch(name) : ENV.fetch(name, "dev-only-#{name.downcase}") }
+    encryption.primary_key = dev_key.("AR_ENCRYPTION_PRIMARY_KEY")
+    encryption.deterministic_key = dev_key.("AR_ENCRYPTION_DETERMINISTIC_KEY")
+    encryption.key_derivation_salt = dev_key.("AR_ENCRYPTION_KEY_DERIVATION_SALT")
   end
 end

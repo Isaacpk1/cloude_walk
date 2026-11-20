@@ -1,0 +1,118 @@
+# Entrada de uma mensagem do cliente (invariante 1; 07, seção 3.1, passo 1).
+#
+#   Ingestion::Receive.call(normalized_message, provider_payload: webhook_cru)
+#
+# Uma transação só: identifica o cliente (RF-07, RN-01, RN-02, RN-05), cria ou trava o atendimento
+# aberto do canal (RF-08, RN-03, RN-04, RN-09), deduplica (RNF-15), atribui o próximo `seq`, atualiza
+# `latest_customer_seq` e grava auditoria (RF-54) e outbox (RNF-14). Nada externo acontece aqui dentro
+# (invariante 2): quem chama só confirma ao provedor depois do retorno, isto é, depois do commit.
+#
+# Concorrência: o índice único da identidade e o do atendimento aberto decidem as corridas de criação.
+# A linha do atendimento fica travada até o commit, então mensagens da mesma conversa entram em fila
+# e a deduplicação é refeita com a trava (07, seção 3.4).
+module Ingestion
+  class Receive
+    Result = Data.define(:status, :ticket, :message) do
+      def created? = status == :created
+      def duplicate? = status == :duplicate
+    end
+
+    def self.call(...) = new(...).call
+
+    def initialize(normalized, provider_payload:)
+      @msg = HelpdeskContracts.validate!(:normalized_message, normalized)
+      @provider_payload = provider_payload
+    end
+
+    def call
+      brand = Brand.find_by!(slug: @msg.fetch("brand"))
+
+      ActiveRecord::Base.transaction do
+        duplicate = find_duplicate(brand)
+        next Result.new(status: :duplicate, ticket: duplicate.ticket, message: duplicate) if duplicate
+
+        customer = find_or_create_customer(brand)
+        ticket, opened = lock_or_open_ticket(brand, customer)
+        # Outra entrega do mesmo webhook pode ter sido gravada enquanto esperávamos a trava.
+        duplicate = find_duplicate(brand)
+        next Result.new(status: :duplicate, ticket: duplicate.ticket, message: duplicate) if duplicate
+
+        record(ticket, opened)
+      end
+    end
+
+    private
+
+    def channel = @msg.fetch("channel")
+    def trace_id = @msg.fetch("trace_id")
+
+    def find_duplicate(brand)
+      Message.find_by(brand:, provider_account: @msg.fetch("provider_account"), channel:,
+                      external_id: @msg.fetch("external_id"))
+    end
+
+    # RN-05: remetente desconhecido vira cliente não verificado. A corrida entre dois webhooks do
+    # mesmo remetente novo é decidida pelo índice único da identidade (RN-02).
+    def find_or_create_customer(brand)
+      identity_attrs = { brand:, channel:, external_id: @msg.dig("sender", "channel_identity") }
+      existing = CustomerIdentity.find_by(identity_attrs)
+      return existing.customer if existing
+
+      ActiveRecord::Base.transaction(requires_new: true) do
+        customer = Customer.create!(brand:, display_name: unverified_name, verified: false)
+        customer.identities.create!(identity_attrs)
+        customer
+      end
+    rescue ActiveRecord::RecordNotUnique
+      CustomerIdentity.find_by!(identity_attrs).customer
+    end
+
+    def unverified_name = "Cliente não verificado (#{channel} …#{@msg.dig('sender', 'channel_identity').last(4)})"
+
+    # RN-03: um atendimento aberto por cliente e canal. A linha fica travada até o commit.
+    def lock_or_open_ticket(brand, customer)
+      ticket = Ticket.open.lock.find_by(customer:, channel:)
+      return [ ticket, false ] if ticket
+
+      created = ActiveRecord::Base.transaction(requires_new: true) do
+        Ticket.create!(brand:, customer:, channel:, state: "novo", linked_ticket: ticket_to_link(customer))
+      end
+      [ created, true ]
+    rescue ActiveRecord::RecordNotUnique
+      [ Ticket.open.lock.find_by!(customer:, channel:), false ]
+    end
+
+    # RN-09: o último atendimento fechado no mesmo canal. Senão, RN-04: um aberto em outro canal.
+    def ticket_to_link(customer)
+      Ticket.where(customer:, channel:, state: "fechado").order(id: :desc).first ||
+        Ticket.open.where(customer:).where.not(channel:).order(id: :desc).first
+    end
+
+    def record(ticket, opened)
+      seq = ticket.messages.maximum(:seq).to_i + 1
+      message = ticket.messages.create!(
+        brand_id: ticket.brand_id, provider_account: @msg.fetch("provider_account"), channel:, direction: "inbound",
+        author_type: "customer", author_id: ticket.customer_id, body: @msg.dig("content", "text"),
+        subject: @msg.dig("content", "subject"), attachments: @msg.dig("content", "attachments") || [],
+        external_id: @msg.fetch("external_id"), seq:, trace_id:, provider_payload: @provider_payload,
+        received_at: Time.iso8601(@msg.fetch("received_at"))
+      )
+      ticket.update!(latest_customer_seq: seq)
+
+      audit(ticket, "ticket.created", state: ticket.state, channel:, linked_ticket_id: ticket.linked_ticket_id) if opened
+      audit(ticket, "message.received", message_id: message.id, seq:, channel:,
+                                        provider_account: message.provider_account, external_id: message.external_id)
+      OutboxEvent.create!(
+        brand_id: ticket.brand_id, ticket:, event_type: "message.received", trace_id:, next_attempt_at: Time.current,
+        payload: { ticket_id: ticket.id, message_id: message.id, seq: }
+      )
+
+      Result.new(status: :created, ticket:, message:)
+    end
+
+    def audit(ticket, event_type, **data)
+      AuditEvent.create!(brand_id: ticket.brand_id, ticket:, actor_type: "customer", actor_id: ticket.customer_id,
+                         event_type:, trace_id:, data:)
+    end
+  end
+end

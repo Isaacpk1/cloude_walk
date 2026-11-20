@@ -1,0 +1,79 @@
+<section class="card">
+  <h1>Simulador do cliente</h1>
+  <p class="muted">Envia a mensagem como o webhook do chat do app (07, seção 5.0) para
+    <code><%= platform_url %>/webhooks/chat/&lt;conta&gt;</code>, assinada com o segredo da conta
+    (<code>X-Helpdesk-Signature</code>, ADR-019). A plataforma confirma com 202 só depois de gravar.</p>
+  <form method="post" action="/chat/messages">
+    <div class="row">
+      <div>
+        <label for="account">Conta do provedor (define a marca)</label>
+        <select id="account" name="account">
+          <% accounts.each do |account| %>
+            <option value="<%= account %>" <%= "selected" if last&.account == account %>><%= account %></option>
+          <% end %>
+        </select>
+      </div>
+      <div>
+        <label for="message_id">message_id (vazio gera um novo)</label>
+        <input id="message_id" name="message_id" placeholder="chat_msg_...">
+      </div>
+      <div>
+        <label for="account_id">Conta do cliente no app (account_id)</label>
+        <input id="account_id" name="account_id" value="<%= last&.payload&.fetch("account_id", nil) || "acc_infinitepay_000021" %>">
+      </div>
+      <div>
+        <label for="customer_ref">Referência do cliente (customer_ref)</label>
+        <input id="customer_ref" name="customer_ref" value="<%= last&.payload&.fetch("customer_ref", nil) || "cus_ref_000021" %>">
+      </div>
+    </div>
+    <label for="text">Mensagem</label>
+    <textarea id="text" name="text" rows="2">meu repasse não caiu</textarea>
+    <label class="inline"><input type="checkbox" name="tamper_signature" value="1"> Enviar com assinatura inválida (a plataforma deve recusar com 401)</label>
+    <button type="submit">Enviar pelo chat</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Envios</h2>
+  <% if entries.empty? %>
+    <p class="muted">Nenhum envio ainda.</p>
+  <% else %>
+    <table>
+      <thead><tr><th>#</th><th>Mensagem</th><th>Resposta da plataforma</th><th>Conversa</th><th></th></tr></thead>
+      <tbody>
+        <% entries.each do |entry| %>
+          <% css = { "Confirmada" => "ok", "Duplicada" => "dup" }.fetch(entry.outcome, "err") %>
+          <tr>
+            <td><%= entry.id %></td>
+            <td>
+              <%= entry.payload["text"] %>
+              <div class="muted"><%= entry.account %> · <code><%= entry.payload["message_id"] %></code></div>
+            </td>
+            <td>
+              <span class="badge badge--<%= css %>"><%= entry.outcome %></span>
+              <% if entry.response&.status %><code><%= entry.response.status %></code><% end %>
+              <% if entry.reason %><code><%= entry.reason %></code><% end %>
+              <% if entry.tampered %><div class="muted">Enviada com assinatura inválida</div><% end %>
+              <% if entry.error || entry.response&.error %>
+                <div class="muted"><%= entry.error ? "Mensagem fora do contrato: #{entry.error}" : entry.response.error %></div>
+              <% end %>
+              <% if entry.response %><div class="muted">trace <code><%= entry.response.trace_id[0, 8] %></code></div><% end %>
+            </td>
+            <td>
+              <% if entry.ticket_id %>
+                <a href="<%= platform_url %>/conversas/<%= entry.ticket_id %>">Abrir conversa <%= entry.ticket_id %></a>
+              <% end %>
+            </td>
+            <td>
+              <% if entry.response %>
+                <form method="post" action="/chat/messages/<%= entry.id %>/resend">
+                  <button class="secondary" type="submit" title="Reentrega o mesmo webhook, como um provedor faria">Reenviar o mesmo ID</button>
+                </form>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>

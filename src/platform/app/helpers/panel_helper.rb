@@ -19,7 +19,11 @@ module PanelHelper
     tag.span(message.author_label, class: "badge badge--author badge--#{message.author_type}")
   end
 
-  def delivery_badge(message)
+  # Mensagem de entrada lida do banco já foi confirmada: o 202 só sai depois do commit (RNF-14).
+  def delivery_badge(message, source = DataSource::SYNTHETIC)
+    if message.inbound? && !source.synthetic?
+      return tag.span("Confirmada", class: "badge badge--delivery badge--delivered", title: "Gravada antes do 202 ao provedor")
+    end
     return tag.span("Recebida", class: "badge badge--delivery badge--received") if message.inbound?
 
     tag.span(message.delivery_label || "Sem entrega", class: "badge badge--delivery badge--#{message.delivery_status || 'none'}")

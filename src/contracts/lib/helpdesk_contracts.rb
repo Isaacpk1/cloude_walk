@@ -2,6 +2,7 @@ require "json"
 require "pathname"
 require "json_schemer"
 require_relative "helpdesk_contracts/version"
+require_relative "helpdesk_contracts/signature"
 
 # Validador único dos contratos do help desk (07, seção 5; RNF-28; invariante 10).
 #

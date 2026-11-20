@@ -10,6 +10,19 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: audit_events_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.audit_events_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'auditoria é imutável (RN-54): registre um novo evento';
+END;
+$$;
+
+
+--
 -- Name: queue_versions_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -36,6 +49,45 @@ CREATE TABLE public.ar_internal_metadata (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL
 );
+
+
+--
+-- Name: audit_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_events (
+    id bigint NOT NULL,
+    occurred_at timestamp(6) without time zone DEFAULT clock_timestamp() NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint,
+    actor_type character varying NOT NULL,
+    actor_id bigint,
+    event_type character varying NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    trace_id character varying NOT NULL,
+    ruleset_version integer,
+    agent_model character varying,
+    agent_version character varying
+);
+
+
+--
+-- Name: audit_events_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.audit_events_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: audit_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.audit_events_id_seq OWNED BY public.audit_events.id;
 
 
 --
@@ -138,6 +190,111 @@ CREATE SEQUENCE public.customers_id_seq
 --
 
 ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
+
+
+--
+-- Name: messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.messages (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint NOT NULL,
+    provider_account character varying NOT NULL,
+    channel character varying NOT NULL,
+    direction character varying NOT NULL,
+    author_type character varying NOT NULL,
+    author_id bigint,
+    body text NOT NULL,
+    internal boolean DEFAULT false NOT NULL,
+    external_id character varying,
+    seq integer NOT NULL,
+    trace_id character varying NOT NULL,
+    subject character varying,
+    attachments jsonb DEFAULT '[]'::jsonb NOT NULL,
+    provider_payload jsonb,
+    received_at timestamp(6) without time zone NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT messages_author_type_check CHECK (((author_type)::text = ANY (ARRAY[('customer'::character varying)::text, ('bot'::character varying)::text, ('analyst'::character varying)::text, ('system'::character varying)::text]))),
+    CONSTRAINT messages_direction_check CHECK (((direction)::text = ANY (ARRAY[('inbound'::character varying)::text, ('outbound'::character varying)::text])))
+);
+
+
+--
+-- Name: messages_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.messages_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: messages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.messages_id_seq OWNED BY public.messages.id;
+
+
+--
+-- Name: outbox_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.outbox_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint,
+    event_type character varying NOT NULL,
+    dedup_key character varying,
+    payload jsonb NOT NULL,
+    trace_id character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    next_attempt_at timestamp(6) without time zone NOT NULL,
+    lease_until timestamp(6) without time zone,
+    published_at timestamp(6) without time zone,
+    completed_at timestamp(6) without time zone
+);
+
+
+--
+-- Name: provider_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.provider_accounts (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    channel character varying NOT NULL,
+    slug character varying NOT NULL,
+    phone_number_id character varying,
+    secret text NOT NULL,
+    active boolean DEFAULT true NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT provider_accounts_channel_check CHECK (((channel)::text = ANY ((ARRAY['chat'::character varying, 'whatsapp'::character varying, 'email'::character varying])::text[]))),
+    CONSTRAINT provider_accounts_whatsapp_phone_check CHECK ((((channel)::text <> 'whatsapp'::text) OR (phone_number_id IS NOT NULL)))
+);
+
+
+--
+-- Name: provider_accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.provider_accounts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: provider_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.provider_accounts_id_seq OWNED BY public.provider_accounts.id;
 
 
 --
@@ -285,6 +442,53 @@ ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
 
 
 --
+-- Name: tickets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.tickets (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    customer_id bigint NOT NULL,
+    channel character varying NOT NULL,
+    state character varying DEFAULT 'novo'::character varying NOT NULL,
+    category character varying,
+    priority character varying,
+    queue_id bigint,
+    queue_version integer,
+    ruleset_version integer,
+    assignee_id bigint,
+    tags character varying[] DEFAULT '{}'::character varying[] NOT NULL,
+    linked_ticket_id bigint,
+    latest_customer_seq integer DEFAULT 0 NOT NULL,
+    assignment_version integer DEFAULT 0 NOT NULL,
+    lock_version integer DEFAULT 0 NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
+    CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text])))
+);
+
+
+--
+-- Name: tickets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.tickets_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: tickets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.tickets_id_seq OWNED BY public.tickets.id;
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -326,6 +530,13 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
+-- Name: audit_events id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_events ALTER COLUMN id SET DEFAULT nextval('public.audit_events_id_seq'::regclass);
+
+
+--
 -- Name: brands id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -344,6 +555,20 @@ ALTER TABLE ONLY public.customer_identities ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.customers ALTER COLUMN id SET DEFAULT nextval('public.customers_id_seq'::regclass);
+
+
+--
+-- Name: messages id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages ALTER COLUMN id SET DEFAULT nextval('public.messages_id_seq'::regclass);
+
+
+--
+-- Name: provider_accounts id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_accounts ALTER COLUMN id SET DEFAULT nextval('public.provider_accounts_id_seq'::regclass);
 
 
 --
@@ -375,6 +600,13 @@ ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_
 
 
 --
+-- Name: tickets id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets ALTER COLUMN id SET DEFAULT nextval('public.tickets_id_seq'::regclass);
+
+
+--
 -- Name: users id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -387,6 +619,14 @@ ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_
 
 ALTER TABLE ONLY public.ar_internal_metadata
     ADD CONSTRAINT ar_internal_metadata_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: audit_events audit_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_events
+    ADD CONSTRAINT audit_events_pkey PRIMARY KEY (id);
 
 
 --
@@ -411,6 +651,30 @@ ALTER TABLE ONLY public.customer_identities
 
 ALTER TABLE ONLY public.customers
     ADD CONSTRAINT customers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: messages messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: outbox_events outbox_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox_events
+    ADD CONSTRAINT outbox_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: provider_accounts provider_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_accounts
+    ADD CONSTRAINT provider_accounts_pkey PRIMARY KEY (id);
 
 
 --
@@ -454,11 +718,40 @@ ALTER TABLE ONLY public.teams
 
 
 --
+-- Name: tickets tickets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT tickets_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: index_audit_events_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_audit_events_on_brand_id ON public.audit_events USING btree (brand_id);
+
+
+--
+-- Name: index_audit_events_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_audit_events_on_ticket_id ON public.audit_events USING btree (ticket_id);
+
+
+--
+-- Name: index_audit_events_on_ticket_id_and_occurred_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_audit_events_on_ticket_id_and_occurred_at ON public.audit_events USING btree (ticket_id, occurred_at);
 
 
 --
@@ -501,6 +794,83 @@ CREATE INDEX index_customers_on_brand_id ON public.customers USING btree (brand_
 --
 
 CREATE UNIQUE INDEX index_customers_on_id_and_brand_id ON public.customers USING btree (id, brand_id);
+
+
+--
+-- Name: index_messages_dedup_per_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_messages_dedup_per_provider ON public.messages USING btree (brand_id, provider_account, channel, external_id) WHERE (external_id IS NOT NULL);
+
+
+--
+-- Name: index_messages_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_messages_on_brand_id ON public.messages USING btree (brand_id);
+
+
+--
+-- Name: index_messages_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_messages_on_ticket_id ON public.messages USING btree (ticket_id);
+
+
+--
+-- Name: index_messages_on_ticket_id_and_seq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_messages_on_ticket_id_and_seq ON public.messages USING btree (ticket_id, seq);
+
+
+--
+-- Name: index_outbox_events_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_outbox_events_on_brand_id ON public.outbox_events USING btree (brand_id);
+
+
+--
+-- Name: index_outbox_events_on_dedup_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_outbox_events_on_dedup_key ON public.outbox_events USING btree (dedup_key) WHERE (dedup_key IS NOT NULL);
+
+
+--
+-- Name: index_outbox_events_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_outbox_events_on_ticket_id ON public.outbox_events USING btree (ticket_id);
+
+
+--
+-- Name: index_outbox_events_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_outbox_events_open ON public.outbox_events USING btree (next_attempt_at) WHERE (completed_at IS NULL);
+
+
+--
+-- Name: index_provider_accounts_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_provider_accounts_on_brand_id ON public.provider_accounts USING btree (brand_id);
+
+
+--
+-- Name: index_provider_accounts_on_phone_number_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_provider_accounts_on_phone_number_id ON public.provider_accounts USING btree (phone_number_id) WHERE (phone_number_id IS NOT NULL);
+
+
+--
+-- Name: index_provider_accounts_on_slug; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_provider_accounts_on_slug ON public.provider_accounts USING btree (slug);
 
 
 --
@@ -595,10 +965,66 @@ CREATE UNIQUE INDEX index_teams_on_id_and_brand_id ON public.teams USING btree (
 
 
 --
+-- Name: index_tickets_on_assignee_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_assignee_id ON public.tickets USING btree (assignee_id);
+
+
+--
+-- Name: index_tickets_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_brand_id ON public.tickets USING btree (brand_id);
+
+
+--
+-- Name: index_tickets_on_customer_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_customer_id ON public.tickets USING btree (customer_id);
+
+
+--
+-- Name: index_tickets_on_id_and_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_tickets_on_id_and_brand_id ON public.tickets USING btree (id, brand_id);
+
+
+--
+-- Name: index_tickets_on_linked_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_linked_ticket_id ON public.tickets USING btree (linked_ticket_id);
+
+
+--
+-- Name: index_tickets_on_queue_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_queue_id ON public.tickets USING btree (queue_id);
+
+
+--
+-- Name: index_tickets_one_open_per_customer_channel; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_tickets_one_open_per_customer_channel ON public.tickets USING btree (customer_id, channel) WHERE ((state)::text <> 'fechado'::text);
+
+
+--
 -- Name: index_users_on_email; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX index_users_on_email ON public.users USING btree (email);
+
+
+--
+-- Name: audit_events audit_events_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER audit_events_immutable BEFORE DELETE OR UPDATE ON public.audit_events FOR EACH ROW EXECUTE FUNCTION public.audit_events_immutable();
 
 
 --
@@ -609,11 +1035,35 @@ CREATE TRIGGER queue_versions_immutable BEFORE DELETE OR UPDATE ON public.queue_
 
 
 --
+-- Name: audit_events fk_audit_events_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_events
+    ADD CONSTRAINT fk_audit_events_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
 -- Name: customer_identities fk_customer_identities_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.customer_identities
     ADD CONSTRAINT fk_customer_identities_same_brand FOREIGN KEY (customer_id, brand_id) REFERENCES public.customers(id, brand_id);
+
+
+--
+-- Name: messages fk_messages_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT fk_messages_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
+-- Name: outbox_events fk_outbox_events_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox_events
+    ADD CONSTRAINT fk_outbox_events_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
 
 
 --
@@ -630,6 +1080,30 @@ ALTER TABLE ONLY public.queues
 
 ALTER TABLE ONLY public.queues
     ADD CONSTRAINT fk_queues_team_same_brand FOREIGN KEY (team_id, brand_id) REFERENCES public.teams(id, brand_id);
+
+
+--
+-- Name: messages fk_rails_19770f78ed; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT fk_rails_19770f78ed FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: messages fk_rails_1a0b99fe7e; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT fk_rails_1a0b99fe7e FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
+
+
+--
+-- Name: tickets fk_rails_1dfd143528; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_rails_1dfd143528 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
 
 
 --
@@ -657,11 +1131,27 @@ ALTER TABLE ONLY public.teams
 
 
 --
+-- Name: tickets fk_rails_5685ed71b0; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_rails_5685ed71b0 FOREIGN KEY (customer_id) REFERENCES public.customers(id);
+
+
+--
 -- Name: team_memberships fk_rails_5aba9331a7; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.team_memberships
     ADD CONSTRAINT fk_rails_5aba9331a7 FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: tickets fk_rails_5ce8e37f94; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_rails_5ce8e37f94 FOREIGN KEY (queue_id) REFERENCES public.queues(id);
 
 
 --
@@ -673,11 +1163,51 @@ ALTER TABLE ONLY public.team_memberships
 
 
 --
+-- Name: audit_events fk_rails_6853c8fc2c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_events
+    ADD CONSTRAINT fk_rails_6853c8fc2c FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
+
+
+--
+-- Name: outbox_events fk_rails_72689aebf9; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox_events
+    ADD CONSTRAINT fk_rails_72689aebf9 FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
+
+
+--
 -- Name: customer_identities fk_rails_79d4b2c664; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.customer_identities
     ADD CONSTRAINT fk_rails_79d4b2c664 FOREIGN KEY (customer_id) REFERENCES public.customers(id);
+
+
+--
+-- Name: outbox_events fk_rails_8e81165da3; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.outbox_events
+    ADD CONSTRAINT fk_rails_8e81165da3 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: audit_events fk_rails_b7193bfed1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_events
+    ADD CONSTRAINT fk_rails_b7193bfed1 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: tickets fk_rails_c6ad1a6fa1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_rails_c6ad1a6fa1 FOREIGN KEY (linked_ticket_id) REFERENCES public.tickets(id);
 
 
 --
@@ -705,11 +1235,35 @@ ALTER TABLE ONLY public.customers
 
 
 --
+-- Name: provider_accounts fk_rails_e0a8efeb27; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.provider_accounts
+    ADD CONSTRAINT fk_rails_e0a8efeb27 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: tickets fk_rails_ea25a37fb1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_rails_ea25a37fb1 FOREIGN KEY (assignee_id) REFERENCES public.users(id);
+
+
+--
 -- Name: queue_versions fk_rails_efffefcebd; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.queue_versions
     ADD CONSTRAINT fk_rails_efffefcebd FOREIGN KEY (created_by_id) REFERENCES public.users(id);
+
+
+--
+-- Name: tickets fk_tickets_customer_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_tickets_customer_same_brand FOREIGN KEY (customer_id, brand_id) REFERENCES public.customers(id, brand_id);
 
 
 --
@@ -719,6 +1273,8 @@ ALTER TABLE ONLY public.queue_versions
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261119010000'),
+('20261119000000'),
 ('20261118190000'),
 ('20261118180000');
 

@@ -1,0 +1,11 @@
+# Contexto de build das imagens de src/ (docker-compose.yml). Caminhos relativos a src/.
+**/.git
+**/.bundle
+**/.env*
+**/log/*
+**/tmp/*
+**/coverage
+**/node_modules
+platform/config/master.key
+platform/config/credentials/*.key
+platform/app/assets/builds/*
