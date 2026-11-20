@@ -27,24 +27,29 @@ seed: ## Carrega os dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
 reset: ## Recria o banco e carrega o seed
 	$(PLATFORM) bin/rails db:reset
 
-test: ## Roda o rspec da plataforma, dos contratos, do broker e dos canais simulados
+test: ## Roda o rspec da plataforma, dos contratos, do broker, do agente mock e dos canais simulados
 	$(PLATFORM) sh -c "RAILS_ENV=test bin/rails db:prepare && bundle exec rspec"
 	docker run --rm -v $(CURDIR)/src/contracts:/contracts -w /contracts ruby:$(CONTRACTS_RUBY)-slim sh -c "bundle install --quiet && bundle exec rspec"
 	$(COMPOSE) run --rm --no-deps broker bundle exec rspec
+	$(COMPOSE) run --rm --no-deps agent-mock bundle exec rspec
 	$(COMPOSE) run --rm --no-deps channels-mock bundle exec rspec
 
 lint: ## Roda o rubocop
 	$(PLATFORM) bundle exec rubocop
 	$(COMPOSE) run --rm --no-deps broker bundle exec rubocop
+	$(COMPOSE) run --rm --no-deps agent-mock bundle exec rubocop
 	$(COMPOSE) run --rm --no-deps channels-mock bundle exec rubocop
 
 security: ## Roda o brakeman
 	$(PLATFORM) bundle exec brakeman -q --no-pager
 
-topics: ## Lista os tópicos do Kafka e as mensagens de helpdesk.agent.inbound.v1 (bloco 03)
+topics: ## Lista os tópicos do Kafka e as mensagens de entrada e saída do agente (blocos 03 e 04)
 	$(COMPOSE) exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
-	$(COMPOSE) exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:29092 \
-		--topic helpdesk.agent.inbound.v1 --from-beginning --timeout-ms 5000 \
-		--property print.key=true --property print.headers=true || true
+	@for t in helpdesk.agent.inbound.v1 helpdesk.agent.outbound.v1; do \
+		echo "== $$t"; \
+		$(COMPOSE) exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:29092 \
+			--topic $$t --from-beginning --timeout-ms 5000 \
+			--property print.key=true --property print.headers=true || true; \
+	done
 
 check: test lint security ## Tudo que precisa passar antes do PR

@@ -32,7 +32,7 @@ A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Ka
 
 | Variável | Padrão | Para quê |
 | --- | --- | --- |
-| `KAFKA_BROKERS` | `localhost:9092` | Kafka (no Compose, `kafka:9092`) |
+| `KAFKA_BROKERS` | `localhost:9092` | Kafka (no Compose, `kafka:29092`) |
 | `KAFKA_MESSAGE_TIMEOUT_MS` | `5000` | Quanto o produtor espera a confirmação antes de falhar |
 | `AGENT_CONSUMER_GROUP` | `agent-mock` | Grupo do consumidor, separado do `consumer` da plataforma |
 | `AGENT_PROFILE` | `rapido` | `rapido` (50–150 ms), `lento` (2–6 s) ou `mudo` (não responde) |
