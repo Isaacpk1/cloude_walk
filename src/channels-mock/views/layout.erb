@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <% if refresh %><meta http-equiv="refresh" content="<%= refresh %>"><% end %>
     <title>Simulador do cliente · canais simulados</title>
     <style>
       :root { font-family: system-ui, sans-serif; color: #1f2933; background: #f5f7fa; }
@@ -25,6 +26,10 @@
       .badge--ok { background: #e3f9e5; color: #207227; }
       .badge--dup { background: #fff3c4; color: #8d2b0b; }
       .badge--err { background: #ffe3e3; color: #a61b1b; }
+      ul.replies { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; gap: .4rem; }
+      li.reply { border-left: 3px solid #2680c2; background: #f0f4f8; padding: .4rem .6rem; border-radius: .3rem; }
+      li.reply form { display: inline; }
+      .total { font-weight: 600; color: #102a43; }
     </style>
   </head>
   <body>
