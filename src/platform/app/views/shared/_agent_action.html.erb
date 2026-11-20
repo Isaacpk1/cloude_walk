@@ -1,0 +1,38 @@
+<%# ROADMAP 04: a ação recebida do agente (AgentActionView). Texto e resultados vêm de fora: só escape padrão do ERB. %>
+<div class="agent-action agent-action--<%= action.outcome %>">
+  <h3 class="agent-action__title">Ação recebida: <%= action.action_label %> <code><%= action.action %></code>
+    <span class="badge badge--outcome badge--<%= action.outcome %>"><%= action.outcome_label %></span></h3>
+  <% if action.rejection_reason %>
+    <p class="agent-action__reason">Motivo do descarte: <strong><%= action.rejection_reason_label %></strong> <code class="muted"><%= action.rejection_reason %></code></p>
+  <% end %>
+  <dl class="turn__facts">
+    <% if action.reply_text %><dt>resposta</dt><dd><%= action.reply_text %></dd><% end %>
+    <% if action.escalation_reason %><dt>motivo da escalação</dt><dd><%= action.escalation_reason %></dd><% end %>
+    <% AgentActionView::SUMMARY_FIELDS.each do |field| %>
+      <% if action.escalation_summary[field] %><dt><%= field %></dt><dd><%= action.escalation_summary[field] %></dd><% end %>
+    <% end %>
+    <% if action.resolution_reason %><dt>motivo do encerramento</dt><dd><%= action.resolution_reason %></dd><% end %>
+    <% if action.resolution_text %><dt>mensagem de encerramento</dt><dd><%= action.resolution_text %></dd><% end %>
+    <dt>agente</dt><dd><%= action.agent_label %> <code title="<%= action.config_hash %>"><%= action.short_config_hash %></code></dd>
+    <dt>duração do agente</dt><dd class="mono"><%= action.agent_ms ? "#{action.agent_ms} ms" : "não informada" %></dd>
+    <dt>event_id</dt><dd><code><%= action.event_id.to_s.first(8) %></code></dd>
+  </dl>
+  <h4>Consultas do agente</h4>
+  <% if action.tool_calls.empty? %>
+    <p class="muted">Nenhuma consulta.</p>
+  <% else %>
+    <table class="tool-calls">
+      <thead><tr><th scope="col">Ferramenta</th><th scope="col">Argumentos</th><th scope="col">Resultado</th><th scope="col">Duração</th></tr></thead>
+      <tbody>
+        <% action.tool_calls.each do |call| %>
+          <tr>
+            <td><code><%= call.tool %></code></td>
+            <td><code class="small"><%= agent_data_text(call.args) %></code></td>
+            <td><code class="small"><%= call.result.nil? ? "—" : agent_data_text(call.result) %></code></td>
+            <td class="mono"><%= call.duration_ms ? "#{call.duration_ms} ms" : "—" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

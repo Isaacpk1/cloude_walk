@@ -1,6 +1,6 @@
 # Ambiente local do Help Desk CloudWalk (ADR-011, RNF-29).
-# Bloco 03: postgres, redis, kafka (+ kafka-init), web, worker, scheduler, broker e channels-mock.
-# Os demais serviços entram nos blocos seguintes (consumer e agent-mock no 04).
+# Bloco 04: postgres, redis, kafka (+ kafka-init), web, worker, scheduler, consumer, broker, agent-mock e
+# channels-mock. Prometheus e Grafana entram com os experimentos (bloco 19).
 name: helpdesk
 
 x-platform: &platform
@@ -103,6 +103,7 @@ services:
     environment:
       <<: *platform-env
       SCHEDULER_INTERVAL: "0.25"
+      SCHEDULER_BATCH: "100"
       # A consulta roda 4 vezes por segundo: em debug, o SQL encobriria os eventos do scheduler.
       RAILS_LOG_LEVEL: info
       # Sem recarga automática do código: mudou o código, `docker compose restart scheduler`.
@@ -115,7 +116,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 300s
-      SCHEDULER_BATCH: "100"
     volumes:
       - ./src/platform:/rails
       - ./src/contracts:/contracts
@@ -128,6 +128,27 @@ services:
         condition: service_healthy
       web:
         condition: service_healthy
+
+  # Karafka: consome as ações do agente em agent.outbound e aplica ao atendimento (RF-31; 07, seções 2
+  # e 3.4). Só publica direto no Kafka para a DLQ. Escala até o número de partições (48).
+  # Espera o web, que prepara o banco e instala as gems no volume compartilhado.
+  consumer:
+    <<: *platform
+    command: ["bundle", "exec", "karafka", "server"]
+    environment:
+      <<: *platform-env
+      KAFKA_BROKERS: kafka:29092
+      # Sem recarga automática do código: mudou o código, `docker compose restart consumer`.
+      RAILS_ENABLE_RELOADING: "0"
+    volumes:
+      - ./src/platform:/rails
+      - ./src/contracts:/contracts
+      - bundle:/usr/local/bundle
+    depends_on:
+      web:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
 
   # Kafka 4 em modo KRaft, nó único (ADR-004). Heap limitado (08, orçamento de memória).
   # Dentro do Compose: kafka:29092. Na máquina: localhost:9092.
@@ -194,6 +215,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+
+  # Agente de IA simulado (ADR-008; RF-32, RF-38): consome agent.inbound, decide por regras de
+  # config/scenarios.yml e publica a ação em agent.outbound. Sem banco (invariante 12).
+  # Perfil e falhas por variável: AGENT_PROFILE (rapido, lento, mudo), AGENT_LATENCY_MS, AGENT_FAILURE_RATE.
+  agent-mock:
+    build:
+      context: ./src
+      dockerfile: agent-mock/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      AGENT_PROFILE: ${AGENT_PROFILE:-rapido}
+      AGENT_SEED: ${AGENT_SEED:-42}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
 
   # Provedores simulados e simulador do cliente (RF-04, ADR-012): http://localhost:4000
   channels-mock:

@@ -33,6 +33,16 @@ RSpec.describe SyntheticConversations do
     it "mostra a consulta feita pelo agente no turno" do
       expect(view.turns.first.tool_calls).to include("consultar_repasse")
     end
+
+    it "RF-32, RN-37: o turno traz a ação recebida de exemplo, com consulta, agente e duração, na conversa sintética" do
+      action = view.turns.first.agent_action
+
+      expect(view.source).to eq(DataSource::SYNTHETIC)
+      expect(action).to have_attributes(action: "reply", outcome: :applied, agent_ms: 2_000)
+      expect(action.reply_text).to eq(view.messages.last.body)
+      expect(action.tool_calls.sole).to have_attributes(tool: "consultar_repasse", duration_ms: be_positive)
+      expect(action.model).to be_present
+    end
   end
 
   describe "RN-56: corrida dos 3 s" do

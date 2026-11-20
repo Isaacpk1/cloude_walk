@@ -78,3 +78,17 @@ jobs:
           bundler-cache: true
       - run: bundle exec rspec
       - run: bundle exec rubocop
+
+  agent-mock:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/agent-mock
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: src/agent-mock
+          bundler-cache: true
+      - run: bundle exec rspec
+      - run: bundle exec rubocop

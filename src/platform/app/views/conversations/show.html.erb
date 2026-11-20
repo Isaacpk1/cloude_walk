@@ -88,6 +88,11 @@
               <dt>event_id</dt><dd><code><%= turn.event_id.first(8) %></code></dd>
             </dl>
             <% if turn.note %><p class="muted"><%= turn.note %></p><% end %>
+            <% if turn.agent_action %>
+              <%= render "shared/agent_action", action: turn.agent_action %>
+            <% elsif !c.source.synthetic? %>
+              <p class="turn__response-state"><strong><%= turn.response_state_label %></strong></p>
+            <% end %>
           </li>
         <% end %>
       </ol>

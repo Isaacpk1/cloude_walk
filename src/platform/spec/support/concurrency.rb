@@ -3,6 +3,10 @@
 require "database_cleaner/active_record"
 
 RSpec.configure do |config|
+  # O `db:prepare` do CI roda o seed num banco novo. Sem esta limpeza, o primeiro teste que
+  # cria uma marca falha com slug repetido, conforme a ordem aleatória (RNF-27).
+  config.before(:suite) { DatabaseCleaner.clean_with(:truncation) }
+
   config.around(:each, :concurrency) do |example|
     self.use_transactional_tests = false
     example.run

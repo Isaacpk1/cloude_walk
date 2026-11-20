@@ -1,0 +1,2 @@
+# Karafka grava aqui fora do Docker; os logs do serviço saem em JSON no stdout.
+/log/
