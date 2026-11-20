@@ -1,4 +1,5 @@
 require "json"
+require "logger"
 require "time"
 
 module AgentMock
@@ -17,6 +18,16 @@ module AgentMock
     def error(event, **fields) = write("error", event, fields)
 
     def self.trace_id(traceparent) = TRACEPARENT.match(traceparent.to_s)&.[](:trace_id)
+
+    # Logger do próprio Karafka também em JSON (invariante 13). O Karafka não loga payloads.
+    def self.karafka_logger(io = $stdout)
+      Logger.new(io).tap do |logger|
+        logger.formatter = proc do |severity, time, _progname, message|
+          "#{JSON.generate(at: time.utc.iso8601(3), level: severity.downcase, service: 'agent-mock', event: 'karafka',
+                           message: message.to_s)}\n"
+        end
+      end
+    end
 
     private
 

@@ -26,3 +26,12 @@ require_relative "agent_mock/scenarios/engine"
 require_relative "agent_mock/publisher"
 require_relative "agent_mock/kafka"
 require_relative "agent_mock/responder"
+
+module AgentMock
+  class << self
+    # Configuração carregada uma vez por processo (config/scenarios.yml + ENV).
+    def config = @config ||= Config.load
+    def log = @log ||= Log.new
+    def clock = SystemClock
+  end
+end
