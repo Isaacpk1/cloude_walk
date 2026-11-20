@@ -1,0 +1,18 @@
+source "https://rubygems.org"
+
+ruby file: ".ruby-version"
+
+# Agente de IA simulado: helpdesk.agent.inbound.v1 → helpdesk.agent.outbound.v1 (ADR-008; docs/10, seção 3.3).
+# Não tem banco e nunca lê o Postgres da plataforma (invariante 12).
+gem "karafka", "~> 2.5"
+# Produtor Kafka sobre o librdkafka (ADR-004), o mesmo do broker.
+gem "waterdrop", "~> 2.8"
+
+# Mesmo validador da plataforma e do broker: contrato na entrada e na saída (invariante 10).
+gem "helpdesk_contracts", path: "../contracts"
+
+group :development, :test do
+  gem "rspec", "~> 3.13"
+  gem "karafka-testing", "~> 2.5"
+  gem "rubocop-rails-omakase", require: false
+end

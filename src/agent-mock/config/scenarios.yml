@@ -1,0 +1,100 @@
+# Configuração do agente mock (ADR-008, RF-38). Tudo aqui entra no config_hash de cada ação (RN-37):
+# mudar uma vírgula muda o hash, e a auditoria mostra com qual configuração a IA decidiu.
+#
+# Perfil escolhido por AGENT_PROFILE (padrão: rapido). Variáveis de ambiente sobrepõem o perfil:
+# AGENT_LATENCY_MS ("200" ou "1000-3000"), AGENT_FAILURE_RATE (0.0 a 1.0), AGENT_MUTE (true/false)
+# e AGENT_SEED. Mesma entrada + mesma configuração + mesma semente = mesma ação (RNF-30).
+version: 1
+seed: 42
+default_profile: rapido
+
+profiles:
+  # Caminho feliz e experimentos de carga (E1): resposta quase imediata.
+  rapido:
+    latency_ms: { min: 50, max: 150 }
+    failure_rate: 0.0
+    mute: false
+  # Agente lento, ainda dentro dos 20 s do turno (RN-46): latência de LLM real.
+  lento:
+    latency_ms: { min: 2000, max: 6000 }
+    failure_rate: 0.0
+    mute: false
+  # Agente fora do ar (E2): consome e não responde. A plataforma escala pelo prazo (RN-33 (4), RN-46).
+  mudo:
+    latency_ms: 0
+    failure_rate: 0.0
+    mute: true
+
+# Limite de trocas da IA sem resolver antes de escalar (RN-33 (6); 06, parâmetro "10 mensagens").
+max_ai_turns: 10
+
+# Consultas sintéticas (RF-32). account_data: true exige cliente verificado (RN-05).
+# Nenhuma tool movimenta dinheiro ou altera cadastro (RN-35): só consultas.
+tools:
+  get_settlement_status:
+    account_data: true
+  get_transaction_status:
+    account_data: true
+  get_fee:
+    account_data: false
+
+# Regras por intenção, avaliadas em ordem; vale a primeira que casar (determinístico).
+# O texto avaliado é o de TODAS as context.pending_messages, sem acento e em minúsculas.
+# any: alguma palavra-chave presente. unless_any: nenhuma destas pode estar presente (negação).
+# Tipos: escalate, resolve, tool_reply (consulta + reply) e reply.
+rules:
+  # RN-33 (2), RN-34: o cliente pediu humano.
+  - id: pedido_de_humano
+    type: escalate
+    any: ["atendente", "humano", "pessoa", "analista"]
+    reason: cliente_pediu_humano
+    summary:
+      problema: "Cliente pediu atendimento humano"
+      motivo: "Pedido explícito de humano (RN-34)"
+      pendente: "Atender o cliente e confirmar o problema relatado"
+  # RN-35: dinheiro e cadastro são exclusivos de humanos. A IA escala, não executa.
+  - id: acao_exclusiva_humana
+    type: escalate
+    any: ["estorno", "estornar", "reembolso", "cancelar venda", "trocar conta", "conta bancaria", "aumentar limite", "limite de credito"]
+    reason: acao_exclusiva_humana
+    summary:
+      problema: "Cliente pediu operação que movimenta dinheiro ou altera cadastro"
+      motivo: "Ação exclusiva de humanos (RN-35)"
+      pendente: "Avaliar e executar a operação pedida, se cabível"
+  # RN-36: só resolve com confirmação do cliente.
+  - id: confirmacao_de_resolucao
+    type: resolve
+    any: ["resolvido", "resolveu", "deu certo", "funcionou"]
+    unless_any: ["nao resolvido", "nao resolveu", "nao deu certo", "nao funcionou"]
+    reason: confirmado_pelo_cliente
+    text: "Que bom que deu certo! Fico à disposição."
+  - id: repasse
+    type: tool_reply
+    tool: get_settlement_status
+    any: ["repasse", "nao caiu", "nao recebi"]
+    category: repasses
+  - id: transacao
+    type: tool_reply
+    tool: get_transaction_status
+    any: ["transacao", "venda", "pagamento", "cobranca"]
+    category: transacoes
+  - id: taxa
+    type: tool_reply
+    tool: get_fee
+    any: ["taxa", "tarifa"]
+    category: taxas
+
+# Textos fixos (determinísticos). %{...} vem do resultado da consulta, nunca de dado pessoal.
+replies:
+  default: "Entendi. Pode me contar com mais detalhes o que aconteceu? Assim consigo te ajudar melhor."
+  needs_verification: "Para consultar dados da sua conta, preciso confirmar sua identidade. Pode acessar pelo app ou informar o e-mail cadastrado?"
+  get_settlement_status:
+    pago: "Consultei aqui: o repasse de %{date}, de R$ %{amount}, já foi pago. Pode levar até 1 hora para aparecer no extrato."
+    pendente: "Consultei aqui: o repasse de %{date}, de R$ %{amount}, está pendente, com previsão para %{expected_at}."
+    em_processamento: "Consultei aqui: o repasse de %{date}, de R$ %{amount}, está em processamento, com previsão para %{expected_at}."
+  get_transaction_status:
+    aprovada: "Consultei aqui: a transação %{reference}, de R$ %{amount}, foi aprovada."
+    em_analise: "Consultei aqui: a transação %{reference}, de R$ %{amount}, está em análise. Te aviso assim que sair."
+    recusada: "Consultei aqui: a transação %{reference}, de R$ %{amount}, foi recusada pelo emissor do cartão."
+  get_fee:
+    default: "A taxa para %{method} é de %{rate}%% por venda, com recebimento em %{settlement_days} dia(s)."
