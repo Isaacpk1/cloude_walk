@@ -42,10 +42,12 @@ RSpec.describe Turns::Window do
       expect(described_class.dispatch_due_at(channel: "email", now:, first_pending_at: now)).to eq(now)
     end
 
-    it "ciclo antigo (mensagem depois do teto): o prazo já vencido sai na próxima volta do scheduler" do
+    it "ciclo antigo (mensagem depois do teto): vence na gravação, nunca antes dela" do
       due = described_class.dispatch_due_at(channel: "chat", now: now + 10.seconds, first_pending_at: now)
 
-      expect(due).to eq(now + 4.seconds)
+      # O teto já passou: o turno sai na próxima volta do scheduler. O prazo não fica no passado, para o
+      # delay_ms do scheduler medir o atraso real (E1) e não o tempo desde o teto antigo.
+      expect(due).to eq(now + 10.seconds)
     end
   end
 

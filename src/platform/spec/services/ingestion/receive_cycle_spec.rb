@@ -71,7 +71,7 @@ RSpec.describe Ingestion::Receive do
       ingest_at(t0 + 3.seconds)
       ticket = ingest_at(t0 + 20.seconds).ticket.reload
 
-      expect(ticket).to have_attributes(first_pending_seq: 1, ai_deadline_at: t0 + 30.seconds, dispatch_due_at: t0 + 4.seconds)
+      expect(ticket).to have_attributes(first_pending_seq: 1, ai_deadline_at: t0 + 30.seconds, dispatch_due_at: t0 + 20.seconds)
     end
 
     it "depois de o turno sair (dispatch_due_at zerado), a mensagem seguinte reagenda no mesmo ciclo" do
