@@ -1,7 +1,9 @@
 # Fonte dos registros reais para as telas de conversa e linha do tempo (ROADMAP 02).
 # Lê tickets, messages e outbox_events (07, seção 4) e devolve os mesmos ConversationView e
 # TimelineView dos exemplos, marcados como DataSource::SYSTEM. A espera da janela de agrupamento
-# (TurnWindowEvents) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03). Respostas, entregas e escalações entram aqui quando
+# (TurnWindowEvents) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03).
+# A ação recebida do agente (AgentActionEvents) vem de ai_turns.response e da auditoria (bloco 04).
+# Entregas e escalações entram aqui quando
 # suas tabelas existirem (blocos 04 a 10).
 class RecordedConversations
   LIMIT = 50
@@ -22,6 +24,7 @@ class RecordedConversations
     events = ticket.messages.select { _1.direction == "inbound" }.flat_map { message_events(ticket, _1, outbox[_1.id]) }
     events += TurnWindowEvents.new(ticket).events
     events += PublicationEvents.new(ticket).events
+    events += AgentActionEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
   end
 
@@ -41,7 +44,7 @@ class RecordedConversations
       customer_name: ticket.customer.display_name, channel: ticket.channel, state: ticket.state,
       title: ticket.messages.first&.body.to_s.truncate(60), assignee: WAITING,
       assignment_version: ticket.assignment_version, latest_customer_seq: ticket.latest_customer_seq,
-      messages: ticket.messages.map { message(ticket, _1) }, turns: ticket.ai_turns.order(:turn).map { turn(_1) },
+      messages: ticket.messages.map { message(ticket, _1) }, turns: turns(ticket),
       escalations: [], source: DataSource::SYSTEM
     )
   end
@@ -61,14 +64,21 @@ class RecordedConversations
     "applied" => "Resposta aplicada."
   }.freeze
 
+  def turns(ticket)
+    actions = AgentActionEvents.new(ticket)
+    ticket.ai_turns.order(:turn).map { turn(_1, actions.for_turn(_1)) }
+  end
+
   # Bloco 03: o turno gravado em ai_turns. As mensagens cobertas são as pendentes do contexto enviado.
-  def turn(record)
+  # Bloco 04: a ação recebida do agente (ai_turns.response) e o seu desfecho.
+  def turn(record, agent_action)
     ConversationView::Turn.new(
       number: record.turn, status: record.status,
       covered_seqs: Array(record.context["pending_messages"]).map { _1["seq"] },
       context_until_seq: record.context_until_seq, assignment_version: record.assignment_version,
       event_id: record.event_id, action: record.response&.dig("action") || "—",
-      note: TURN_NOTES[record.status], tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] }
+      note: TURN_NOTES[record.status], tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] },
+      agent_action:
     )
   end
 
