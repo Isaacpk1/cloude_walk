@@ -13,4 +13,10 @@ Sidekiq.configure_server do |config|
   # Recuperação do outbox enquanto o scheduler do bloco 08 não existe (07, seção 6).
   config.on(:startup) { Outbox::Sweeper.start }
   config.on(:shutdown) { Outbox::Sweeper.stop }
+  # Sinal de vida para o healthcheck do Compose (RNF-29): renovado na subida e a cada batimento do
+  # Sidekiq com o Redis (~10 s). Sem Redis, o arquivo envelhece e o worker aparece como unhealthy.
+  if (heartbeat = ENV["SIDEKIQ_HEARTBEAT_FILE"].presence)
+    config.on(:startup) { FileUtils.touch(heartbeat) }
+    config.on(:beat) { FileUtils.touch(heartbeat) }
+  end
 end

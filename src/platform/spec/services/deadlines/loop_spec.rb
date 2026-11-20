@@ -3,13 +3,13 @@ require "rails_helper"
 RSpec.describe Deadlines::Loop, "ADR-016: laço do scheduler (bin/scheduler)" do
   let(:sleeps) { [] }
 
-  def build(batch: 100, ticks: 1)
+  def build(batch: 100, ticks: 1, heartbeat: nil)
     instance = nil
     sleeper = lambda do |seconds|
       sleeps << seconds
       instance.stop! if sleeps.size >= ticks
     end
-    instance = described_class.new(interval: 0.25, batch:, sleeper:)
+    instance = described_class.new(interval: 0.25, batch:, sleeper:, heartbeat:)
   end
 
   it "a cada volta registra os prazos vencidos com o horário atual e o tamanho do lote" do
@@ -54,5 +54,40 @@ RSpec.describe Deadlines::Loop, "ADR-016: laço do scheduler (bin/scheduler)" do
 
     expect(described_class.from_env(env)).to have_attributes(interval: 0.5, batch: 50)
     expect(described_class.from_env({})).to have_attributes(interval: 0.25, batch: 100)
+  end
+
+  describe "RNF-29: sinal de vida para o healthcheck do Compose" do
+    let(:dir) { Dir.mktmpdir }
+    let(:heartbeat) { File.join(dir, "scheduler.alive") }
+
+    after { FileUtils.rm_rf(dir) }
+
+    it "renova o arquivo a cada volta que consulta o banco com sucesso" do
+      allow(Deadlines::DispatchDue).to receive(:call).and_return([])
+
+      travel_to(Time.zone.parse("2026-11-20T01:22:04Z")) { build(heartbeat:).run }
+
+      expect(File.mtime(heartbeat)).to eq(Time.zone.parse("2026-11-20T01:22:04Z"))
+    end
+
+    it "falha de dependência: sem banco, não renova (o Compose passa a ver o scheduler como unhealthy)" do
+      allow(Deadlines::DispatchDue).to receive(:call).and_raise(ActiveRecord::ConnectionNotEstablished)
+
+      build(heartbeat:).run
+
+      expect(File).not_to exist(heartbeat)
+    end
+
+    it "sem arquivo configurado, não grava nada" do
+      allow(Deadlines::DispatchDue).to receive(:call).and_return([])
+
+      expect { build.run }.not_to raise_error
+      expect(Dir.children(dir)).to be_empty
+    end
+
+    it "lê o caminho de SCHEDULER_HEARTBEAT_FILE" do
+      expect(described_class.from_env("SCHEDULER_HEARTBEAT_FILE" => heartbeat).heartbeat).to eq(heartbeat)
+      expect(described_class.from_env({}).heartbeat).to be_nil
+    end
   end
 end

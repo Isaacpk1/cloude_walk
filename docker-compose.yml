@@ -78,6 +78,14 @@ services:
       # Sem recarga automática do código: mudou o código, `docker compose restart worker`
       # (config/environments/development.rb).
       RAILS_ENABLE_RELOADING: "0"
+      SIDEKIQ_HEARTBEAT_FILE: /tmp/sidekiq.alive
+    # Pronto quando o Sidekiq subiu e fala com o Redis: o arquivo é renovado a cada ~10 s.
+    healthcheck:
+      test: ["CMD", "ruby", "-e", "exit(Time.now - File.mtime('/tmp/sidekiq.alive') < 30 ? 0 : 1) rescue exit(1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
     volumes:
       - ./src/platform:/rails
       - ./src/contracts:/contracts
@@ -99,6 +107,14 @@ services:
       RAILS_LOG_LEVEL: info
       # Sem recarga automática do código: mudou o código, `docker compose restart scheduler`.
       RAILS_ENABLE_RELOADING: "0"
+      SCHEDULER_HEARTBEAT_FILE: /tmp/scheduler.alive
+    # Pronto quando a primeira volta consultou o banco; travado ou sem banco por 5 s vira unhealthy.
+    healthcheck:
+      test: ["CMD", "ruby", "-e", "exit(Time.now - File.mtime('/tmp/scheduler.alive') < 5 ? 0 : 1) rescue exit(1)"]
+      interval: 2s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
       SCHEDULER_BATCH: "100"
     volumes:
       - ./src/platform:/rails
