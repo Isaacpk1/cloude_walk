@@ -11,6 +11,7 @@ module AgentMock
         @id = spec.fetch("id")
         @type = spec.fetch("type")
         raise Config::Invalid, "regra #{id}: tipo desconhecido #{type}" unless TYPES.include?(type)
+        raise Config::Invalid, "regra #{id}: tool fora do catálogo #{spec['tool']}" if type == "tool_reply" && !Tools::CATALOG.key?(spec.fetch("tool"))
 
         @any = spec.fetch("any")
         @unless_any = spec.fetch("unless_any", [])
