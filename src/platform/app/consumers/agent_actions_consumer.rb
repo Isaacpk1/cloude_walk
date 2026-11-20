@@ -7,13 +7,15 @@
 class AgentActionsConsumer < Karafka::BaseConsumer
   def consume
     messages.each do |message|
-      AgentActions::Apply.call(message.raw_payload, traceparent: header(message, "traceparent"))
+      AgentActions::Apply.call(message.raw_payload, traceparent: header(message, "traceparent"),
+                                                    header_event_id: header(message, "event_id"))
       mark_as_consumed(message)
     end
   end
 
   private
 
-  # O payload vai cru: o serviço precisa do corpo como chegou para a DLQ, inclusive quando não é JSON.
+  # O payload vai cru: o serviço precisa do corpo como chegou para a DLQ, inclusive quando não é JSON. O
+  # cabeçalho event_id é a reserva do serviço para a DLQ quando o corpo não tem event_id legível.
   def header(message, name) = Array(message.headers[name]).first
 end
