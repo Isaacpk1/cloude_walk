@@ -8,6 +8,7 @@ require_relative "lib/channels_mock/faults"
 require_relative "lib/channels_mock/chat_deliveries"
 require_relative "lib/channels_mock/status_callbacks"
 require_relative "lib/channels_mock/providers/chat_api"
+require_relative "lib/channels_mock/conversation_view"
 
 module ChannelsMock
   # Provedores simulados e simulador do cliente (RF-04, ADR-012). Bloco 02: só o chat do app, na entrada.
@@ -49,8 +50,20 @@ module ChannelsMock
       end
 
       r.root do
-        view("index", locals: { entries: Inbox.all, accounts: Providers::Chat::ACCOUNTS, platform_url: PLATFORM_PUBLIC_URL,
-                                last: Inbox.all.first })
+        entries = Inbox.all
+        items, orphans = ConversationView.build(entries:, records: ChatDeliveries.all)
+        refresh = r.params["atualizar"].to_s[/\A[1-9]\d?\z/]
+        view("index", locals: { items:, orphans:, accounts: Providers::Chat::ACCOUNTS, platform_url: PLATFORM_PUBLIC_URL,
+                                last: entries.first, fault: Faults.state, refresh: },
+                      layout_opts: { locals: { refresh: } })
+      end
+
+      # Falha simulada do provedor do chat, escolhida na tela (blocos 05 e 09).
+      r.post "simulador", "falhas" do
+        Faults.set(r.params["fault"].to_s, times: r.params.fetch("times", "1").to_s.then { _1.empty? ? 1 : _1 })
+        r.redirect "/"
+      rescue ArgumentError, TypeError => e
+        r.halt(422, e.message)
       end
 
       r.on "chat", "messages" do
