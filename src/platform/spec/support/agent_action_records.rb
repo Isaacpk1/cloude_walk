@@ -1,6 +1,8 @@
-# Grava direto no banco o efeito de uma ação do agente, no formato combinado do bloco 04
+# Grava direto no banco o efeito de uma ação do agente, no mesmo formato do AgentActions::Apply
 # (ai_turns.response, ai_turns.status e auditoria agent_action.applied/rejected), para testar a
-# leitura do painel sem depender do consumer (AgentActions::Apply).
+# leitura do painel com desfechos arbitrários (ex.: um motivo de descarte qualquer) sem montar o cenário
+# que o produz. O formato é conferido contra o Apply real em spec/read_models/agent_action_events_spec.rb;
+# para o caminho de verdade, grave pelo AgentActions::Apply (spec/support/agent_actions.rb).
 module AgentActionRecordHelpers
   def agent_action_payload(turn, action: "reply", text: "Seu repasse cai hoje até as 18h.", agent_ms: 2_000,
                            tool_calls: nil, **extra)
@@ -23,11 +25,15 @@ module AgentActionRecordHelpers
   # Rejeitada: o turno guarda a resposta (a primeira) e a auditoria agent_action.rejected leva o motivo.
   def record_agent_action(turn, payload, rejected: nil)
     turn.reload
-    attrs = { response: turn.response || payload, response_received_at: turn.response_received_at || Time.current }
+    now = Time.current
+    attrs = { response: turn.response || payload, response_received_at: turn.response_received_at || now }
     attrs.merge!(status: "applied", applied_event_id: payload["event_id"]) unless rejected
     turn.update_columns(attrs)
-    data = payload.slice("turn", "event_id", "in_reply_to", "action", "tool_calls", "agent", "timing",
-                         "context_until_seq", "classification").compact
+    data = payload.slice("turn", "event_id", "in_reply_to", "action", "timing", "context_until_seq", "classification")
+                  .merge("tool_calls" => payload.fetch("tool_calls", []),
+                         "agent" => payload.fetch("agent", {}).slice("model", "version", "config_hash"),
+                         "turn_status" => turn.status, "platform_received_at" => now.utc.iso8601(6))
+                  .merge(payload.slice("reply", "escalation", "resolution")).compact
     data["reason"] = rejected if rejected
     AuditEvent.create!(brand_id: turn.brand_id, ticket_id: turn.ticket_id, actor_type: "agent",
                        event_type: rejected ? "agent_action.rejected" : "agent_action.applied", data:,

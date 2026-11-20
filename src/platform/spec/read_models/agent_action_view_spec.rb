@@ -144,7 +144,7 @@ RSpec.describe RecordedConversations, "ROADMAP 04: ação do agente no painel" d
       expect(discarded.agent_action).to have_attributes(outcome: :rejected, rejection_reason: "in_reply_to_divergente")
     end
 
-    it "repetição: cada ação recebida aparece com o seu desfecho; o texto só existe para a primeira (ai_turns.response)" do
+    it "repetição, RF-54: cada ação recebida aparece com o seu desfecho e o seu texto (da auditoria)" do
       turn = turn_of(trace_id:)
       record_agent_action(turn, agent_action_payload(turn, text: "a"))
       record_agent_action(turn, agent_action_payload(turn, text: "b"), rejected: "turno_nao_elegivel")
@@ -154,7 +154,7 @@ RSpec.describe RecordedConversations, "ROADMAP 04: ação do agente no painel" d
       expect(events.count { _1.kind == :agent_run }).to eq(2)
       expect(events.find { _1.kind == :applied }.agent_action).to have_attributes(reply_text: "a")
       expect(events.find { _1.kind == :discarded }.agent_action)
-        .to have_attributes(reply_text: nil, rejection_reason: "turno_nao_elegivel", tool_calls: [ be_a(AgentActionView::ToolCall) ])
+        .to have_attributes(reply_text: "b", rejection_reason: "turno_nao_elegivel", tool_calls: [ be_a(AgentActionView::ToolCall) ])
     end
 
     it "marca errada: a linha do tempo de um atendimento não mostra a ação de outro, de outra marca" do

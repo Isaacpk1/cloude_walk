@@ -32,4 +32,31 @@ RSpec.describe AgentActionEvents, "RF-31, RF-55: ação do turno como o consumer
       expect(outcomes).to eq([ [ :discarded, "PRIMEIRA", "contexto_divergente" ], [ :applied, "SEGUNDA", nil ] ])
     end
   end
+
+  describe "RF-54: o helper dos testes do painel grava no formato do AgentActions::Apply" do
+    def audit_shape(turn)
+      audit = AuditEvent.where(ticket_id: turn.ticket_id, event_type: %w[agent_action.applied agent_action.rejected]).sole
+      [ audit.event_type, audit.data.keys.sort, audit.data.slice("reply", "turn_status", "reason"),
+        audit.data["platform_received_at"].present?, audit.agent_model, audit.agent_version ]
+    end
+
+    it "aplicada" do
+      real = opened_turn
+      apply(agent_action_for(real, reply: { "text" => "oi" }))
+      helper = opened_turn(identity: "acc_infinitepay_000099")
+      record_agent_action(helper, agent_action_for(helper, reply: { "text" => "oi" }))
+
+      expect(audit_shape(helper)).to eq(audit_shape(real))
+      expect(helper.reload.status).to eq(real.reload.status)
+    end
+
+    it "rejeitada" do
+      real = opened_turn
+      apply(agent_action_for(real, context_until_seq: 9, reply: { "text" => "oi" }))
+      helper = opened_turn(identity: "acc_infinitepay_000099")
+      record_agent_action(helper, agent_action_for(helper, reply: { "text" => "oi" }), rejected: "contexto_divergente")
+
+      expect(audit_shape(helper)).to eq(audit_shape(real))
+    end
+  end
 end
