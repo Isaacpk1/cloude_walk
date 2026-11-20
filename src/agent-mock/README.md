@@ -28,7 +28,7 @@ A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Ka
 
 ## Configuração
 
-`config/scenarios.yml` tem a semente, os perfis, as tools, as regras e os textos. As variáveis de ambiente sobrepõem o perfil, e entram no `config_hash`.
+`config/scenarios.yml` tem a semente, os perfis, as tools, as regras e os textos. As variáveis `AGENT_*` do perfil (semente, latência, falha, mudo) sobrepõem o perfil e entram no `config_hash`; as de Kafka e `AGENT_CONCURRENCY` não.
 
 | Variável | Padrão | Para quê |
 | --- | --- | --- |
@@ -40,8 +40,9 @@ A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Ka
 | `AGENT_LATENCY_MS` | do perfil | Fixa (`2000`) ou faixa (`1000-3000`) |
 | `AGENT_FAILURE_RATE` | do perfil | De `0` a `1`: fração de eventos sem resposta |
 | `AGENT_MUTE` | do perfil | `true` ou `false` |
+| `AGENT_CONCURRENCY` | `48` | Threads do Karafka (inteiro ≥ 1). A latência simulada ocupa a thread: vazão ≈ concorrência ÷ latência, ~24 turnos/s com 48 e o agente a 2 s (07, seção 7). Não entra no `config_hash`: muda a vazão, não a decisão |
 
-Mesma entrada + mesma configuração + mesma semente = mesma ação, exceto `event_id` e `timing`. A latência e a falha são sorteadas por `event_id`, então não dependem da ordem de chegada nem da partição. Configuração inválida (perfil desconhecido, taxa fora de 0..1, tool fora do catálogo) derruba a subida.
+Mesma entrada + mesma configuração + mesma semente = mesma ação, exceto `event_id` e `timing`. A latência e a falha são sorteadas por `event_id`, então não dependem da ordem de chegada nem da partição. Configuração inválida (perfil desconhecido, taxa fora de 0..1, tool fora do catálogo, regra mal formada, `AGENT_CONCURRENCY` < 1) derruba a subida.
 
 Os logs saem em JSON no stdout, com `trace_id`, `event_id`, `conversation_id`, decisão, regra e duração. O texto do cliente e o `display_name` nunca vão para o log (RN-51).
 

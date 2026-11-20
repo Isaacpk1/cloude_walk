@@ -32,5 +32,22 @@ module AgentMock
     end
 
     def group_id(env: ENV) = env.fetch("AGENT_CONSUMER_GROUP", "agent-mock")
+
+    # Threads de processamento do Karafka (07, seção 7). A latência simulada ocupa a thread, então a
+    # vazão é ~concorrência ÷ latência. O padrão do Karafka (5) daria ~2,5 turnos/s com o agente a 2 s;
+    # 48 acompanha as 48 partições de infra/kafka/topics.yml (~24 turnos/s). A ordem por partição
+    # continua garantida: o Karafka nunca processa duas mensagens da mesma partição ao mesmo tempo.
+    # Fica fora do config_hash (RN-37): muda a vazão, não a decisão de nenhum turno.
+    DEFAULT_CONCURRENCY = 48
+
+    def concurrency(env: ENV)
+      value = env.fetch("AGENT_CONCURRENCY", DEFAULT_CONCURRENCY.to_s)
+      threads = Integer(value, 10)
+      raise ArgumentError if threads < 1
+
+      threads
+    rescue ArgumentError, TypeError
+      raise Config::Invalid, "AGENT_CONCURRENCY inválido (inteiro >= 1): #{value.inspect}"
+    end
   end
 end
