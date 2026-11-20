@@ -65,6 +65,32 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
     expect(Time.zone.at(job[:at])).to be_within(0.001).of(item.next_attempt_at)
   end
 
+  describe "RF-06: delivery.requested" do
+    let!(:account) { create(:provider_account, brand: infinitepay, slug: "infinitepay-chat-mock") }
+
+    it "envia a saída ao provedor do chat" do
+      delivery = requested_delivery(customer_message.ticket)
+      stub_channels
+
+      described_class.perform_now(delivery_item(delivery).id)
+
+      expect(delivery.reload.status).to eq("delivered")
+      expect(channel_requests.size).to eq(1)
+    end
+
+    it "RN-43: falha transitória agenda o despertador para o next_attempt_at do item" do
+      delivery = requested_delivery(customer_message.ticket)
+      stub_channels(status: 503)
+      clear_enqueued_jobs
+
+      described_class.perform_now(delivery_item(delivery).id)
+
+      job = enqueued_jobs.sole
+      expect(job).to include(job: described_class, args: [ delivery_item(delivery).id ])
+      expect(Time.zone.at(job[:at])).to be_within(0.001).of(delivery_item(delivery).next_attempt_at)
+    end
+  end
+
   it "repetição: ação encerrada não faz nada" do
     item = due_dispatch(ingest)
     item.update!(completed_at: start)
