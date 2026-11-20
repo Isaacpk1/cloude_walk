@@ -114,7 +114,7 @@ Com Docker (na raiz do repositório):
 make up        # cria o .env a partir do .env.example, sobe postgres, redis, kafka, web, worker, scheduler, consumer, broker, agent-mock e channels-mock, e prepara o banco
 make seed      # dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
 make check     # rspec + rubocop + brakeman da plataforma
-make topics    # mensagens de helpdesk.agent.inbound.v1 e .outbound.v1, com chave e cabeçalhos
+make topics    # mensagens de helpdesk.agent.inbound.v1, .outbound.v1 e .dlq.v1, com chave e cabeçalhos
 make help      # lista todos os alvos
 ```
 

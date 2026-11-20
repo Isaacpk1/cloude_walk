@@ -43,9 +43,9 @@ lint: ## Roda o rubocop
 security: ## Roda o brakeman
 	$(PLATFORM) bundle exec brakeman -q --no-pager
 
-topics: ## Lista os tópicos do Kafka e as mensagens de entrada e saída do agente (blocos 03 e 04)
+topics: ## Lista os tópicos do Kafka e as mensagens de entrada, saída e DLQ do agente (blocos 03 e 04)
 	$(COMPOSE) exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list
-	@for t in helpdesk.agent.inbound.v1 helpdesk.agent.outbound.v1; do \
+	@for t in helpdesk.agent.inbound.v1 helpdesk.agent.outbound.v1 helpdesk.agent.dlq.v1; do \
 		echo "== $$t"; \
 		$(COMPOSE) exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:29092 \
 			--topic $$t --from-beginning --timeout-ms 5000 \
