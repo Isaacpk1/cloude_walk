@@ -168,3 +168,11 @@ RSpec.describe RecordedConversations, "ROADMAP 04: ação do agente no painel" d
     end
   end
 end
+
+RSpec.describe AgentActionView, "RN-56: rótulo de todo motivo que o AgentActions::Apply grava" do
+  it "nenhum motivo de rejeição do serviço aparece cru no painel" do
+    reasons = File.read(Rails.root.join("app/services/agent_actions/apply.rb")).scan(/(?:reject\(|return )"([a-z_]+)"|^\s+"([a-z_]+)" (?:if|unless)/).flatten.compact.uniq
+    expect(reasons).not_to be_empty
+    expect(reasons - AgentActionView::REJECTION_REASONS.keys).to eq([])
+  end
+end
