@@ -11,7 +11,7 @@ Faz o papel do agente de IA da CloudWalk ([ADR-008](../../docs/08-decisoes-de-ar
 | `ticket.ai_turns >= 10` | `escalate` com `limite_de_trocas` (RN-33) |
 | Caso normal | Primeira regra de `config/scenarios.yml` que casar no texto de **todas** as `pending_messages`; sem regra, `reply` padrão |
 
-Regras padrão: pedido de humano → `escalate` (RN-34); estorno, troca de conta ou limite → `escalate` (RN-35); "resolvido", "resolveu", "deu certo" (sem negação) → `resolve` (RN-36); repasse, transação ou taxa → consulta sintética + `reply`. Cliente com `customer.verified: false` não tem consulta de dados de conta: o agente pede identificação (RN-05). A taxa não é dado de conta e segue liberada.
+Regras padrão: pedido de humano → `escalate` (RN-34); estorno, troca de conta ou limite → `escalate` (RN-35); "resolvido", "resolveu", "deu certo" → `resolve` só quando afirmativos (RN-36): negação até 3 palavras antes ("ainda não está resolvido", "nada foi resolvido") ou pergunta ("resolveu?") não confirmam, e a IA segue com `reply` (recursos genéricos de regra `negations` + `negation_window` e `ignore_questions`, validados na subida); repasse, transação ou taxa → consulta sintética + `reply`. Cliente com `customer.verified: false` não tem consulta de dados de conta: o agente pede identificação (RN-05). A taxa não é dado de conta e segue liberada.
 
 As consultas (`get_settlement_status`, `get_transaction_status`, `get_fee`) são locais e sintéticas: o resultado sai de um hash da semente e dos argumentos. Cada uma vira um item de `tool_calls` com `tool`, `args`, `result` e `duration_ms` (sintético). Nenhuma movimenta dinheiro ou altera cadastro (RN-35).
 

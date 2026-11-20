@@ -107,6 +107,24 @@ RSpec.describe AgentMock::Responder do
       expect(action_in(producer)["action"]).to eq("reply")
     end
 
+    [ "ainda não está resolvido", "não foi resolvido", "resolveu?", "nada foi resolvido", "não resolveu ainda" ].each do |text|
+      it "#{text.inspect} não encerra: publica reply, não resolve" do
+        deliver(inbound(texts: [ text ]))
+
+        action = action_in(producer)
+        expect_valid_action(action)
+        expect(action["action"]).to eq("reply")
+      end
+    end
+
+    [ "deu certo, obrigado", "resolveu sim" ].each do |text|
+      it "#{text.inspect} encerra com resolve" do
+        deliver(inbound(texts: [ text ]))
+
+        expect(action_in(producer)).to include("action" => "resolve", "resolution" => include("reason" => "confirmado_pelo_cliente"))
+      end
+    end
+
     it "'obrigado' sozinho não é confirmação" do
       deliver(inbound(texts: [ "Obrigado" ]))
 

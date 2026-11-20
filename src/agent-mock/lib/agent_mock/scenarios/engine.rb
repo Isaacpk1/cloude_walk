@@ -16,7 +16,8 @@ module AgentMock
       def decide(event)
         return turn_limit(event) if event.dig("ticket", "ai_turns") >= @config.max_ai_turns
 
-        text = Text.normalize(event.dig("context", "pending_messages").map { _1.fetch("text") }.join("\n"))
+        # Uma mensagem por linha: o fim da mensagem também encerra a frase (ignore_questions, RN-36).
+        text = event.dig("context", "pending_messages").map { Text.normalize(_1.fetch("text")) }.join("\n")
         rule = @rules.find { _1.match?(text) }
         return Decision.reply(rule: "padrao", text: @config.replies.fetch("default")) unless rule
 

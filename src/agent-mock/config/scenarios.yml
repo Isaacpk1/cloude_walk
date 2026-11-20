@@ -41,6 +41,8 @@ tools:
 # Regras por intenção, avaliadas em ordem; vale a primeira que casar (determinístico).
 # O texto avaliado é o de TODAS as context.pending_messages, sem acento e em minúsculas.
 # any: alguma palavra-chave presente. unless_any: nenhuma destas pode estar presente (negação).
+# negations + negation_window (opcionais, juntos): termo de any com negação até N palavras antes não conta.
+# ignore_questions (opcional): termo de any numa frase ou mensagem terminada em "?" não conta.
 # Tipos: escalate, resolve, tool_reply (consulta + reply) e reply.
 rules:
   # RN-33 (2), RN-34: o cliente pediu humano.
@@ -61,11 +63,15 @@ rules:
       problema: "Cliente pediu operação que movimenta dinheiro ou altera cadastro"
       motivo: "Ação exclusiva de humanos (RN-35)"
       pendente: "Avaliar e executar a operação pedida, se cabível"
-  # RN-36: só resolve com confirmação do cliente.
+  # RN-36: só resolve com confirmação do cliente. Leitura conservadora: o termo só conta se for
+  # afirmativo. Negação até 3 palavras antes ("ainda nao esta resolvido", "nada foi resolvido",
+  # "nao resolveu ainda") ou pergunta ("resolveu?") não confirmam; na dúvida, a IA segue com reply.
   - id: confirmacao_de_resolucao
     type: resolve
     any: ["resolvido", "resolveu", "deu certo", "funcionou"]
-    unless_any: ["nao resolvido", "nao resolveu", "nao deu certo", "nao funcionou"]
+    negations: ["nao", "nada", "nunca", "nem", "sem", "ninguem"]
+    negation_window: 3
+    ignore_questions: true
     reason: confirmado_pelo_cliente
     text: "Que bom que deu certo! Fico à disposição."
   - id: repasse
