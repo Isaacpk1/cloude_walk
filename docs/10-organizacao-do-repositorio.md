@@ -136,14 +136,16 @@ Consome `helpdesk.agent.inbound.v1` e publica em `helpdesk.agent.outbound.v1` (A
 ```text
 src/agent-mock/
 ├── karafka.rb
-├── app/consumers/
+├── app/consumers/inbound_consumer.rb
 ├── lib/agent_mock/
 │   ├── scenarios/              # respostas determinísticas por intenção
-│   ├── tools/                  # consultas sintéticas (repasse, conta)
-│   └── failure_modes.rb        # latência, taxa de falha, modo mudo
+│   ├── tools/                  # consultas sintéticas (repasse, transação, taxa)
+│   ├── failure_modes.rb        # latência, taxa de falha, modo mudo
+│   ├── responder.rb            # contrato → prazo → falhas → decisão → validação → publicação
+│   └── publisher.rb            # produce_sync em outbound e na DLQ
 ├── config/scenarios.yml        # perfis rápido, lento e sem resposta
 ├── spec/
-├── Gemfile · Dockerfile
+├── Gemfile · Dockerfile · README.md
 ```
 
 Não tem banco e nunca lê o Postgres da plataforma (invariante 12).
