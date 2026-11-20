@@ -1,0 +1,241 @@
+# Aplicação da ação do agente ao atendimento (RF-31; 07, seção 3.1, passo 6, e seção 3.4; RN-56).
+#
+#   AgentActions::Apply.call(payload, traceparent: header) # => Result(status:, reason:, turn:)
+#
+# `payload` é o corpo cru do Kafka (String) ou um Hash. `status`: :applied, :rejected, :duplicate ou :invalid.
+#
+# 1. Contrato agent_outbound (invariante 10, RNF-28). Fora dele: falha permanente, DLQ sem retentativa (RN-44)
+#    e nenhum efeito no atendimento.
+# 2. Atendimento pelo conversation_id (`tkt_<id>`), sempre com o brand_id da marca do payload (invariante 6).
+#    Marca divergente ou atendimento inexistente: DLQ sem efeito e sem auditoria, porque não há atendimento
+#    verificado onde gravá-la (07, seção 5.3; ADR-014; 07, seção 6, "payload fora do contrato").
+# 3. Uma transação: marca o evento em processed_events (RN-47, invariante 3), trava a linha do atendimento
+#    (mesma ordem da ingestão e de Turns::Open), lê o relógio do banco e confere as quatro condições da
+#    seção 3.4. Grava a primeira ação recebida no turno, o resultado (`eligible → applied` condicional,
+#    invariante 8) e a auditoria (RN-37, RF-54).
+# 4. Fora da transação (invariante 2): log JSON e, se for o caso, a DLQ pelo produtor do Karafka.
+#
+# Escopo do bloco 04: a ação aplicada fica registrada. A mensagem de saída e a entrega ao canal são do
+# bloco 05, o handoff da `escalate` do bloco 10 e o encerramento da `resolve` fica pendente (RN-36).
+module AgentActions
+  class Apply
+    Result = Data.define(:status, :reason, :turn)
+
+    TOPICS = { outbound: "helpdesk.agent.outbound.v1", dlq: "helpdesk.agent.dlq.v1" }.freeze
+    CONSUMER = "agent_actions".freeze
+    CONTENT_FIELDS = %w[reply escalation resolution].freeze
+    CONVERSATION_ID = /\Atkt_(?<id>[1-9]\d{0,18})\z/
+    TRACEPARENT = /\A00-(?<trace_id>\h{32})-\h{16}-\h{2}\z/
+
+    # Saída da transação: o que aconteceu e o que fazer depois do commit.
+    Outcome = Data.define(:status, :reason, :turn, :trace_id, :dead_letter)
+
+    def self.call(...) = new(...).call
+
+    def initialize(payload, traceparent: nil)
+      @raw = payload.is_a?(String) ? payload : JSON.generate(payload)
+      @traceparent = traceparent
+    end
+
+    def call
+      violations = HelpdeskContracts.errors(:agent_outbound, @raw)
+      outcome = violations.any? ? invalid(violations) : decide
+      log(outcome)
+      dead_letter(outcome) if outcome.dead_letter
+      Result.new(status: outcome.status, reason: outcome.reason, turn: outcome.turn)
+    end
+
+    private
+
+    attr_reader :action
+
+    def invalid(violations)
+      @action = parse_loose
+      Outcome.new(status: :invalid, reason: "contrato", turn: nil, trace_id: header_trace_id,
+                  dead_letter: violations.map(&:pointer))
+    end
+
+    def decide
+      @action = JSON.parse(@raw)
+      ActiveRecord::Base.transaction do
+        ticket = find_ticket
+        next ticket if ticket.is_a?(Outcome)
+        next duplicate unless mark_processed
+
+        # Mesma ordem de travas da ingestão e de Turns::Open: atendimento primeiro (07, seção 3.4).
+        @ticket = Ticket.lock.find_by!(id: ticket.id, brand_id: ticket.brand_id)
+        @now = DatabaseClock.now # depois do lock (condição 4)
+        @turn = @ticket.ai_turns.find_by(brand_id: @ticket.brand_id, turn: action.fetch("turn"))
+        judge
+      end
+    end
+
+    # --- Correlação com o atendimento e a marca (ADR-014) ---
+
+    def find_ticket
+      brand = Brand.find_by(slug: action.fetch("brand"))
+      return unroutable("marca_divergente") unless brand
+
+      id = CONVERSATION_ID.match(action.fetch("conversation_id"))&.[](:id)
+      return unroutable("turno_inexistente") unless id
+
+      Ticket.find_by(id:, brand_id: brand.id) || unroutable(other_brand?(id, brand) ? "marca_divergente" : "turno_inexistente")
+    end
+
+    # Só a existência, sem ler nenhum dado do atendimento da outra marca: distingue o motivo na DLQ.
+    def other_brand?(id, brand) = Ticket.where(id:).where.not(brand_id: brand.id).exists?
+
+    def unroutable(reason)
+      Outcome.new(status: :rejected, reason:, turn: nil, trace_id: header_trace_id, dead_letter: [])
+    end
+
+    # RN-47: a chave primária (consumer, event_id) decide. Uma entrega concorrente da mesma ação espera o
+    # commit da primeira aqui e não encontra linha a inserir.
+    def mark_processed
+      ProcessedEvent.insert({ consumer: CONSUMER, event_id: action.fetch("event_id") },
+                            returning: [ :event_id ]).rows.any?
+    end
+
+    def duplicate = Outcome.new(status: :duplicate, reason: nil, turn: nil, trace_id: header_trace_id, dead_letter: nil)
+
+    # --- As quatro condições (07, seção 3.4; invariante 4) ---
+
+    def judge
+      return reject("turno_inexistente", record_response: false) unless @turn
+      return reject("in_reply_to_divergente", record_response: false) if action.fetch("in_reply_to") != @turn.event_id
+
+      reason = rejection_reason
+      reason ? reject(reason) : apply
+    end
+
+    def rejection_reason
+      turn_reason || assignment_reason || context_reason || deadline_reason
+    end
+
+    # 1. Turno atual e elegível.
+    def turn_reason
+      return "turno_superado" if @turn.status == "superseded"
+      return "prazo_vencido" if @turn.status == "expired"
+      return "turno_nao_elegivel" unless @turn.eligible?
+
+      "turno_superado" if @ticket.ai_turns.where(turn: (@turn.turn + 1)..).exists?
+    end
+
+    # 2. Mesma atribuição, que continua com a IA.
+    def assignment_reason
+      returned = action.fetch("assignment_version")
+      return "atribuicao_mudou" if returned != @turn.assignment_version || @turn.assignment_version != @ticket.assignment_version
+
+      "fora_da_ia" unless @ticket.with_ai?
+    end
+
+    # 3. Contexto devolvido igual ao persistido, e o persistido cobre a última mensagem do cliente.
+    def context_reason
+      return "contexto_divergente" if action.fetch("context_until_seq") != @turn.context_until_seq
+
+      "turno_superado" if @turn.context_until_seq < @ticket.latest_customer_seq
+    end
+
+    # 4. Ciclo pendente e relógio do banco antes do prazo do turno, que nunca passa do teto do ciclo (RN-46).
+    def deadline_reason
+      return "ciclo_encerrado" unless @ticket.first_pending_seq
+
+      deadline = [ @turn.deadline_at, @ticket.ai_deadline_at ].compact.min
+      "prazo_vencido" if @now >= deadline
+    end
+
+    # --- Efeitos ---
+
+    def apply
+      applied = record_response(status: "applied", applied_event_id: action.fetch("event_id"))
+      # Sob o lock não há corrida; se outro caminho mudar o turno sem o lock, a regra do banco decide.
+      return reject("turno_nao_elegivel") unless applied
+
+      # "Marca o turno applied, registra a ação final, limpa os prazos" (07, seção 3.4).
+      @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+      audit("agent_action.applied")
+      outcome(:applied, nil)
+    end
+
+    def reject(reason, record_response: true)
+      record_response(status: nil) if record_response
+      audit("agent_action.rejected", reason:)
+      outcome(:rejected, reason)
+    end
+
+    # 07, seção 4: `response` guarda a primeira ação recebida para o turno, aplicada ou descartada; a
+    # aplicação é a atualização condicional `eligible → applied` (RN-56, invariante 8).
+    def record_response(status:, applied_event_id: nil)
+      scope = AiTurn.where(id: @turn.id, brand_id: @ticket.brand_id)
+      sets = [ "response = COALESCE(response, :response::jsonb)",
+               "response_received_at = COALESCE(response_received_at, :now)", "updated_at = :now" ]
+      if status
+        scope = scope.where(status: "eligible")
+        sets += [ "status = :status", "applied_event_id = :applied_event_id" ]
+      end
+      changed = scope.update_all([ sets.join(", "), { response: @raw, now: @now, status:, applied_event_id: } ])
+      @turn.reload
+      changed == 1
+    end
+
+    def audit(event_type, **extra)
+      agent = action.fetch("agent")
+      AuditEvent.create!(
+        brand_id: @ticket.brand_id, ticket: @ticket, actor_type: "agent", event_type:, trace_id:,
+        agent_model: agent["model"], agent_version: agent["version"],
+        data: {
+          turn: action.fetch("turn"), event_id: action.fetch("event_id"), in_reply_to: action.fetch("in_reply_to"),
+          action: action.fetch("action"), tool_calls: action.fetch("tool_calls", []),
+          agent: agent.slice("model", "version", "config_hash"), timing: action["timing"],
+          context_until_seq: action.fetch("context_until_seq"), classification: action["classification"],
+          turn_status: @turn&.status, platform_received_at: @now.utc.iso8601(6)
+        }.merge(content, extra).compact
+      )
+    end
+
+    # RF-54: o conteúdo da ação como veio (só o que existir). `response` guarda só a primeira ação do turno;
+    # sem isto, uma segunda ação rejeitada ficaria sem conteúdo na auditoria.
+    def content = action.slice(*CONTENT_FIELDS).transform_keys(&:to_sym)
+
+    def outcome(status, reason) = Outcome.new(status:, reason:, turn: @turn, trace_id:, dead_letter: nil)
+
+    # --- Rastreio (RF-56) ---
+
+    def header_trace_id = TRACEPARENT.match(@traceparent.to_s)&.[](:trace_id)
+
+    # O trace do turno: o do traceparent ou, sem ele, o do evento do turno no outbox.
+    def trace_id
+      @trace_id ||= header_trace_id ||
+                    (@turn && OutboxEvent.where(id: @turn.event_id, brand_id: @ticket.brand_id).pick(:trace_id)) ||
+                    action.fetch("event_id").delete("-")
+    end
+
+    # --- Fora da transação (invariante 2) ---
+
+    def log(outcome)
+      JsonLog.info("agent_action.#{outcome.dead_letter ? 'dead_lettered' : outcome.status}",
+                   trace_id: outcome.trace_id, event_id: field("event_id"), in_reply_to: field("in_reply_to"),
+                   conversation_id: field("conversation_id"), turn: field("turn"), status: outcome.status,
+                   reason: outcome.reason)
+    end
+
+    # RN-44, invariante 10: o corpo vai como chegou, para o supervisor ver e reprocessar (RF-37, bloco 09).
+    # Sem retentativa da ação; se o Kafka recusar, o erro sobe e o offset não é confirmado.
+    def dead_letter(outcome)
+      Karafka.producer.produce_sync(
+        topic: TOPICS.fetch(:dlq), key: field("conversation_id"), payload: @raw,
+        headers: { "dlq_reason" => outcome.reason, "dlq_source" => "platform",
+                   "dlq_violations" => JSON.generate(outcome.dead_letter), "event_id" => field("event_id").to_s,
+                   "traceparent" => @traceparent.to_s }
+      )
+    end
+
+    def field(name) = action.is_a?(Hash) ? action[name] : nil
+
+    def parse_loose
+      JSON.parse(@raw.dup.force_encoding(Encoding::UTF_8))
+    rescue JSON::ParserError, EncodingError
+      nil
+    end
+  end
+end
