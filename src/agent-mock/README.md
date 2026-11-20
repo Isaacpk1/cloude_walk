@@ -20,7 +20,7 @@ Toda ação é validada contra `agent_outbound` antes de sair. Se não passar, �
 - chave `conversation_id`; cabeçalhos `event_id` (da ação), `traceparent` (o mesmo recebido, RF-56) e `schema`;
 - `in_reply_to`, `conversation_id`, `brand`, `turn`, `context_until_seq` e `assignment_version` iguais aos do evento;
 - `agent`: `model: mock-deterministico`, `version` (`lib/agent_mock/version.rb`) e `config_hash` (`sha256:` do JSON canônico da configuração efetiva, RN-37);
-- `timing`: `received_at`, `responded_at` e `agent_ms` (inclui a latência simulada, RNF-03).
+- `timing`: `received_at`, `responded_at` e `agent_ms` = `responded_at - received_at`, a execução simulada inteira: latência sorteada mais a soma dos `duration_ms` das consultas, que também ocupam a thread (RNF-03). Determinístico para a mesma entrada e semente.
 
 A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Kafka não confirmar, o erro sobe, o Karafka não confirma o offset daquele evento e ele volta (07, seção 6). O offset é marcado evento a evento.
 

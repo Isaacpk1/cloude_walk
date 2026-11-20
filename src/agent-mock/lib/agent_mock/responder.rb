@@ -64,6 +64,7 @@ module AgentMock
       end
 
       decision = @engine.decide(event)
+      simulate_tools(decision)
       action = build_action(event, decision, received_at, @clock.call)
       violations = HelpdeskContracts.errors(:agent_outbound, action)
       return reject_action(action, context, traceparent, violations) if violations.any?
@@ -73,6 +74,14 @@ module AgentMock
                                    tools: decision.tool_calls.map { _1["tool"] }, latency_ms:,
                                    agent_ms: action.dig("timing", "agent_ms"))
       Result.new(status: :published, action:)
+    end
+
+    # As consultas são sintéticas, mas o duration_ms delas é tempo de execução: o relógio avança por
+    # ele, e timing.agent_ms (responded_at - received_at) cobre latência + consultas (RNF-03).
+    # O duration_ms sai da semente e dos argumentos, então o agent_ms segue determinístico (RNF-30).
+    def simulate_tools(decision)
+      tools_ms = decision.tool_calls.sum { _1.fetch("duration_ms") }
+      @clock.sleep(tools_ms / 1000.0) if tools_ms.positive?
     end
 
     # 07, seção 5.3: correlação igual à do evento, agent (RN-37) e timing (RNF-03).

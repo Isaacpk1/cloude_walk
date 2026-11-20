@@ -378,6 +378,34 @@ RSpec.describe AgentMock::Responder do
       expect(action_in(producer)["timing"]).to include("agent_ms" => 2000, "responded_at" => "2026-11-17T13:40:03.760Z")
     end
 
+    it "agent_ms cobre a execução simulada inteira: latência + duration_ms das consultas, coerente com o relógio" do
+      responder = described_class.new(producer:, config: AgentMock::Config.load(env: { "AGENT_LATENCY_MS" => "2000" }),
+                                      log: AgentMock::Log.new(io), clock:)
+      event = inbound(texts: [ "Meu repasse de ontem não caiu" ])
+
+      responder.call(payload: JSON.generate(event), headers: headers_for(event))
+
+      action = action_in(producer)
+      tools_ms = action["tool_calls"].sum { _1["duration_ms"] }
+      expect(tools_ms).to be_positive
+      timing = action["timing"]
+      elapsed_ms = ((Time.iso8601(timing["responded_at"]) - Time.iso8601(timing["received_at"])) * 1000).round
+      expect(timing["agent_ms"]).to eq(2000 + tools_ms)
+      expect(elapsed_ms).to eq(timing["agent_ms"])
+      expect(clock.slept).to eq([ 2.0, tools_ms / 1000.0 ])
+      expect(action["tool_calls"].map { _1["duration_ms"] }).to all(be <= timing["agent_ms"])
+    end
+
+    it "agent_ms é determinístico: a mesma entrada dá o mesmo agent_ms (RNF-30)" do
+      event = inbound(texts: [ "Meu repasse de ontem não caiu" ])
+      2.times do
+        described_class.new(producer:, config:, log: AgentMock::Log.new(io), clock: KafkaHelpers::FakeClock.new)
+                       .call(payload: JSON.generate(event), headers: headers_for(event))
+      end
+
+      expect(outbound(producer).map { JSON.parse(_1[:payload])["timing"] }.uniq.size).to eq(1)
+    end
+
     it "latência que passa do prazo ainda publica: quem rejeita a resposta tardia é a plataforma (RN-46)" do
       responder = described_class.new(producer:, config: AgentMock::Config.load(env: { "AGENT_LATENCY_MS" => "25000" }),
                                       log: AgentMock::Log.new(io), clock:)
@@ -420,7 +448,8 @@ RSpec.describe AgentMock::Responder do
       line = sole(log_lines(io))
       expect(line).to include("service" => "agent-mock", "event" => "agent.published", "trace_id" => trace_id,
                               "event_id" => event["event_id"], "conversation_id" => event["conversation_id"],
-                              "action" => "reply", "rule" => "repasse", "agent_ms" => 0)
+                              "action" => "reply", "rule" => "repasse",
+                              "agent_ms" => action_in(producer)["tool_calls"].sum { _1["duration_ms"] })
       expect(io.string).not_to include("repasse não caiu")
       expect(io.string).not_to include(event.dig("customer", "display_name"))
     end
