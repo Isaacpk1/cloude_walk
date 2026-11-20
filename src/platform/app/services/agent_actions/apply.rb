@@ -17,19 +17,25 @@
 #    atendimento, lê o relógio do banco e confere as quatro condições da seção 3.4. A ordem das travas é
 #    processed_events → atendimento; não há ciclo porque a ingestão, Turns::Open e DispatchDue travam só o
 #    atendimento e nunca tocam processed_events, e cada ação trava apenas a própria chave (consumer, event_id). Grava a primeira ação recebida no turno, o resultado (`eligible → applied` condicional,
-#    invariante 8) e a auditoria (RN-37, RF-54).
-# 4. Fora da transação (invariante 2): a DLQ pelo produtor do Karafka, se for o caso, e depois o log JSON.
+#    invariante 8) e a auditoria (RN-37, RF-54). Aplicada com texto para o cliente (`reply.text` ou
+#    `resolution.text`), grava também a saída (bloco 05; 07, seções 3.1 passo 6 e 3.2): a mensagem `outbound`
+#    com o próximo seq do atendimento travado, pelo canal e pela conta da última mensagem do cliente (RF-06),
+#    a entrega `pending` (delivery_id estável, RNF-15), o item `delivery.requested` no outbox e a auditoria
+#    `delivery.requested`. Rejeitada, duplicada ou inválida não grava saída.
+# 4. Fora da transação (invariante 2): a DLQ pelo produtor do Karafka, se for o caso, o despertador do envio
+#    (OutboxJob com o item delivery.requested; o envio HTTP é do worker) e depois o log JSON.
 #    Erro de caractere do Postgres dentro da transação (defesa além da checagem do passo 1) também é
 #    permanente e vai para a DLQ; qualquer outro erro de banco é transitório e sobe (o offset não é confirmado).
 #
-# Escopo do bloco 04: a ação aplicada fica registrada. A mensagem de saída e a entrega ao canal são do
-# bloco 05, o handoff da `escalate` do bloco 10 e o encerramento da `resolve` fica pendente (RN-36).
+# Fora do escopo aqui: o envio ao provedor (Deliveries::Send, no worker), o handoff da `escalate` e o aviso
+# de transferência (bloco 10) e o encerramento da `resolve` (RN-36).
 module AgentActions
   class Apply
     Result = Data.define(:status, :reason, :turn)
 
     TOPICS = { outbound: "helpdesk.agent.outbound.v1", dlq: "helpdesk.agent.dlq.v1" }.freeze
     CONSUMER = "agent_actions".freeze
+    DELIVERY_EVENT = "delivery.requested".freeze
     CONTENT_FIELDS = %w[reply escalation resolution].freeze
     CONVERSATION_ID = /\Atkt_(?<id>[1-9]\d{0,18})\z/
     TRACEPARENT = /\A00-(?<trace_id>\h{32})-\h{16}-\h{2}\z/
@@ -38,7 +44,10 @@ module AgentActions
     UNSTORABLE = [ PG::UntranslatableCharacter, PG::CharacterNotInRepertoire ].freeze
 
     # Saída da transação: o que aconteceu e o que fazer depois do commit.
-    Outcome = Data.define(:status, :reason, :turn, :trace_id, :dead_letter)
+    # delivery_event_id: o item delivery.requested gravado, para acordar o worker depois do commit.
+    Outcome = Data.define(:status, :reason, :turn, :trace_id, :dead_letter, :delivery_event_id) do
+      def initialize(delivery_event_id: nil, **) = super
+    end
 
     def self.call(...) = new(...).call
 
@@ -53,6 +62,7 @@ module AgentActions
       violations = unstorable(JSON.parse(@raw)) if violations.empty?
       outcome = violations.any? ? invalid(violations) : decide
       dead_letter(outcome) if outcome.dead_letter
+      notify_worker(outcome) if outcome.delivery_event_id
       log(outcome) # depois da confirmação da DLQ: se o Kafka recusar, o erro sobe sem logar dead_lettered
       Result.new(status: outcome.status, reason: outcome.reason, turn: outcome.turn)
     end
@@ -189,7 +199,54 @@ module AgentActions
       # "Marca o turno applied, registra a ação final, limpa os prazos" (07, seção 3.4).
       @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
       audit("agent_action.applied")
+      request_delivery
       outcome(:applied, nil)
+    end
+
+    # --- Saída ao cliente (bloco 05; 07, seção 3.1, passo 6, e seção 3.2; RF-06, RNF-14, RNF-15) ---
+
+    # Texto para o cliente e o tipo da entrega. A escalate não tem texto: o aviso de transferência é do bloco 10.
+    def outgoing
+      case action.fetch("action")
+      when "reply" then [ action.dig("reply", "text"), "reply" ]
+      when "resolve" then [ action.dig("resolution", "text"), "resolution" ]
+      end
+    end
+
+    # Com o atendimento travado, na transação do `applied`: a mensagem com o próximo seq (a mesma regra da
+    # ingestão, que também trava o atendimento: os seqs não colidem), a entrega `pending`, o item do outbox
+    # que acorda o envio (invariante 2: nada de HTTP aqui) e a auditoria. Responde pelo canal e pela conta da
+    # última mensagem do cliente (RF-06).
+    def request_delivery
+      text, kind = outgoing
+      return unless text
+
+      origin = last_customer_message
+      seq = Message.where(ticket_id: @ticket.id, brand_id: @ticket.brand_id).maximum(:seq).to_i + 1
+      message = Message.create!(
+        brand_id: @ticket.brand_id, ticket: @ticket, direction: "outbound", author_type: "bot", body: text, seq:,
+        channel: origin.channel, provider_account: origin.provider_account, external_id: nil, trace_id:, received_at: @now
+      )
+      delivery = Delivery.create!(
+        brand_id: @ticket.brand_id, ticket: @ticket, message:, seq:, channel: message.channel,
+        provider_account: message.provider_account, kind:, status: "pending",
+        ai_assignment_version: @turn.assignment_version, trace_id:
+      )
+      delivery.reload # delivery_id vem do padrão do banco
+      @delivery_event = OutboxEvent.create!(
+        brand_id: @ticket.brand_id, ticket: @ticket, event_type: DELIVERY_EVENT, dedup_key: "delivery:#{delivery.delivery_id}",
+        payload: { delivery_id: delivery.delivery_id, ticket_id: @ticket.id, seq: }, trace_id:, next_attempt_at: Time.current
+      )
+      AuditEvent.create!(
+        brand_id: @ticket.brand_id, ticket: @ticket, actor_type: "system", event_type: DELIVERY_EVENT, trace_id:,
+        data: { delivery_id: delivery.delivery_id, message_id: message.id, seq:, kind:, turn: @turn.turn,
+                context_until_seq: @turn.context_until_seq }
+      )
+    end
+
+    def last_customer_message
+      Message.where(ticket_id: @ticket.id, brand_id: @ticket.brand_id, direction: "inbound", author_type: "customer")
+             .order(seq: :desc).first!
     end
 
     def reject(reason, record_response: true)
@@ -232,7 +289,9 @@ module AgentActions
     # sem isto, uma segunda ação rejeitada ficaria sem conteúdo na auditoria.
     def content = action.slice(*CONTENT_FIELDS).transform_keys(&:to_sym)
 
-    def outcome(status, reason) = Outcome.new(status:, reason:, turn: @turn, trace_id:, dead_letter: nil)
+    def outcome(status, reason)
+      Outcome.new(status:, reason:, turn: @turn, trace_id:, dead_letter: nil, delivery_event_id: @delivery_event&.id)
+    end
 
     # --- Rastreio (RF-56) ---
 
@@ -246,6 +305,15 @@ module AgentActions
     end
 
     # --- Fora da transação (invariante 2) ---
+
+    # Despertador do envio, como na ingestão. Se o Redis estiver fora, a entrega já está gravada e o item segue
+    # aberto no outbox: a recuperação o reoferece (07, seção 6).
+    def notify_worker(outcome)
+      OutboxJob.perform_later(outcome.delivery_event_id)
+    rescue StandardError => e
+      JsonLog.warn("outbox.enqueue_failed", trace_id: outcome.trace_id, event_id: outcome.delivery_event_id,
+                                            error: e.class.name)
+    end
 
     def log(outcome)
       JsonLog.info("agent_action.#{outcome.dead_letter ? 'dead_lettered' : outcome.status}",
