@@ -59,6 +59,7 @@ CREATE TABLE public.ai_turns (
     response_received_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT ai_turns_applied_event_check CHECK ((((status)::text = 'applied'::text) = (applied_event_id IS NOT NULL))),
     CONSTRAINT ai_turns_context_until_seq_check CHECK ((context_until_seq >= 1)),
     CONSTRAINT ai_turns_status_check CHECK (((status)::text = ANY (ARRAY[('eligible'::character varying)::text, ('applied'::character varying)::text, ('superseded'::character varying)::text, ('expired'::character varying)::text]))),
     CONSTRAINT ai_turns_turn_check CHECK ((turn >= 1))
@@ -304,6 +305,17 @@ CREATE TABLE public.outbox_events (
     attempts integer DEFAULT 0 NOT NULL,
     last_error text,
     CONSTRAINT outbox_events_attempts_check CHECK ((attempts >= 0))
+);
+
+
+--
+-- Name: processed_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.processed_events (
+    consumer character varying NOT NULL,
+    event_id uuid NOT NULL,
+    processed_at timestamp(6) without time zone DEFAULT clock_timestamp() NOT NULL
 );
 
 
@@ -737,6 +749,14 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.outbox_events
     ADD CONSTRAINT outbox_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: processed_events processed_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.processed_events
+    ADD CONSTRAINT processed_events_pkey PRIMARY KEY (consumer, event_id);
 
 
 --
@@ -1402,6 +1422,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261121000000'),
 ('20261120010000'),
 ('20261120000000'),
 ('20261119010000'),
