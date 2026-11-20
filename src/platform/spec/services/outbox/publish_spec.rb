@@ -213,14 +213,14 @@ RSpec.describe Outbox::Publish, "RF-30, RNF-23: publicação do evento do outbox
       expect(audits("agent_event.discarded").sole.data).to include("reason" => "turno_superseded")
     end
 
-    it "tempo no limite (RN-46): publica a 1 ms do prazo e descarta no prazo" do
+    it "tempo no limite (RN-46, ADR-020): publica a 1 ms do prazo do turno (20 s) e descarta no prazo" do
       on_time = open_event("um", identity: "acc_a")
       late = open_event("dois", identity: "acc_b")
       stub_broker
 
-      travel_to(start + 30.seconds - 0.001, with_usec: true)
+      travel_to(start + 20.seconds - 0.001, with_usec: true)
       expect(publish(on_time).status).to eq(:published)
-      travel_to(start + 30.seconds, with_usec: true)
+      travel_to(start + 20.seconds, with_usec: true)
       expect(publish(late).status).to eq(:discarded)
       expect(audits("agent_event.discarded").sole.data).to include("reason" => "prazo_vencido")
     end
@@ -228,7 +228,7 @@ RSpec.describe Outbox::Publish, "RF-30, RNF-23: publicação do evento do outbox
     it "não agenda retentativa para depois do prazo do turno" do
       item = open_event
       stub_broker({ status: 503 })
-      travel_to(start + 29.5.seconds)
+      travel_to(start + 19.5.seconds)
 
       expect(publish(item).status).to eq(:expired)
       expect(item.reload.completed_at).to be_present

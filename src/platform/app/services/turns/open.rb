@@ -72,10 +72,11 @@ module Turns
       not_opened(:window_open, reason: "janela_aberta", dispatch_due_at: iso(ticket.dispatch_due_at))
     end
 
-    # RN-46: o prazo é do ciclo, contado de first_pending_at, e vale para todos os turnos dele.
+    # RN-46, ADR-020: o teto do ciclo (ai_deadline_at) não reinicia. Vencido, o turno não abre.
     def check_deadline
-      return not_opened(:expired, reason: "sem_prazo") unless deadline_at
-      return not_opened(:expired, reason: "prazo_vencido", deadline_at: iso(deadline_at)) if now >= deadline_at
+      cycle_deadline_at = ticket.ai_deadline_at
+      return not_opened(:expired, reason: "sem_prazo") unless cycle_deadline_at
+      return not_opened(:expired, reason: "prazo_vencido", deadline_at: iso(cycle_deadline_at)) if now >= cycle_deadline_at
 
       open_turn
     end
@@ -125,7 +126,10 @@ module Turns
       ticket.messages.where(internal: false).where(seq: ...first_pending).reorder(seq: :desc).limit(HISTORY_LIMIT).to_a.reverse
     end
 
-    def deadline_at = ticket.ai_deadline_at
+    # ADR-020: o turno tem 20 s desde a abertura, sem passar do teto do ciclo.
+    def deadline_at
+      @deadline_at ||= Turns::Policy.for(ticket.brand).turn_deadline_at(opened_at: now, cycle_deadline_at: ticket.ai_deadline_at)
+    end
     def iso(time) = time&.utc&.iso8601(3)
 
     def audit(event_type, **data)

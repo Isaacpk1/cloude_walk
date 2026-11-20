@@ -26,7 +26,7 @@ RSpec.describe Ingestion::Receive do
       ticket = ingest_at(t0).ticket.reload
 
       expect(ticket).to have_attributes(
-        first_pending_seq: 1, first_pending_at: t0, dispatch_due_at: t0 + 1.5.seconds, ai_deadline_at: t0 + 30.seconds
+        first_pending_seq: 1, first_pending_at: t0, dispatch_due_at: t0 + 1.5.seconds, ai_deadline_at: t0 + 60.seconds
       )
     end
 
@@ -44,7 +44,7 @@ RSpec.describe Ingestion::Receive do
 
       data = AuditEvent.where(ticket: result.ticket, event_type: "message.received").order(:id).last.data
       expect(data).to include("first_pending_seq" => 1, "dispatch_due_at" => (t0 + 2.5.seconds).iso8601(3),
-                              "ai_deadline_at" => (t0 + 30.seconds).iso8601(3))
+                              "ai_deadline_at" => (t0 + 60.seconds).iso8601(3))
     end
   end
 
@@ -54,7 +54,7 @@ RSpec.describe Ingestion::Receive do
       ticket = ingest_at(t0 + 1.second).ticket.reload
 
       expect(ticket).to have_attributes(
-        first_pending_seq: 1, first_pending_at: t0, dispatch_due_at: t0 + 2.5.seconds, ai_deadline_at: t0 + 30.seconds,
+        first_pending_seq: 1, first_pending_at: t0, dispatch_due_at: t0 + 2.5.seconds, ai_deadline_at: t0 + 60.seconds,
         latest_customer_seq: 2
       )
     end
@@ -71,7 +71,7 @@ RSpec.describe Ingestion::Receive do
       ingest_at(t0 + 3.seconds)
       ticket = ingest_at(t0 + 20.seconds).ticket.reload
 
-      expect(ticket).to have_attributes(first_pending_seq: 1, ai_deadline_at: t0 + 30.seconds, dispatch_due_at: t0 + 20.seconds)
+      expect(ticket).to have_attributes(first_pending_seq: 1, ai_deadline_at: t0 + 60.seconds, dispatch_due_at: t0 + 20.seconds)
     end
 
     it "depois de o turno sair (dispatch_due_at zerado), a mensagem seguinte reagenda no mesmo ciclo" do
@@ -88,7 +88,7 @@ RSpec.describe Ingestion::Receive do
     it "dispatch_due_at é o próprio horário da gravação" do
       ticket = ingest_at(t0, normalized(channel: "email", identity: "cliente@example.test")).ticket.reload
 
-      expect(ticket).to have_attributes(first_pending_at: t0, dispatch_due_at: t0, ai_deadline_at: t0 + 30.seconds)
+      expect(ticket).to have_attributes(first_pending_at: t0, dispatch_due_at: t0, ai_deadline_at: t0 + 60.seconds)
     end
   end
 

@@ -26,7 +26,7 @@ RSpec.describe "Janela de agrupamento com mensagens concorrentes", :concurrency 
       ticket = Ticket.sole
       expect(ticket).to have_attributes(
         latest_customer_seq: 4, first_pending_seq: 1, first_pending_at: t0, dispatch_due_at: t0 + 1.5.seconds,
-        ai_deadline_at: t0 + 30.seconds
+        ai_deadline_at: t0 + 60.seconds
       )
     end
 

@@ -3,15 +3,14 @@ require "rails_helper"
 RSpec.describe Turns::Window do
   let(:now) { Time.utc(2026, 11, 18, 21, 0, 0) }
 
-  describe "RN-55: janela de agrupamento por canal (06, parâmetros)" do
-    it "chat e whatsapp esperam 1,5 s; e-mail não espera" do
-      expect(described_class.for("chat")).to eq(1.5.seconds)
-      expect(described_class.for("whatsapp")).to eq(1.5.seconds)
-      expect(described_class.for("email")).to eq(0.seconds)
-    end
+  describe "ADR-020: os tempos vêm da política da marca" do
+    it "usa a janela, o teto e o prazo do ciclo da política recebida (configuração do bloco 12)" do
+      custom = Turns::Policy::DEFAULT.with(windows: { "chat" => 3.seconds }, ceiling: 10.seconds, cycle_deadline: 90.seconds)
 
-    it "canal desconhecido é erro, não janela padrão" do
-      expect { described_class.for("sms") }.to raise_error(KeyError)
+      expect(described_class.dispatch_due_at(channel: "chat", now:, first_pending_at: now, policy: custom)).to eq(now + 3.seconds)
+      expect(described_class.dispatch_due_at(channel: "chat", now: now + 9.seconds, first_pending_at: now, policy: custom))
+        .to eq(now + 10.seconds)
+      expect(described_class.ai_deadline_at(first_pending_at: now, policy: custom)).to eq(now + 90.seconds)
     end
   end
 
@@ -52,8 +51,8 @@ RSpec.describe Turns::Window do
   end
 
   describe "RN-46: prazo da IA no ciclo" do
-    it "30 s desde a primeira mensagem pendente" do
-      expect(described_class.ai_deadline_at(first_pending_at: now)).to eq(now + 30.seconds)
+    it "ADR-020: teto do ciclo de 60 s desde a primeira mensagem pendente" do
+      expect(described_class.ai_deadline_at(first_pending_at: now)).to eq(now + 60.seconds)
     end
   end
 end

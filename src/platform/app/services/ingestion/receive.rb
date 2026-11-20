@@ -130,20 +130,21 @@ module Ingestion
       Result.new(status: :created, ticket:, message:, outbox_event_id: notice.id)
     end
 
-    # RN-55, RN-46 (07, seção 3.4; ADR-016): com a linha travada, a mensagem abre o ciclo pendente, se
+    # RN-55, RN-46 (07, seção 3.4; ADR-016, ADR-020): com a linha travada, a mensagem abre o ciclo pendente, se
     # não houver um, e empurra o fim da janela de agrupamento até o teto de 4 s. O `scheduler` abre o
     # turno quando dispatch_due_at vence. Caso fora da IA não ganha prazos da IA.
     def cycle_deadlines(ticket, seq)
       return {} unless ticket.with_ai?
 
       now = Time.current
+      policy = Turns::Policy.for(ticket.brand)
       cycle = if ticket.first_pending_seq
         {}
       else
-        { first_pending_seq: seq, first_pending_at: now, ai_deadline_at: Turns::Window.ai_deadline_at(first_pending_at: now) }
+        { first_pending_seq: seq, first_pending_at: now, ai_deadline_at: Turns::Window.ai_deadline_at(first_pending_at: now, policy:) }
       end
       first_pending_at = cycle.fetch(:first_pending_at, ticket.first_pending_at)
-      cycle.merge(dispatch_due_at: Turns::Window.dispatch_due_at(channel: ticket.channel, now:, first_pending_at:))
+      cycle.merge(dispatch_due_at: Turns::Window.dispatch_due_at(channel: ticket.channel, now:, first_pending_at:, policy:))
     end
 
     # RN-56, invariante 4: no mesmo commit, todo turno elegível que não cobre esta mensagem perde a

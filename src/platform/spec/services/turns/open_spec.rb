@@ -15,7 +15,7 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
       ingest("meu repasse não caiu", trace_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
       travel 1.second
       second = ingest("é o de ontem, R$ 1.200", trace_id: "4bf92f3577b34da6a3ce929d0e0e4736")
-      ticket = start_cycle(second.ticket, dispatch_due_at: start + 2.5.seconds, ai_deadline_at: start + 30.seconds)
+      ticket = start_cycle(second.ticket, dispatch_due_at: start + 2.5.seconds, ai_deadline_at: start + 60.seconds)
       travel_to(start + 2.5.seconds, with_usec: true)
       item = create(:turn_dispatch, for_ticket: ticket)
 
@@ -24,16 +24,16 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
       turn = result.turn
       expect(result.status).to eq(:opened)
       expect(turn).to have_attributes(turn: 1, status: "eligible", context_until_seq: 2, assignment_version: 0,
-                                      brand_id: infinitepay.id, ticket_id: ticket.id, deadline_at: start + 30.seconds)
+                                      brand_id: infinitepay.id, ticket_id: ticket.id, deadline_at: start + 22.5.seconds)
       payload = OutboxEvent.find(turn.event_id).payload
       expect(payload.dig("context", "pending_messages")).to eq([ { "seq" => 1, "text" => "meu repasse não caiu" },
                                                                  { "seq" => 2, "text" => "é o de ontem, R$ 1.200" } ])
-      expect(payload["deadline_at"]).to eq((start + 30.seconds).utc.iso8601(3))
+      expect(payload["deadline_at"]).to eq((start + 22.5.seconds).utc.iso8601(3))
       expect(OutboxEvent.find(turn.event_id)).to have_attributes(event_type: "agent.event", completed_at: nil, attempts: 0,
                                                                  trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
                                                                  next_attempt_at: Time.current)
       expect(item.reload.completed_at).to eq(Time.current)
-      expect(ticket.reload).to have_attributes(dispatch_due_at: nil, first_pending_seq: 1, ai_deadline_at: start + 30.seconds)
+      expect(ticket.reload).to have_attributes(dispatch_due_at: nil, first_pending_seq: 1, ai_deadline_at: start + 60.seconds)
     end
 
     it "RNF-28: o evento sai dentro do contrato agent_inbound, com o event_id igual ao id do outbox" do
@@ -54,15 +54,24 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
       expect(payload["message"]).to eq("id" => "msg_#{received.message.id}", "seq" => 1, "text" => "meu repasse não caiu")
     end
 
-    it "RN-46: o prazo vem de ticket.ai_deadline_at e é o mesmo para os turnos do ciclo" do
+    it "RN-46, ADR-020: cada turno tem 20 s desde a abertura; o teto do ciclo não reinicia" do
       first = ingest("meu repasse não caiu")
       first_turn = open_for(first).turn
-      travel 3.seconds
+      travel 20.seconds
       second_turn = open_for(ingest("é o de ontem")).turn
 
-      expect(first_turn.deadline_at).to eq(start + 30.seconds)
-      expect(second_turn).to have_attributes(turn: 2, context_until_seq: 2, deadline_at: start + 30.seconds)
-      expect(OutboxEvent.find(second_turn.event_id).payload["deadline_at"]).to eq((start + 30.seconds).utc.iso8601(3))
+      expect(first_turn.deadline_at).to eq(start + 20.seconds)
+      expect(second_turn).to have_attributes(turn: 2, context_until_seq: 2, deadline_at: start + 40.seconds)
+      expect(OutboxEvent.find(second_turn.event_id).payload["deadline_at"]).to eq((start + 40.seconds).utc.iso8601(3))
+      expect(first.ticket.reload.ai_deadline_at).to eq(start + 60.seconds)
+    end
+
+    it "ADR-020: turno aberto perto do teto do ciclo vale só até o teto (tempo no limite)" do
+      received = ingest("meu repasse não caiu")
+      travel 50.seconds
+      turn = open_for(received).turn
+
+      expect(turn.deadline_at).to eq(start + 60.seconds)
     end
 
     it "RF-54, RF-56: audita a abertura com o trace_id da ação e o fim da janela" do
@@ -208,7 +217,7 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
   describe "tempo no limite (RN-46, RN-55)" do
     it "abre o turno a 1 ms do prazo" do
       item = due_dispatch(ingest)
-      travel_to(start + 30.seconds - 0.001, with_usec: true)
+      travel_to(start + 60.seconds - 0.001, with_usec: true)
 
       expect(described_class.call(item.id).status).to eq(:opened)
     end
@@ -216,7 +225,7 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
     it "não abre o turno exatamente no prazo: o caso segue pelo timeout (bloco 08)" do
       received = ingest
       item = due_dispatch(received)
-      travel_to(start + 30.seconds)
+      travel_to(start + 60.seconds)
 
       result = described_class.call(item.id)
 
@@ -224,7 +233,7 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
       expect(AiTurn.count).to eq(0)
       expect(received.ticket.reload.dispatch_due_at).to eq(start)
       expect(last_audit(received.ticket).data).to include("reason" => "prazo_vencido",
-                                                          "deadline_at" => (start + 30.seconds).utc.iso8601(3))
+                                                          "deadline_at" => (start + 60.seconds).utc.iso8601(3))
     end
 
     it "abre exatamente no fim da janela (dispatch_due_at == agora)" do

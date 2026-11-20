@@ -161,8 +161,8 @@ Todos são configuráveis. Os de origem *proposta* são escolhas deste projeto, 
 | Capacidade do agente de IA (bot) | 1.000 atendimentos simultâneos, configurável pelo supervisor | Proposta | RN-30 |
 | Offline antes de devolver casos à fila | 10 min | Proposta | RN-31 |
 | Trocas da IA sem resolução antes de escalar | 10 mensagens | Proposta | RN-33 |
-| Tempo limite do agente por turno | 20 s desde a abertura do turno, limitado ao teto do ciclo | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)); calibrar com o p95 do agente real | RN-46 |
-| Teto do ciclo com a IA | 60 s desde a primeira mensagem pendente, sem reiniciar | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) | RN-46 |
+| Tempo limite do agente por turno | 20 s desde a abertura do turno, limitado ao teto do ciclo. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)); calibrar com o p95 do agente real | RN-46 |
+| Teto do ciclo com a IA | 60 s desde a primeira mensagem pendente, sem reiniciar. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) | RN-46 |
 | Retentativas | 5, com backoff 1, 2, 4, 8, 16 s e jitter | RNF-16 | RN-43 |
 | Retenção mínima da DLQ | 7 dias | RNF-16 (prazo de reentrega do WhatsApp) | RN-48 |
 | Contexto do atendente | Todas as mensagens pendentes + 20 de histórico + 3 atendimentos em 90 dias | Proposta | RN-49 |

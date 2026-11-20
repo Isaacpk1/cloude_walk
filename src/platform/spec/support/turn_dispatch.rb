@@ -1,7 +1,7 @@
 # Faz o papel da ingestão e do scheduler do bloco 03 nos testes do worker, sem depender deles:
 # grava os prazos do ciclo direto no atendimento e a ação "turn.dispatch" no outbox (07, seção 3.4).
 module TurnDispatchHelpers
-  AI_DEADLINE = 30.seconds # RN-46
+  AI_DEADLINE = 60.seconds # RN-46, ADR-020: teto do ciclo
 
   # Abre o ciclo pendente, se ainda não houver, e marca o fim da janela (dispatch_due_at).
   def start_cycle(ticket, dispatch_due_at: Time.current, ai_deadline_at: nil)

@@ -7,7 +7,7 @@ module DeadlineHelpers
     ticket = result.ticket
     first_at = ticket.first_pending_at || due_at - 1.5.seconds
     ticket.update_columns(first_pending_seq: ticket.first_pending_seq || result.message.seq, first_pending_at: first_at,
-                          dispatch_due_at: due_at, ai_deadline_at: first_at + 30.seconds)
+                          dispatch_due_at: due_at, ai_deadline_at: first_at + 60.seconds)
     ticket.reload
   end
 
