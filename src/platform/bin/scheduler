@@ -7,7 +7,7 @@ require_relative "../config/environment"
 $stdout.sync = true
 # Logs em JSON no stdout do contêiner (invariante 13). Em produção o logger já é o stdout. Nível info
 # por padrão: a consulta roda 4 vezes por segundo e o SQL de debug encobriria os eventos.
-unless Rails.env.production?
+unless Rails.env.production? || ENV["RAILS_LOG_TO_STDOUT"].present?
   Rails.logger.broadcast_to(ActiveSupport::Logger.new($stdout, level: ENV.fetch("SCHEDULER_LOG_LEVEL", "info")))
 end
 

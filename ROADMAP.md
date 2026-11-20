@@ -155,7 +155,7 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 19. Carga e leitura de desempenho
 
-- [ ] **Backend:** rodar E1 e E5 com semente, configuração e taxas registradas. Medir latência por etapa, fila, throughput, perdas e proporção de turnos superados. Comparar conversas independentes com rajadas na mesma conversa.
+- [ ] **Backend:** rodar E1 e E5 com semente, configuração e taxas registradas. Rodar num perfil próprio, com `RAILS_ENV=production`, código carregado na imagem e sem a pasta `src/platform` montada: no Docker Desktop do Windows, a pasta montada acrescentou ~1,5 s por passo (worker e transação da ingestão) no teste do bloco 03, e os números não representariam a plataforma. Medir latência por etapa, fila, throughput, perdas e proporção de turnos superados. Comparar conversas independentes com rajadas na mesma conversa.
 - [ ] **Frontend:** ligar percentis e contagens aos dados da execução. Mostrar a janela medida e permitir comparar um caso individual com a visão agregada no Grafana.
 - **Pronto quando:** é possível explicar de onde vem a latência e qual componente acumula fila primeiro, com os números reproduzíveis e as limitações registradas. **Referências** E1, E5, RNF-03, RNF-09 a RNF-13, RNF-22.
 

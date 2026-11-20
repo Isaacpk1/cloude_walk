@@ -5,6 +5,15 @@ Rails.application.configure do
   # Sem isto, a proteção de host do Rails responde 403 a todo webhook vindo do simulador.
   config.hosts << "web"
 
+  # No Docker, o log vai para a saída do contêiner, e não para log/development.log. No Windows, a pasta
+  # montada do host deixa cada escrita lenta, e as escritas somavam ~1,5 s por transação, com o
+  # atendimento travado (medição do bloco 03). RAILS_LOG_LEVEL ajusta o nível (padrão debug).
+  if ENV["RAILS_LOG_TO_STDOUT"].present?
+    $stdout.sync = true
+    config.logger = ActiveSupport::TaggedLogging.logger($stdout)
+    config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "debug")
+  end
+
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Make code changes take effect immediately without server restart.
