@@ -5,6 +5,7 @@ class Message < ApplicationRecord
 
   belongs_to :brand
   belongs_to :ticket, inverse_of: :messages
+  has_one :delivery, dependent: :restrict_with_exception
 
   validates :author_type, inclusion: { in: AUTHOR_TYPES }
   validates :direction, inclusion: { in: DIRECTIONS }
