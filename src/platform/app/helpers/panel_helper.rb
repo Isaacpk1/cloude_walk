@@ -45,6 +45,10 @@ module PanelHelper
     ms.nil? ? "sem fim registrado" : "#{ms} ms"
   end
 
+  # Argumentos e resultados das consultas do agente (ROADMAP 04) como JSON compacto. Volta como texto
+  # comum: o ERB escapa (o conteúdo vem de fora).
+  def agent_data_text(data) = JSON.generate(data)
+
   def timeline_bar_style(timeline, event)
     total = [ timeline.total_duration_ms.to_i, 1 ].max
     start = timeline.offset_ms(event) * 100.0 / total

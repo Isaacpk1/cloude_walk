@@ -8,6 +8,9 @@
     <div><dt>trace_id</dt><dd><code><%= event.trace_id || "—" %></code></dd></div>
     <% if event.detail %><div><dt>Detalhe</dt><dd><%= event.detail %></dd></div><% end %>
   </dl>
+  <% if event.agent_action %>
+    <%= render "shared/agent_action", action: event.agent_action %>
+  <% end %>
   <% if (error = event.error) %>
     <dl class="selected-event__fields selected-event__fields--error">
       <div><dt>Origem do erro</dt><dd><strong><%= error.origin_label %></strong></dd></div>

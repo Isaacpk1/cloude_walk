@@ -32,10 +32,11 @@ class SyntheticConversations
   def happy_path(b)
     names = names_for("infinitepay", customer_index: 0)
     b.message(1, "customer", names[:customer_name], "meu repasse não caiu", at: 0)
-    b.message(2, "bot", names[:bot], "Encontrei seu repasse de R$ 1.200,00 da venda de ontem. Ele está programado e cai hoje até as 18h.",
-              at: 3_702, delivery_status: "delivered", trace_seq: 1)
+    reply = "Encontrei seu repasse de R$ 1.200,00 da venda de ontem. Ele está programado e cai hoje até as 18h."
+    b.message(2, "bot", names[:bot], reply, at: 3_702, delivery_status: "delivered", trace_seq: 1)
     b.turn(1, "applied", covered_seqs: [ 1 ], assignment_version: 1, action: "reply", tool_calls: %w[consultar_repasse],
-                         note: "context_until_seq 1 cobre latest_customer_seq 1")
+                         note: "context_until_seq 1 cobre latest_customer_seq 1",
+                         agent_action: agent_action(reply, agent_ms: 2_000, outcome: :applied))
 
     b.ingestion(seq: 1, at: 0)
     b.cycle(turn: 1, trace_seq: 1, wait: 38..1_538, publish: 1_545..1_610, agent: 1_650..3_650,
@@ -55,7 +56,9 @@ class SyntheticConversations
     b.message(3, "bot", names[:bot], "Achei o repasse de ontem, de R$ 1.200,00. Ele foi liberado hoje às 9h e cai na sua conta até as 18h.",
               at: 6_041, delivery_status: "delivered", trace_seq: 1)
     b.turn(1, "superseded", covered_seqs: [ 1 ], assignment_version: 1, action: "reply", tool_calls: %w[consultar_repasse],
-                            note: "Superado pela gravação da seq 2 aos 3 s. Resposta das 3,5 s descartada")
+                            note: "Superado pela gravação da seq 2 aos 3 s. Resposta das 3,5 s descartada",
+                            agent_action: agent_action("Qual repasse você quer consultar?", agent_ms: 1_860, outcome: :rejected,
+                                                                                               rejection_reason: "turno_superado"))
     b.turn(2, "applied", covered_seqs: [ 1, 2 ], assignment_version: 1, action: "reply", tool_calls: %w[consultar_repasse],
                          note: "Contexto com as mensagens 1 e 2")
 
@@ -109,6 +112,18 @@ class SyntheticConversations
 
   def participant(name, kind) = ConversationView::Participant.new(name:, kind:)
 
+  # Ação de exemplo do agente mock (ROADMAP 04), no mesmo formato da ação gravada. A conversa inteira
+  # continua marcada como DataSource::SYNTHETIC.
+  def agent_action(text, agent_ms:, outcome:, rejection_reason: nil)
+    AgentActionView.new(
+      event_id: nil, action: "reply", reply_text: text, escalation_reason: nil, escalation_summary: {},
+      resolution_reason: nil, resolution_text: nil,
+      tool_calls: [ AgentActionView::ToolCall.new(tool: "consultar_repasse", args: { "periodo" => "ontem" },
+                                                  result: { "status" => "programado", "valor" => "1200.00" }, duration_ms: 140) ],
+      model: "mock-deterministico", version: "exemplo", config_hash: "exemplo-sintetico", agent_ms:, outcome:, rejection_reason:
+    )
+  end
+
   def names_for(brand_slug, customer_index:)
     brand = Brand.find_by(slug: brand_slug)
     brand_name = brand&.name || FALLBACK_BRAND_NAMES.fetch(brand_slug)
@@ -142,10 +157,11 @@ class SyntheticConversations
       )
     end
 
-    def turn(number, status, covered_seqs:, assignment_version:, action:, tool_calls:, note:)
+    def turn(number, status, covered_seqs:, assignment_version:, action:, tool_calls:, note:, agent_action: nil)
       @turns << ConversationView::Turn.new(
         number:, status:, covered_seqs:, context_until_seq: covered_seqs.max, assignment_version:,
-        event_id: uuid("turn-#{number}"), action:, tool_calls:, note:
+        event_id: uuid("turn-#{number}"), action:, tool_calls:, note:,
+        agent_action: agent_action&.with(event_id: uuid("action-#{number}"))
       )
     end
 
@@ -179,6 +195,7 @@ class SyntheticConversations
 
     def build(**attrs)
       source = DataSource::SYNTHETIC
+      attach_agent_actions
       conversation = ConversationView.new(
         id: @id, ticket_id: @ticket_id, messages: @messages, turns: @turns, escalations: @escalations, source:, **attrs
       )
@@ -186,6 +203,16 @@ class SyntheticConversations
     end
 
     private
+
+    # A execução do agente e a aplicação ou o descarte do turno levam a ação de exemplo, como na
+    # leitura dos registros (AgentActionEvents).
+    def attach_agent_actions
+      actions = @turns.to_h { [ _1.number, _1.agent_action ] }
+      @events.map! do |event|
+        action = actions[event.turn]
+        action && %i[agent_run applied discarded].include?(event.kind) ? event.with(agent_action: action) : event
+      end
+    end
 
     def time(ms) = BASE_TIME + ((@number - 1) * 3600) + Rational(ms, 1000)
     def trace(seq) = Digest::SHA256.hexdigest("#{@id}:trace:#{seq}")[0, 32]

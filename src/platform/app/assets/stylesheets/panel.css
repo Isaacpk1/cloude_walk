@@ -83,6 +83,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .badge--delivered, .badge--applied { background: #e3f4ea; color: var(--ok); }
 .badge--pending, .badge--sending, .badge--eligible { background: #fff4d6; color: var(--warn); }
 .badge--cancelled, .badge--superseded, .badge--expired, .badge--failed { background: #fdecea; color: var(--danger); }
+.badge--rejected { background: #fdecea; color: var(--danger); }
 .badge--state { background: var(--system-bg); color: var(--system); }
 .badge--assignee-bot { background: var(--bot-bg); color: var(--bot); }
 .badge--assignee-human { background: var(--analyst-bg); color: var(--analyst); }
@@ -168,3 +169,13 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .selected-event__fields dt { font-size: .75rem; color: var(--muted, #666); }
 .selected-event__fields dd { margin: 0; }
 .selected-event__fields--error { border-top: 1px solid var(--border); padding-top: .5rem; }
+
+/* ROADMAP 04: ação recebida do agente, na conversa e no evento escolhido da linha do tempo. */
+.agent-action { border-top: 1px solid var(--border); margin-top: .5rem; padding-top: .5rem; }
+.agent-action__title { font-size: .9rem; margin: 0 0 .35rem; }
+.agent-action h4 { font-size: .8rem; margin: .5rem 0 .25rem; color: var(--muted); }
+.agent-action__reason { margin: 0 0 .35rem; font-size: .85rem; }
+.tool-calls { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.tool-calls th, .tool-calls td { text-align: left; padding: .2rem .4rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.tool-calls code { word-break: break-word; }
+.turn__response-state { margin: .35rem 0 0; font-size: .85rem; }

@@ -1,19 +1,28 @@
 # Um registro de `ai_turns` (07, seção 3.4): o que a IA recebeu e o que aconteceu com a resposta.
-# `covered_seqs` são as mensagens do cliente que entraram no contexto do turno.
+# `covered_seqs` são as mensagens do cliente que entraram no contexto do turno. `agent_action`
+# (AgentActionView) é a ação recebida do agente, quando houver (bloco 04).
 class ConversationView::Turn < Data.define(
-  :number, :status, :covered_seqs, :context_until_seq, :assignment_version, :event_id, :action, :note, :tool_calls
+  :number, :status, :covered_seqs, :context_until_seq, :assignment_version, :event_id, :action, :note, :tool_calls, :agent_action
 )
   STATUS_LABELS = {
     "eligible" => "Elegível", "applied" => "Aplicado", "superseded" => "Superado", "expired" => "Expirado"
   }.freeze
 
-  def initialize(status:, covered_seqs:, tool_calls: [], **rest)
+  def initialize(status:, covered_seqs:, tool_calls: [], agent_action: nil, **rest)
     raise ArgumentError, "status de turno desconhecido: #{status}" unless STATUS_LABELS.key?(status)
 
-    super(status:, covered_seqs: covered_seqs.sort.freeze, tool_calls: tool_calls.freeze, **rest)
+    super(status:, covered_seqs: covered_seqs.sort.freeze, tool_calls: tool_calls.freeze, agent_action:, **rest)
   end
 
   def status_label = STATUS_LABELS.fetch(status)
   def superseded? = status == "superseded"
   def applied? = status == "applied"
+  def eligible? = status == "eligible"
+
+  # Sem ação recebida: o turno ainda elegível espera o agente; encerrado, ficou sem resposta.
+  def response_state_label
+    return agent_action.outcome_label if agent_action
+
+    eligible? ? "Aguardando resposta do agente" : "Sem resposta do agente"
+  end
 end
