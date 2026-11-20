@@ -23,7 +23,8 @@ module AgentActionRecordHelpers
 
   # Aplicada: turno eligible → applied, applied_event_id e auditoria agent_action.applied.
   # Rejeitada: o turno guarda a resposta (a primeira) e a auditoria agent_action.rejected leva o motivo.
-  def record_agent_action(turn, payload, rejected: nil)
+  # occurred_at: horário da auditoria (padrão: relógio do banco), para testar durações com o tempo controlado.
+  def record_agent_action(turn, payload, rejected: nil, occurred_at: nil)
     turn.reload
     now = Time.current
     attrs = { response: turn.response || payload, response_received_at: turn.response_received_at || now }
@@ -38,7 +39,8 @@ module AgentActionRecordHelpers
     AuditEvent.create!(brand_id: turn.brand_id, ticket_id: turn.ticket_id, actor_type: "agent",
                        event_type: rejected ? "agent_action.rejected" : "agent_action.applied", data:,
                        trace_id: OutboxEvent.find_by(id: turn.event_id)&.trace_id || SecureRandom.hex(16),
-                       agent_model: payload.dig("agent", "model"), agent_version: payload.dig("agent", "version"))
+                       agent_model: payload.dig("agent", "model"), agent_version: payload.dig("agent", "version"),
+                       **{ occurred_at: }.compact)
   end
 
   private

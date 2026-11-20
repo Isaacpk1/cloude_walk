@@ -16,7 +16,13 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     discarded: "Descarte da resposta",
     escalated: "Escalação",
     assigned: "Atribuição",
-    delivered: "Entrega ao canal"
+    delivery_requested: "Saída gravada para entrega",
+    delivery_sending: "Envio ao canal",
+    delivery_retry_scheduled: "Retentativa da entrega agendada",
+    delivered: "Entrega ao canal",
+    delivery_failed: "Falha na entrega",
+    delivery_reconciliation: "Entrega em conciliação",
+    delivery_status: "Status do provedor"
   }.freeze
 
   def self.ms_between(from, to) = ((to - from) * 1000).round
