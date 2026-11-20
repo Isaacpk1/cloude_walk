@@ -1,19 +1,26 @@
 # Aplicação da ação do agente ao atendimento (RF-31; 07, seção 3.1, passo 6, e seção 3.4; RN-56).
 #
-#   AgentActions::Apply.call(payload, traceparent: header) # => Result(status:, reason:, turn:)
+#   AgentActions::Apply.call(payload, traceparent: header, header_event_id: header) # => Result(status:, reason:, turn:)
 #
 # `payload` é o corpo cru do Kafka (String) ou um Hash. `status`: :applied, :rejected, :duplicate ou :invalid.
+# `header_event_id` (cabeçalho `event_id` da mensagem) só serve de reserva para a DLQ quando o corpo não
+# traz um event_id legível (JSON malformado).
 #
 # 1. Contrato agent_outbound (invariante 10, RNF-28). Fora dele: falha permanente, DLQ sem retentativa (RN-44)
-#    e nenhum efeito no atendimento.
+#    e nenhum efeito no atendimento. Também é falha de contrato um payload que o Postgres não consegue gravar
+#    em jsonb: `\u0000` em qualquer string, chave ou valor (07, seção 6, "payload fora do contrato"). Sem isso
+#    a transação falharia sempre, o offset nunca seria confirmado e a partição travaria.
 # 2. Atendimento pelo conversation_id (`tkt_<id>`), sempre com o brand_id da marca do payload (invariante 6).
 #    Marca divergente ou atendimento inexistente: DLQ sem efeito e sem auditoria, porque não há atendimento
 #    verificado onde gravá-la (07, seção 5.3; ADR-014; 07, seção 6, "payload fora do contrato").
-# 3. Uma transação: marca o evento em processed_events (RN-47, invariante 3), trava a linha do atendimento
-#    (mesma ordem da ingestão e de Turns::Open), lê o relógio do banco e confere as quatro condições da
-#    seção 3.4. Grava a primeira ação recebida no turno, o resultado (`eligible → applied` condicional,
+# 3. Uma transação: marca o evento em processed_events (RN-47, invariante 3), depois trava a linha do
+#    atendimento, lê o relógio do banco e confere as quatro condições da seção 3.4. A ordem das travas é
+#    processed_events → atendimento; não há ciclo porque a ingestão, Turns::Open e DispatchDue travam só o
+#    atendimento e nunca tocam processed_events, e cada ação trava apenas a própria chave (consumer, event_id). Grava a primeira ação recebida no turno, o resultado (`eligible → applied` condicional,
 #    invariante 8) e a auditoria (RN-37, RF-54).
-# 4. Fora da transação (invariante 2): log JSON e, se for o caso, a DLQ pelo produtor do Karafka.
+# 4. Fora da transação (invariante 2): a DLQ pelo produtor do Karafka, se for o caso, e depois o log JSON.
+#    Erro de caractere do Postgres dentro da transação (defesa além da checagem do passo 1) também é
+#    permanente e vai para a DLQ; qualquer outro erro de banco é transitório e sobe (o offset não é confirmado).
 #
 # Escopo do bloco 04: a ação aplicada fica registrada. A mensagem de saída e a entrega ao canal são do
 # bloco 05, o handoff da `escalate` do bloco 10 e o encerramento da `resolve` fica pendente (RN-36).
@@ -26,22 +33,27 @@ module AgentActions
     CONTENT_FIELDS = %w[reply escalation resolution].freeze
     CONVERSATION_ID = /\Atkt_(?<id>[1-9]\d{0,18})\z/
     TRACEPARENT = /\A00-(?<trace_id>\h{32})-\h{16}-\h{2}\z/
+    NUL = "\u0000".freeze
+    # Erros do Postgres causados pelo conteúdo do payload: repetir não muda o resultado.
+    UNSTORABLE = [ PG::UntranslatableCharacter, PG::CharacterNotInRepertoire ].freeze
 
     # Saída da transação: o que aconteceu e o que fazer depois do commit.
     Outcome = Data.define(:status, :reason, :turn, :trace_id, :dead_letter)
 
     def self.call(...) = new(...).call
 
-    def initialize(payload, traceparent: nil)
+    def initialize(payload, traceparent: nil, header_event_id: nil)
       @raw = payload.is_a?(String) ? payload : JSON.generate(payload)
       @traceparent = traceparent
+      @header_event_id = header_event_id
     end
 
     def call
-      violations = HelpdeskContracts.errors(:agent_outbound, @raw)
+      violations = HelpdeskContracts.errors(:agent_outbound, @raw).map(&:to_h)
+      violations = unstorable(JSON.parse(@raw)) if violations.empty?
       outcome = violations.any? ? invalid(violations) : decide
-      log(outcome)
       dead_letter(outcome) if outcome.dead_letter
+      log(outcome) # depois da confirmação da DLQ: se o Kafka recusar, o erro sobe sem logar dead_lettered
       Result.new(status: outcome.status, reason: outcome.reason, turn: outcome.turn)
     end
 
@@ -49,10 +61,28 @@ module AgentActions
 
     attr_reader :action
 
+    # violations: [{ pointer:, type:, message: }], o mesmo formato do broker e do agent-mock em dlq_violations.
     def invalid(violations)
       @action = parse_loose
-      Outcome.new(status: :invalid, reason: "contrato", turn: nil, trace_id: header_trace_id,
-                  dead_letter: violations.map(&:pointer))
+      Outcome.new(status: :invalid, reason: "contrato", turn: nil, trace_id: header_trace_id, dead_letter: violations)
+    end
+
+    # O jsonb do Postgres não aceita \u0000 em string nenhuma (chave ou valor). O ponteiro é o da string;
+    # para uma chave, o do objeto que a contém.
+    def unstorable(value, pointer = "")
+      case value
+      when Hash
+        value.flat_map do |key, item|
+          key.include?(NUL) ? [ nul_violation(pointer) ] : unstorable(item, "#{pointer}/#{key.gsub('~', '~0').gsub('/', '~1')}")
+        end
+      when Array then value.each_with_index.flat_map { |item, index| unstorable(item, "#{pointer}/#{index}") }
+      when String then value.include?(NUL) ? [ nul_violation(pointer) ] : []
+      else []
+      end
+    end
+
+    def nul_violation(pointer)
+      { pointer:, type: "conteudo_invalido", message: "caractere nulo (\\u0000), que o Postgres não grava em jsonb" }
     end
 
     def decide
@@ -62,12 +92,17 @@ module AgentActions
         next ticket if ticket.is_a?(Outcome)
         next duplicate unless mark_processed
 
-        # Mesma ordem de travas da ingestão e de Turns::Open: atendimento primeiro (07, seção 3.4).
+        # Travas: processed_events (acima) e depois o atendimento. Sem ciclo: quem trava o atendimento
+        # (ingestão, Turns::Open, DispatchDue) não toca processed_events, e cada ação só trava a própria chave.
         @ticket = Ticket.lock.find_by!(id: ticket.id, brand_id: ticket.brand_id)
         @now = DatabaseClock.now # depois do lock (condição 4)
         @turn = @ticket.ai_turns.find_by(brand_id: @ticket.brand_id, turn: action.fetch("turn"))
         judge
       end
+    rescue ActiveRecord::StatementInvalid => e
+      raise unless UNSTORABLE.any? { e.cause.is_a?(_1) }
+
+      invalid([ { pointer: "", type: "conteudo_invalido", message: "o Postgres recusou o conteúdo: #{e.cause.class.name}" } ])
     end
 
     # --- Correlação com o atendimento e a marca (ADR-014) ---
@@ -225,7 +260,7 @@ module AgentActions
       Karafka.producer.produce_sync(
         topic: TOPICS.fetch(:dlq), key: field("conversation_id"), payload: @raw,
         headers: { "dlq_reason" => outcome.reason, "dlq_source" => "platform",
-                   "dlq_violations" => JSON.generate(outcome.dead_letter), "event_id" => field("event_id").to_s,
+                   "dlq_violations" => JSON.generate(outcome.dead_letter), "event_id" => (field("event_id") || @header_event_id).to_s,
                    "traceparent" => @traceparent.to_s }
       )
     end

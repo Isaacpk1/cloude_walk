@@ -292,7 +292,7 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
       dlq = dead_letters.sole
       expect(dlq[:headers]).to include("dlq_reason" => "contrato", "dlq_source" => "platform",
                                        "event_id" => action["event_id"], "traceparent" => AgentActionHelpers::TRACEPARENT)
-      expect(JSON.parse(dlq[:headers]["dlq_violations"])).to include("/action")
+      expect(JSON.parse(dlq[:headers]["dlq_violations"])).to include(include("pointer" => "/action"))
       expect(dlq[:key]).to eq("tkt_#{ticket.id}")
     end
 
@@ -321,6 +321,119 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
 
       expect { apply(agent_action_for(turn, action: "refund")) }.to raise_error(WaterDrop::Errors::ProduceError)
       expect(ProcessedEvent.count).to eq(0)
+    end
+  end
+
+  describe "RN-44, invariante 10, 07 seção 6: ação no contrato que o Postgres não grava" do
+    def nothing_recorded = [ ProcessedEvent.count, AiTurn.where.not(response: nil).count, AuditEvent.count, turn.reload.status ]
+
+    {
+      "reply.text" => [ { reply: { "text" => "oi\u0000" } }, "/reply/text" ],
+      "tool_calls[].args" => [ { tool_calls: [ { "tool" => "get_settlement_status", "args" => { "date" => "a\u0000b" },
+                                                   "result" => {}, "duration_ms" => 1 } ] }, "/tool_calls/0/args/date" ],
+      "chave em tool_calls[].result" => [ { tool_calls: [ { "tool" => "get_settlement_status", "args" => {},
+                                                             "result" => { "x\u0000" => 1 }, "duration_ms" => 1 } ] },
+                                          "/tool_calls/0/result" ]
+    }.each do |where, (overrides, pointer)|
+      it "\\u0000 em #{where} vai para a DLQ como contrato, com o corpo original e sem efeito" do
+        action = agent_action_for(turn, **overrides)
+        expect(HelpdeskContracts.valid?(:agent_outbound, action)).to be(true)
+        before = nothing_recorded
+
+        expect(apply(JSON.generate(action))).to have_attributes(status: :invalid, reason: "contrato", turn: nil)
+
+        expect(nothing_recorded).to eq(before)
+        dlq = dead_letters.sole
+        expect(dlq[:payload]).to eq(JSON.generate(action))
+        expect(dlq[:headers]).to include("dlq_reason" => "contrato", "dlq_source" => "platform", "event_id" => action["event_id"])
+        expect(JSON.parse(dlq[:headers]["dlq_violations"]))
+          .to contain_exactly(include("pointer" => pointer, "type" => "conteudo_invalido"))
+      end
+    end
+
+    it "defesa: erro de caractere do Postgres dentro da transação é permanente (DLQ, nada gravado)" do
+      action = agent_action_for(turn)
+      allow(AuditEvent).to receive(:create!).and_wrap_original do
+        ActiveRecord::Base.connection.select_value(%q(SELECT '"\\u0000"'::jsonb))
+      end
+
+      expect { expect(apply(action)).to have_attributes(status: :invalid, reason: "contrato") }
+        .not_to change { [ ProcessedEvent.count, AuditEvent.count, turn.reload.status, turn.response ] }
+      expect(turn).to have_attributes(status: "eligible", response: nil)
+      expect(dead_letters.sole[:headers]).to include("dlq_reason" => "contrato", "event_id" => action["event_id"])
+      expect(JSON.parse(dead_letters.sole[:headers]["dlq_violations"])).to contain_exactly(include("type" => "conteudo_invalido"))
+    end
+
+    it "RNF-14: erro de banco transitório continua subindo, sem DLQ (o consumer não confirma o offset)" do
+      action = agent_action_for(turn)
+      allow(AuditEvent).to receive(:create!).and_raise(ActiveRecord::ConnectionNotEstablished, "banco fora")
+
+      expect { apply(action) }.to raise_error(ActiveRecord::ConnectionNotEstablished)
+      expect(dead_letters).to be_empty
+    end
+
+    it "RNF-14: outro erro de SQL (não de caractere) também sobe" do
+      action = agent_action_for(turn)
+      allow(AuditEvent).to receive(:create!).and_wrap_original do
+        ActiveRecord::Base.connection.select_value("SELECT 1/0")
+      end
+
+      expect { apply(action) }.to raise_error(ActiveRecord::StatementInvalid)
+      expect(dead_letters).to be_empty
+    end
+  end
+
+  describe "RN-44, RF-37: cabeçalhos e log da DLQ" do
+    it "JSON malformado usa o event_id do cabeçalho da mensagem Kafka" do
+      header = SecureRandom.uuid
+
+      described_class.call("{nao é json", traceparent: AgentActionHelpers::TRACEPARENT, header_event_id: header)
+
+      expect(dead_letters.sole[:headers]).to include("event_id" => header)
+    end
+
+    it "o event_id do corpo vale mais que o do cabeçalho" do
+      action = agent_action_for(turn, action: "refund")
+
+      described_class.call(action, header_event_id: SecureRandom.uuid)
+
+      expect(dead_letters.sole[:headers]).to include("event_id" => action["event_id"])
+    end
+
+    it "dlq_violations no formato do broker e do agent-mock: {pointer, type, message}" do
+      apply(agent_action_for(turn, action: "refund"))
+
+      violations = JSON.parse(dead_letters.sole[:headers]["dlq_violations"])
+      expect(violations).to include(include("pointer" => "/action", "type" => "enum", "message" => kind_of(String)))
+      expect(violations).to all(match("pointer" => kind_of(String), "type" => kind_of(String), "message" => kind_of(String)))
+    end
+
+    def json_lines
+      lines = []
+      allow(Rails.logger).to receive(:info).and_wrap_original { |m, line| lines << line; m.call(line) }
+      lines
+    end
+
+    it "agent_action.dead_lettered só é logado depois de a DLQ confirmar" do
+      lines = json_lines
+      logged_before_produce = nil
+      allow(Karafka.producer).to receive(:produce_sync).and_wrap_original do |original, **message|
+        logged_before_produce = lines.any? { _1.to_s.include?("agent_action.dead_lettered") }
+        original.call(**message)
+      end
+
+      apply(agent_action_for(turn, action: "refund"))
+
+      expect(logged_before_produce).to be(false)
+      expect(lines.map { JSON.parse(_1.to_s)["event"] rescue nil }).to include("agent_action.dead_lettered")
+    end
+
+    it "se a DLQ recusa, não loga agent_action.dead_lettered" do
+      lines = json_lines
+      allow(Karafka.producer).to receive(:produce_sync).and_raise(WaterDrop::Errors::ProduceError.new("fora do ar"))
+
+      expect { apply(agent_action_for(turn, action: "refund")) }.to raise_error(WaterDrop::Errors::ProduceError)
+      expect(lines.map(&:to_s).join).not_to include("agent_action.dead_lettered")
     end
   end
 
