@@ -179,3 +179,11 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .tool-calls th, .tool-calls td { text-align: left; padding: .2rem .4rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 .tool-calls code { word-break: break-word; }
 .turn__response-state { margin: .35rem 0 0; font-size: .85rem; }
+
+/* ROADMAP 05: entrega da saída e estágios da resposta do turno */
+.delivery { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .35rem; font-size: .8rem; }
+.delivery__reason { color: var(--danger); }
+.turn-stages { margin-top: .5rem; font-size: .85rem; }
+.turn-stages h4 { margin: .25rem 0; }
+.turn-stages__list { margin: 0; padding-left: 1.2rem; }
+.turn-stages__total { margin: .35rem 0 0; }

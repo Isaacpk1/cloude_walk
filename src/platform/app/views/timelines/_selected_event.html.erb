@@ -19,7 +19,7 @@
       <% if error.message %><div><dt>Mensagem</dt><dd><%= error.message %></dd></div><% end %>
       <div><dt>Próximo passo</dt><dd>
         <% if error.retry %>
-          Nova tentativa às <%= panel_time(error.next_attempt_at, precise: true) %>, com o mesmo event_id
+          Nova tentativa às <%= panel_time(error.next_attempt_at, precise: true) %>, com o mesmo <%= error.retry_key %>
         <% elsif error.outcome %>
           <%= error.outcome_label %>
         <% else %>
