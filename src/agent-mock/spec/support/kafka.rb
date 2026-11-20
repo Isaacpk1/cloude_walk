@@ -65,3 +65,11 @@ module KafkaHelpers
 
   def log_lines(io) = io.string.lines.map { JSON.parse(_1) }
 end
+
+module KafkaHelpers
+  # Exatamente um item (como o Enumerable#sole do Rails).
+  def sole(list)
+    expect(list.size).to eq(1), "esperava 1 item, veio #{list.size}"
+    list.first
+  end
+end
