@@ -13,6 +13,11 @@ class KarafkaApp < Karafka::App
       # Produtor da DLQ: só confirma com todas as réplicas (como o broker, 07, seção 3.1, passo 4).
       "request.required.acks": -1
     }
+    # Workers que processam partições em paralelo (padrão do Karafka: 5). Cada worker usa uma conexão do
+    # pool do Active Record (config/database.yml, max_connections = RAILS_MAX_THREADS): no processo
+    # consumer, KAFKA_CONCURRENCY e RAILS_MAX_THREADS sobem e descem juntos, senão os workers esperam
+    # conexão (ActiveRecord::ConnectionTimeoutError) e a mensagem volta para reentrega.
+    config.concurrency = Integer(ENV.fetch("KAFKA_CONCURRENCY", 5))
     config.client_id = "helpdesk-platform"
     config.group_id = "platform-consumer"
     # Recria o consumer a cada lote só em desenvolvimento, para o reload de código funcionar.
