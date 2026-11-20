@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.description = "Esquemas JSON e validador único dos contratos entre canais, plataforma, broker e agente (07, seção 5; RNF-28)."
   spec.authors = [ "Help desk CloudWalk" ]
   spec.license = "Nonstandard"
-  spec.required_ruby_version = ">= 3.3"
+  spec.required_ruby_version = ">= 4.0"
 
   spec.files = Dir["lib/**/*.rb", "v*/schemas/**/*.json", "README.md"]
   spec.require_paths = [ "lib" ]
