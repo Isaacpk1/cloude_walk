@@ -27,6 +27,7 @@ Formato: ADR curto (contexto → decisão → alternativas → consequências). 
 | Organização do repositório | Monorepo com o código em `src/`, um diretório por fronteira de rede | [ADR-017](#adr-017--monorepo-com-o-código-em-src) |
 | Formato dos canais simulados | Subconjunto fiel da Cloud API do WhatsApp e da API do Gmail, com adaptador de entrada e de saída por canal | [ADR-018](#adr-018--canais-simulados-no-formato-dos-provedores-reais) |
 | Contas e autenticação dos webhooks de entrada | Conta do provedor na URL e cadastrada na tabela `provider_accounts`, com segredo criptografado. Cada canal confere a assinatura do seu provedor | [ADR-019](#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada) |
+| Prazo da IA | 20 s por turno, teto de 60 s por ciclo, escalação imediata em falha definitiva da publicação | [ADR-020](#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo) |
 
 ### Orçamento de memória (RNF-29: 4 vCPU, 8 GB)
 
@@ -483,6 +484,47 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - (+) Trocar um segredo ou desativar uma conta não exige deploy.
 - (−) O ambiente local precisa das chaves do Active Record Encryption. Fora de produção, há valores padrão só para desenvolvimento.
 - (−) O seed e o `channels-mock` precisam usar o mesmo segredo de desenvolvimento (`PROVIDER_SECRET_<CONTA>` ou `dev-secret-<conta>`).
+
+---
+
+## ADR-020 — Prazo da IA por turno com teto do ciclo
+
+**Proposto em 19/11/2026.** Muda a RN-46, a RN-57 e o RNF-18. Mantém o mecanismo do [ADR-016](#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox).
+
+**Contexto.** A regra anterior dava 30 s desde a primeira mensagem pendente, compartilhados por todos os turnos do ciclo. No teste do bloco 03, o cliente escreveu aos 0 s e aos 20 s: o turno 2 abriu aos 21 s e teve só 8 s. O prazo punia a IA por uma demora do cliente. Além disso, a regra não separava "agente quebrado" de "agente lento": num pico em que o agente fica lento, todos os casos estourariam juntos e lotariam a fila humana justamente quando a IA mais deveria ajudar.
+
+**Decisão.**
+
+1. **Prazo por turno:** cada turno tem 20 s desde a sua abertura (`ai_turns.deadline_at`).
+2. **Teto do ciclo:** o turno nunca passa de 60 s desde a primeira mensagem pendente (`tickets.ai_deadline_at`), que não reinicia com mensagens novas. É a garantia para o cliente.
+3. **Falha definitiva escala na hora:** recusa do broker, contrato inválido ou retentativas esgotadas encerram a publicação e registram o handoff na mesma transação, sem esperar o prazo.
+4. O aviso de progresso aos 15 s (RN-57) não muda.
+
+| Situação | Antes (30 s do ciclo) | Agora |
+| --- | --- | --- |
+| Agente responde em segundos | Resposta na hora | Igual |
+| Cliente escreve aos 0 s e aos 20 s | Turno 2 com 8 s | Turno 2 com 20 s |
+| Broker recusando ou fora do ar | Escala aos 30 s | Escala ao esgotar as retentativas (antes dos 20 s) |
+| Agente vivo, mas lento | Escala aos 30 s | Escala aos 20 s do turno, no máximo aos 60 s do ciclo |
+| Cliente que nunca para de escrever | Humano aos 30 s | Humano aos 60 s, com aviso aos 15 s |
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Manter 30 s fixos por ciclo | Turnos injustos e escalação em massa no pico por lentidão, não por falha |
+| Reiniciar o prazo a cada mensagem, sem teto | Um cliente que escreve sem parar nunca seria atendido por ninguém |
+| Retentar o turno uma vez antes de escalar | Duplica o trabalho de um agente que só estava lento e dobra a espera no caso de falha real |
+| Medir a saúde do agente (heartbeat) para decidir | O agente real não oferece esse sinal hoje. Fica para quando a CloudWalk confirmar o que o agente expõe (07, seção 9) |
+
+**Consequências.**
+
+- (+) A IA sempre tem um tempo justo por turno, e a falha clara não espera prazo.
+- (+) O cliente continua com espera máxima garantida e aviso aos 15 s.
+- (−) No pior caso, a espera máxima do cliente sobe de 30 s para 60 s.
+- (−) Dois prazos para validar em vez de um: o consumer confere o do turno, que nunca passa do teto.
+- Os valores (20 s e 60 s) são proposta. Devem ser calibrados com o p95 do agente real e com o E4.
+- Implementação: o bloco 03 grava o teto e o prazo do turno; o handoff no vencimento e na falha definitiva entra nos blocos 08 e 10.
 
 ---
 
