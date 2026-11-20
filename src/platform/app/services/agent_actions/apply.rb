@@ -13,9 +13,10 @@
 # 2. Atendimento pelo conversation_id (`tkt_<id>`), sempre com o brand_id da marca do payload (invariante 6).
 #    Marca divergente ou atendimento inexistente: DLQ sem efeito e sem auditoria, porque não há atendimento
 #    verificado onde gravá-la (07, seção 5.3; ADR-014; 07, seção 6, "payload fora do contrato").
-# 3. Uma transação: marca o evento em processed_events (RN-47, invariante 3), trava a linha do atendimento
-#    (mesma ordem da ingestão e de Turns::Open), lê o relógio do banco e confere as quatro condições da
-#    seção 3.4. Grava a primeira ação recebida no turno, o resultado (`eligible → applied` condicional,
+# 3. Uma transação: marca o evento em processed_events (RN-47, invariante 3), depois trava a linha do
+#    atendimento, lê o relógio do banco e confere as quatro condições da seção 3.4. A ordem das travas é
+#    processed_events → atendimento; não há ciclo porque a ingestão, Turns::Open e DispatchDue travam só o
+#    atendimento e nunca tocam processed_events, e cada ação trava apenas a própria chave (consumer, event_id). Grava a primeira ação recebida no turno, o resultado (`eligible → applied` condicional,
 #    invariante 8) e a auditoria (RN-37, RF-54).
 # 4. Fora da transação (invariante 2): a DLQ pelo produtor do Karafka, se for o caso, e depois o log JSON.
 #    Erro de caractere do Postgres dentro da transação (defesa além da checagem do passo 1) também é
@@ -91,7 +92,8 @@ module AgentActions
         next ticket if ticket.is_a?(Outcome)
         next duplicate unless mark_processed
 
-        # Mesma ordem de travas da ingestão e de Turns::Open: atendimento primeiro (07, seção 3.4).
+        # Travas: processed_events (acima) e depois o atendimento. Sem ciclo: quem trava o atendimento
+        # (ingestão, Turns::Open, DispatchDue) não toca processed_events, e cada ação só trava a própria chave.
         @ticket = Ticket.lock.find_by!(id: ticket.id, brand_id: ticket.brand_id)
         @now = DatabaseClock.now # depois do lock (condição 4)
         @turn = @ticket.ai_turns.find_by(brand_id: @ticket.brand_id, turn: action.fetch("turn"))
