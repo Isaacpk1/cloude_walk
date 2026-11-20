@@ -4,11 +4,11 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
   let!(:brand) { create(:brand, :infinitepay) }
   let(:source) { described_class.new }
 
-  def ingest(text, external_id: SecureRandom.uuid, trace_id: SecureRandom.hex(16))
+  def ingest(text, external_id: SecureRandom.uuid, trace_id: SecureRandom.hex(16), identity: "acc_infinitepay_000021")
     Ingestion::Receive.call({
       "schema" => "helpdesk.normalized_message.v1", "channel" => "chat", "brand" => "infinitepay",
       "provider_account" => "infinitepay-chat-mock", "external_id" => external_id,
-      "sender" => { "channel_identity" => "acc_infinitepay_000021" }, "content" => { "type" => "text", "text" => text },
+      "sender" => { "channel_identity" => identity }, "content" => { "type" => "text", "text" => text },
       "received_at" => Time.current.utc.iso8601(3), "trace_id" => trace_id
     }, provider_payload: {})
   end
@@ -22,12 +22,37 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
 
       expect(conversation).to have_attributes(
         id: ticket.id.to_s, brand_slug: "infinitepay", channel: "chat", state: "novo", latest_customer_seq: 2,
-        source: DataSource::SYSTEM, turns: [], escalations: []
+        source: DataSource::SYSTEM, escalations: []
       )
       expect(conversation.messages.map { [ _1.seq, _1.author_type, _1.body ] })
         .to eq([ [ 1, "customer", "meu repasse não caiu" ], [ 2, "customer", "é o de ontem" ] ])
       expect(conversation.assignee).to have_attributes(kind: "queue")
       expect(source.all.map(&:id)).to eq([ ticket.id.to_s ])
+    end
+
+    it "ROADMAP 03, RN-56: mostra os turnos gravados com as mensagens cobertas e o status" do
+      received = ingest("meu repasse não caiu")
+      first = open_turn_for(received)
+      ingest("é o de ontem")
+      second = open_turn_for(received)
+
+      turns = source.find(received.ticket.id.to_s).turns
+
+      expect(turns.map { [ _1.number, _1.status, _1.covered_seqs, _1.context_until_seq ] })
+        .to eq([ [ 1, "superseded", [ 1 ], 1 ], [ 2, "eligible", [ 1, 2 ], 2 ] ])
+      expect(turns.map(&:event_id)).to eq([ first.event_id, second.event_id ])
+      expect(turns.first.note).to include("superado")
+      expect(turns.last.note).to include("aguardando a resposta do agente")
+    end
+
+    it "mostra só os turnos do próprio atendimento" do
+      mine = ingest("meu repasse não caiu")
+      open_turn_for(mine)
+      other = ingest("outro cliente", identity: "acc_infinitepay_000099")
+      open_turn_for(other)
+
+      expect(other.ticket.id).not_to eq(mine.ticket.id)
+      expect(source.find(mine.ticket.id.to_s).turns.map(&:event_id)).to eq(mine.ticket.ai_turns.pluck(:event_id))
     end
 
     it "não encontra o que não é um atendimento" do
@@ -46,6 +71,60 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
       expect(timeline.events).to all(have_attributes(seq: 1, trace_id: "4bf92f3577b34da6a3ce929d0e0e4736",
                                                      ticket_id: ticket.id.to_s, source: DataSource::SYSTEM))
       expect(timeline.events.map(&:duration_ms)).to all(be >= 0)
+    end
+  end
+
+  describe "#timeline: publicação no broker (ROADMAP 03)" do
+    let(:start) { Time.zone.parse("2026-11-18T21:00:00Z") }
+    let(:trace_id) { "4bf92f3577b34da6a3ce929d0e0e4736" }
+
+    around { |example| travel_to(start) { example.run } }
+
+    def open_and_publish(*responses)
+      received = ingest("meu repasse não caiu", trace_id:)
+      event_id = open_turn_for(received).event_id
+      stub_broker(*responses)
+      responses.size.times do
+        Outbox::Publish.call(event_id, jitter: -> { 0.0 })
+        travel 1.second
+      end
+      received.ticket
+    end
+
+    it "mostra a publicação do turno, da abertura à confirmação do Kafka, com tópico, partição e offset" do
+      ticket = open_and_publish({ status: 200 })
+
+      event = source.timeline(ticket.id.to_s).events.find { _1.kind == :published }
+
+      # O fim é o horário da auditoria (relógio do banco, clock_timestamp()).
+      confirmed_at = AuditEvent.find_by!(event_type: "agent_event.published").occurred_at
+      expect(event).to have_attributes(turn: 1, seq: 1, trace_id:, ticket_id: ticket.id.to_s, error: nil,
+                                       started_at: start, finished_at: confirmed_at, source: DataSource::SYSTEM)
+      expect(event.detail).to include("helpdesk.agent.inbound.v1", "partição 7", "offset 42", "tentativa 1")
+    end
+
+    it "mostra cada tentativa que falhou com a origem do erro, e a publicação que deu certo depois" do
+      ticket = open_and_publish({ status: 503 }, { status: 200 })
+
+      events = source.timeline(ticket.id.to_s).events
+      failed = events.find { _1.kind == :publish_failed }
+
+      expect(failed.error).to have_attributes(origin: "kafka", http_status: 503, attempt: 1, retry: true)
+      expect(failed.error.origin_label).to include("Kafka")
+      expect(failed).to have_attributes(turn: 1, trace_id:)
+      confirmed_at = AuditEvent.find_by!(event_type: "agent_event.published").occurred_at
+      expect(events.find { _1.kind == :published }).to have_attributes(started_at: start, finished_at: confirmed_at)
+      expect(events.find { _1.kind == :published }.detail).to include("tentativa 2")
+    end
+
+    it "publicação recusada pelo broker fica sem fim e com a origem (assinatura)" do
+      ticket = open_and_publish({ status: 401 })
+
+      events = source.timeline(ticket.id.to_s).events
+
+      expect(events.find { _1.kind == :published }.finished_at).to be_nil
+      expect(events.find { _1.kind == :publish_failed }.error)
+        .to have_attributes(origin: "assinatura", http_status: 401, retry: false)
     end
   end
 end

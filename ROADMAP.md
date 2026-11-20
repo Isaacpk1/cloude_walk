@@ -10,9 +10,11 @@ Referências do projeto: [escopo](docs/02-escopo.md), [requisitos funcionais](do
 | --- | --- | --- |
 | 01. Ambiente e dados iniciais | **Feito** | Compose validado com `make up` |
 | 02. Entrada e gravação de uma mensagem | **Feito** | Compose validado com `make up`, com o `channels-mock`. Canal implementado: chat do app (WhatsApp e e-mail no bloco 15) |
-| 03. Publicação no broker e Kafka | Adiantado em parte | Os esquemas JSON dos eventos (`src/contracts/v1`) já existem, com testes. O outbox já recebe `message.received`; falta publicar |
-| 06. Agrupamento de mensagens | Adiantado em parte | A ingestão já grava `seq` e `latest_customer_seq` com a linha travada. Falta a versão do contexto, a janela e o turno |
-| 03 em diante | A fazer | Próximo: **03. Publicação no broker e Kafka** |
+| 03. Publicação no broker e Kafka | **Feito** | Validado em 19/11/2026 com o Compose completo no Docker Desktop (Windows): turnos publicados no Kafka real, turno superado pela mensagem nova e `401` com assinatura inválida. Turno aberto pelo `scheduler` no fim da janela do chat, sem atalho, e prazo da IA do [ADR-020](docs/08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo) |
+| 06. Agrupamento de mensagens | Adiantado em parte | A ingestão já grava `seq` e `latest_customer_seq` com a linha travada e invalida o turno que não cobre a mensagem nova (bloco 03). O turno existe (`ai_turns`). A janela e o teto de 4 s do chat entram no bloco 03. Falta a versão do contexto, a janela dos demais canais e a tela |
+| 04 em diante | A fazer | Próximo: **04. Agente mock e ação de retorno** |
+
+Decisões tomadas durante o bloco 03: respostas do broker (`401` sem publicar, `422` com o corpo na DLQ, `503` para nova tentativa) e colunas `attempts` e `last_error` no outbox ([07, seções 4 e 5.2](docs/07-arquitetura.md#52-webhook-plataforma--broker-e-evento-em-agentinbound)); tópicos declarados em `infra/kafka/topics.yml` ([docs/10, seção 3.7](docs/10-organizacao-do-repositorio.md#37-infra--infraestrutura-sem-código-de-negócio)); `traceparent` obrigatório no webhook para o broker: sem ele, `422` e DLQ (RF-56, [07, seção 5.2](docs/07-arquitetura.md#52-webhook-plataforma--broker-e-evento-em-agentinbound)); formato da mensagem na DLQ vira esquema `dead_letter` no bloco 09. **Recusado o atalho** de abrir o turno a cada mensagem: o bloco 03 adianta a janela de agrupamento só do chat (bloco 06) e um scheduler mínimo só para abrir o turno (bloco 08), o caminho do [07, seção 3.1](docs/07-arquitetura.md#31-ida-e-volta-com-o-agente-caminho-feliz): a ingestão grava `dispatch_due_at`, o `scheduler` grava a abertura no outbox quando ele vence e o worker monta o turno com todas as mensagens pendentes. A fila na porta da ingestão ficou para depois do E1 (`possiveis-melhorias.md`, item 12). Prazo da IA revisto: 20 s por turno, teto de 60 s por ciclo e escalação imediata em falha definitiva, com os tempos centralizados em `Turns::Policy` e configuráveis por marca no bloco 12 ([ADR-020](docs/08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)).
 
 Decisões tomadas durante o bloco 02: contas dos provedores na tabela `provider_accounts`, com segredo criptografado, e webhook de entrada autenticado antes do parse ([ADR-019](docs/08-decisoes-de-arquitetura.md#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada)); `account_id` do chat identifica o cliente ([07, seção 5.0](docs/07-arquitetura.md#50-webhooks-dos-canais-entrada-e-saída)); auditoria imutável também por trigger ([07, seção 4](docs/07-arquitetura.md#índices-e-restrições-que-carregam-regra-de-negócio)); o simulador do cliente nasce no `channels-mock`, como manda o [docs/10](docs/10-organizacao-do-repositorio.md#34-srcchannels-mock--provedores-e-simulador).
 
@@ -49,9 +51,11 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 03. Publicação no broker e Kafka
 
-- [ ] **Backend:** ~~definir os esquemas JSON dos eventos~~ (feito no bloco 01, `src/contracts/v1`), publicar o outbox com assinatura HMAC, validar no broker e confirmar a publicação no Kafka. Propagar o rastreio e usar a conversa como chave da partição.
-- [ ] **Frontend:** acrescentar a etapa de publicação e mostrar a origem de um erro ao escolher o evento na linha do tempo.
+- [x] **Backend:** ~~definir os esquemas JSON dos eventos~~ (feito no bloco 01, `src/contracts/v1`), publicar o outbox com assinatura HMAC, validar no broker e confirmar a publicação no Kafka. Propagar o rastreio e usar a conversa como chave da partição.
+- [x] **Frontend:** acrescentar a etapa de publicação e mostrar a origem de um erro ao escolher o evento na linha do tempo.
+- [x] **Backend (adiantado dos blocos 06 e 08):** a ingestão grava `first_pending_at` e `dispatch_due_at` com a janela do chat (1,5 s, teto de 4 s, RN-55); um `scheduler` mínimo encontra os `dispatch_due_at` vencidos e grava a abertura do turno no outbox com chave única (ADR-016); o worker trava o atendimento, revalida o prazo e monta o turno com todas as mensagens pendentes. Remove a abertura direta pelo `message.received`.
 - **Pronto quando:** a mensagem do simulador gera um evento válido no tópico de entrada, visível pela sua correlação. Um webhook mal assinado é rejeitado. **Referências** RF-29, RF-30, RF-33, RF-56, RNF-23, RNF-28.
+- **Situação:** comprovado em 19/11/2026 com `docker compose up` completo (Docker Desktop no Windows): `kafka`, `kafka-init`, `broker`, `worker`, `scheduler`, `web` e `channels-mock`. Mensagens do simulador viraram eventos em `helpdesk.agent.inbound.v1` (mesma partição por conversa, offsets 0 e 1), com o mesmo `trace_id` da mensagem; mensagem nova marcou o turno anterior como superado e abriu outro com todas as pendentes; envio com assinatura inválida recebeu `401` sem gravar nada. Tempos medidos (ambiente de desenvolvimento): scheduler abaixo de 250 ms do fim da janela, abertura do turno ~430 ms e publicação ~300 ms depois, ingestão com o atendimento travado por 20 a 60 ms. Ajustes feitos na validação: `.ruby-version` copiado nas imagens do broker e do `channels-mock`; `start_period` no healthcheck do `web`; log do Rails na saída do contêiner e worker e scheduler sem recarga automática (a pasta montada do Windows somava 1,5 a 3 s por passo); healthcheck do `worker` e do `scheduler` por arquivo de sinal de vida; tela da conversa lendo `ai_turns`; fim da janela nunca antes da gravação. Fica para depois: DLQ da plataforma, tabela `dead_letters` e escalação pela RN-45 (bloco 09); handoff no vencimento do prazo e na falha definitiva da publicação ([ADR-020](docs/08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo), blocos 08 e 10), que também deve limpar `dispatch_due_at` dos ciclos descartados; aviso de progresso (bloco 08); janela dos demais canais (bloco 06); atribuição ao bot pela triagem (bloco 11). Até o bloco 11, todo caso que não está com um humano vai para a IA.
 
 ### 04. Agente mock e ação de retorno
 
@@ -69,7 +73,7 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 06. Agrupamento de mensagens e contexto do turno
 
-- [ ] **Backend:** gravar ~~sequência~~ (feito no bloco 02: `seq` e `latest_customer_seq`) e versão do contexto no atendimento. Implementar a janela de agrupamento, o teto de espera e a montagem do turno com todas as mensagens pendentes.
+- [ ] **Backend:** gravar ~~sequência~~ (feito no bloco 02: `seq` e `latest_customer_seq`) e versão do contexto no atendimento. A tabela `ai_turns` e a invalidação do turno na ingestão já existem (bloco 03). Implementar a janela de agrupamento e o teto de espera dos demais canais (~~chat e montagem do turno com todas as mensagens pendentes~~ adiantados no bloco 03).
 - [ ] **Frontend:** mostrar a fase de agrupamento e quais mensagens entraram em cada turno. Adicionar um cenário no simulador que envia a segunda mensagem aos 3 s.
 - **Pronto quando:** uma rajada agrupa as mensagens conforme a política do canal, e o turno persistido corresponde ao contexto enviado. **Referências** RF-09, RF-29, RF-33, RN-49, RN-55.
 
@@ -81,13 +85,13 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 08. Scheduler, aviso e prazo do atendimento
 
-- [ ] **Backend:** implementar o scheduler apoiado no Postgres e no outbox. Registrar a abertura de turno, o aviso de progresso e o fallback com chaves que permitam reexecução segura. Verificar o prazo do ticket mesmo sem publicação confirmada.
+- [ ] **Backend:** implementar o scheduler apoiado no Postgres e no outbox (~~scheduler mínimo e abertura de turno~~ adiantados no bloco 03). Registrar o aviso de progresso e o fallback com chaves que permitam reexecução segura. Verificar o prazo do ticket mesmo sem publicação confirmada.
 - [ ] **Frontend:** mostrar o prazo do atendimento, o aviso de progresso e o motivo do timeout. Incluir perfis rápido, lento e sem resposta no simulador.
 - **Pronto quando:** uma resposta recebida a partir de `T` é rejeitada mesmo antes do job de timeout, e uma queda do broker antes do primeiro envio encaminha o caso para a fila humana. **Referências** RF-36, RN-46, RN-57, RNF-18, ADR-016.
 
 ### 09. Retentativas, DLQ e recuperação
 
-- [ ] **Backend:** implementar retentativas com backoff, DLQ e retomada dos itens ainda abertos. Encerrar eventos superados ou expirados conforme a política de recuperação. Injetar queda após o commit da ação do scheduler e perda da confirmação do provedor.
+- [ ] **Backend:** implementar retentativas com backoff, DLQ e retomada dos itens ainda abertos. Criar o esquema `dead_letter` em `src/contracts/v1` para a mensagem da DLQ (decisão do bloco 03). Encerrar eventos superados ou expirados conforme a política de recuperação. Injetar queda após o commit da ação do scheduler e perda da confirmação do provedor.
 - [ ] **Frontend:** mostrar tentativas e desfecho do evento na linha do tempo. Exibir o motivo da falha em cada etapa e a condição de entrega em conciliação.
 - **Pronto quando:** mensagens confirmadas continuam no histórico após a falha, eventos antigos não reativam a IA e a confirmação perdida não gera uma segunda resposta visível. **Referências** RF-34, RF-35, RNF-14 a RNF-17.
 
@@ -107,8 +111,8 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 12. Configuração pelo supervisor
 
-- [ ] **Backend:** completar cadastro de marcas, equipes, atendentes, filas e regras. Validar alterações concorrentes, proteger referências a filas e aplicar novas versões em tempo de execução.
-- [ ] **Frontend:** implementar formulários de configuração com validação e mensagens de erro visíveis. Mostrar a versão da regra em uso.
+- [ ] **Backend:** completar cadastro de marcas, equipes, atendentes, filas e regras. Validar alterações concorrentes, proteger referências a filas e aplicar novas versões em tempo de execução. Configuração versionada dos tempos da IA por marca (janela por canal, prazo do turno, teto do ciclo e aviso), lida por `Turns::Policy.for(brand)`, com os limites do [ADR-020](docs/08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo).
+- [ ] **Frontend:** implementar formulários de configuração com validação e mensagens de erro visíveis. Mostrar a versão da regra em uso. Incluir os tempos da IA da marca.
 - **Pronto quando:** o supervisor cria ou altera uma regra pelo navegador e o próximo atendimento segue a nova configuração, com a decisão rastreável. **Referências** RF-13 a RF-18, RF-22, RF-58, RNF-07.
 
 ### 13. Distribuição humana e SLA
@@ -151,7 +155,7 @@ Decisões tomadas durante o bloco 01: organização do repositório ([ADR-017](d
 
 ### 19. Carga e leitura de desempenho
 
-- [ ] **Backend:** rodar E1 e E5 com semente, configuração e taxas registradas. Medir latência por etapa, fila, throughput, perdas e proporção de turnos superados. Comparar conversas independentes com rajadas na mesma conversa.
+- [ ] **Backend:** rodar E1 e E5 com semente, configuração e taxas registradas. Rodar num perfil próprio, com `RAILS_ENV=production`, código carregado na imagem e sem a pasta `src/platform` montada: no Docker Desktop do Windows, a pasta montada acrescentou ~1,5 s por passo (worker e transação da ingestão) no teste do bloco 03, e os números não representariam a plataforma. Medir latência por etapa, fila, throughput, perdas e proporção de turnos superados. Comparar conversas independentes com rajadas na mesma conversa.
 - [ ] **Frontend:** ligar percentis e contagens aos dados da execução. Mostrar a janela medida e permitir comparar um caso individual com a visão agregada no Grafana.
 - **Pronto quando:** é possível explicar de onde vem a latência e qual componente acumula fila primeiro, com os números reproduzíveis e as limitações registradas. **Referências** E1, E5, RNF-03, RNF-09 a RNF-13, RNF-22.
 

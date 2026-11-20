@@ -41,6 +41,9 @@ module Platform
     # Don't generate system test files.
     config.generators.system_tests = nil
 
+    # ADR-005: jobs no Sidekiq (filas e pesos em config/sidekiq.yml). Nos testes, adaptador :test.
+    config.active_job.queue_adapter = :sidekiq
+
     # ADR-019: segredos das contas de canal criptografados no banco (Active Record Encryption).
     # As chaves vêm do ambiente. Os valores padrão só existem para desenvolvimento e testes.
     encryption = config.active_record.encryption

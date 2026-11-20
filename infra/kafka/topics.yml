@@ -1,0 +1,21 @@
+# Tópicos do Kafka (ADR-004; docs/10, seção 3.7). É o "esquema" do Kafka: o kafka-init cria o que
+# faltar a cada `make up`. Mudar partições aqui não reparticiona um tópico existente.
+# 48 partições: teto de ~24 turnos/s com o agente mock a 2 s (07, seção 7).
+# Formato fixo, lido por create-topics.sh sem dependências: name, partitions, replication_factor, config.
+topics:
+  - name: helpdesk.agent.inbound.v1
+    partitions: 48
+    replication_factor: 1
+    config:
+      retention.ms: "604800000"
+  - name: helpdesk.agent.outbound.v1
+    partitions: 48
+    replication_factor: 1
+    config:
+      retention.ms: "604800000"
+  # RN-48, RNF-16: a DLQ fica no mínimo 7 dias.
+  - name: helpdesk.agent.dlq.v1
+    partitions: 48
+    replication_factor: 1
+    config:
+      retention.ms: "604800000"
