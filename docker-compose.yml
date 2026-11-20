@@ -73,6 +73,11 @@ services:
   worker:
     <<: *platform
     command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+    environment:
+      <<: *platform-env
+      # Sem recarga automática do código: mudou o código, `docker compose restart worker`
+      # (config/environments/development.rb).
+      RAILS_ENABLE_RELOADING: "0"
     volumes:
       - ./src/platform:/rails
       - ./src/contracts:/contracts
@@ -92,6 +97,8 @@ services:
       SCHEDULER_INTERVAL: "0.25"
       # A consulta roda 4 vezes por segundo: em debug, o SQL encobriria os eventos do scheduler.
       RAILS_LOG_LEVEL: info
+      # Sem recarga automática do código: mudou o código, `docker compose restart scheduler`.
+      RAILS_ENABLE_RELOADING: "0"
       SCHEDULER_BATCH: "100"
     volumes:
       - ./src/platform:/rails
