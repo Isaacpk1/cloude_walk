@@ -69,10 +69,10 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
       expect(data.keys).not_to include("reply", "resolution")
     end
 
-    it "bloco 04: não grava mensagem de saída nem entrega (bloco 05) nem novos itens no outbox" do
+    it "bloco 05: o reply aplicado grava uma saída; os detalhes ficam em apply_delivery_spec.rb" do
       action = agent_action_for(turn)
 
-      expect { apply(action) }.not_to change { [ Message.count, OutboxEvent.count ] }
+      expect { apply(action) }.to change(Message, :count).by(1).and change(Delivery, :count).by(1)
     end
   end
 

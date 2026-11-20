@@ -15,6 +15,8 @@ RSpec.describe "Aplicação da ação do agente com processos concorrentes", :co
       results = run_concurrently(threads: 4) { apply(action) }
 
       expect(results.map(&:status).tally).to eq(applied: 1, duplicate: 3)
+      expect([ Message.where(direction: "outbound").count, Delivery.count,
+               OutboxEvent.where(event_type: "delivery.requested").count ]).to eq([ 1, 1, 1 ])
       expect(AuditEvent.where(event_type: [ "agent_action.applied", "agent_action.rejected" ]).count).to eq(1)
       expect(ProcessedEvent.count).to eq(1)
       expect(turn.reload).to have_attributes(status: "applied", applied_event_id: action["event_id"])
@@ -32,6 +34,9 @@ RSpec.describe "Aplicação da ação do agente com processos concorrentes", :co
       winner = actions[results.index { _1.status == :applied }]
       expect(results.find { _1.status == :rejected }.reason).to eq("turno_nao_elegivel")
       expect(turn.reload).to have_attributes(status: "applied", applied_event_id: winner["event_id"], response: winner)
+      # Bloco 05: uma só saída, com o texto da vencedora.
+      expect(Message.where(direction: "outbound").sole).to have_attributes(body: winner.dig("reply", "text"), seq: 2)
+      expect([ Delivery.count, OutboxEvent.where(event_type: "delivery.requested").count ]).to eq([ 1, 1 ])
     end
   end
 
@@ -52,15 +57,23 @@ RSpec.describe "Aplicação da ação do agente com processos concorrentes", :co
         rejected_audit = AuditEvent.where(ticket_id: ticket.id, event_type: "agent_action.rejected").pick(:id)
         message_audit = AuditEvent.where(ticket_id: ticket.id, event_type: "message.received").maximum(:id)
 
+        seqs = Message.where(ticket_id: ticket.id).order(:seq).pluck(:seq, :direction)
+        expect(seqs.map(&:first)).to eq((1..seqs.size).to_a) # sem seq repetido nem buraco
+
         if turn.reload.status == "applied"
-          # A resposta entrou antes: a mensagem 2 abre um ciclo novo, gravado depois.
+          # A resposta entrou antes: a saída leva o seq 2 e a mensagem do cliente, gravada depois, o 3,
+          # abrindo um ciclo novo.
           expect(applied_audit).to be < message_audit
-          expect(ticket).to have_attributes(latest_customer_seq: 2, first_pending_seq: 2)
+          expect(seqs).to eq([ [ 1, "inbound" ], [ 2, "outbound" ], [ 3, "inbound" ] ])
+          expect(Delivery.find_by!(ticket_id: ticket.id).seq).to eq(2)
+          expect(ticket).to have_attributes(latest_customer_seq: 3, first_pending_seq: 3)
         else
-          # A mensagem entrou antes: o turno 1 foi superado no commit dela e a resposta, rejeitada.
+          # A mensagem entrou antes: o turno 1 foi superado no commit dela e a resposta, rejeitada, sem saída.
           expect(turn.status).to eq("superseded")
           expect(results.first).to have_attributes(status: :rejected, reason: "turno_superado")
           expect(rejected_audit).to be > message_audit
+          expect(seqs).to eq([ [ 1, "inbound" ], [ 2, "inbound" ] ])
+          expect(Delivery.where(ticket_id: ticket.id)).to be_empty
           expect(ticket).to have_attributes(latest_customer_seq: 2, first_pending_seq: 1)
         end
         turn.status
@@ -83,6 +96,28 @@ RSpec.describe "Aplicação da ação do agente com processos concorrentes", :co
       expect(turn.reload).to have_attributes(status: "eligible", response: nil, applied_event_id: nil)
       expect(turn.ticket.reload.attributes).to eq(ticket_before)
       expect(ProcessedEvent.count).to eq(0)
+    end
+
+    it "bloco 05: o insert do outbox da entrega falha → nem mensagem, nem entrega, nem applied" do
+      turn = opened_turn
+      ticket_before = turn.ticket.reload.attributes
+      counts = -> { [ Message.count, Delivery.count, OutboxEvent.count, AuditEvent.count ] }
+      before = counts.call
+      allow(OutboxEvent).to receive(:create!).and_call_original
+      allow(OutboxEvent).to receive(:create!).with(hash_including(event_type: "delivery.requested"))
+                                             .and_raise(ActiveRecord::ConnectionNotEstablished, "banco caiu")
+      action = agent_action_for(turn)
+
+      expect { apply(action) }.to raise_error(ActiveRecord::ConnectionNotEstablished)
+
+      expect(counts.call).to eq(before)
+      expect(turn.reload).to have_attributes(status: "eligible", response: nil, applied_event_id: nil)
+      expect(turn.ticket.reload.attributes).to eq(ticket_before)
+      expect(ProcessedEvent.count).to eq(0)
+
+      allow(OutboxEvent).to receive(:create!).and_call_original
+      expect(apply(action).status).to eq(:applied) # a reentrega grava o conjunto inteiro
+      expect([ Message.where(direction: "outbound").count, Delivery.count ]).to eq([ 1, 1 ])
     end
 
     it "a reentrega depois da falha aplica normalmente (nada ficou marcado como processado)" do
