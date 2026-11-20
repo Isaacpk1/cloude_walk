@@ -12,11 +12,17 @@ class AgentActionEvents
     @ticket = ticket
   end
 
-  # A primeira ação recebida para o turno (ai_turns.response) e o seu desfecho. nil sem resposta.
+  # A ação do turno e o seu desfecho. nil sem resposta. No turno applied é a ação aplicada
+  # (applied_event_id, conteúdo da auditoria agent_action.applied), que pode não ser a primeira recebida:
+  # uma primeira descartada (ex.: contexto_divergente) deixa o turno eligible e fica em ai_turns.response.
+  # As descartadas continuam visíveis, com o motivo, na linha do tempo (#events). Nos demais turnos é a
+  # primeira ação recebida (ai_turns.response).
   def for_turn(turn)
     response = turn.response
     return unless response
-    return AgentActionView.from(response, outcome: :applied) if turn.status == "applied"
+
+    applied = applied_action(turn)
+    return applied if applied
 
     rejected = audits.find { _1.event_type == "agent_action.rejected" && _1.data["event_id"] == response["event_id"] }
     return AgentActionView.from(response, outcome: :received) unless rejected
@@ -27,6 +33,15 @@ class AgentActionEvents
   def events = audits.flat_map { action_events(_1) }
 
   private
+
+  def applied_action(turn)
+    return unless turn.status == "applied"
+
+    audit = audits.find { _1.event_type == "agent_action.applied" && _1.data["event_id"] == turn.applied_event_id }
+    return AgentActionView.from(content_for(audit.data), outcome: :applied) if audit
+
+    AgentActionView.from(turn.response, outcome: :applied) if turn.response["event_id"] == turn.applied_event_id
+  end
 
   # Isolamento por marca (invariante 6): só a auditoria da marca do atendimento.
   def audits
@@ -52,8 +67,10 @@ class AgentActionEvents
                                      finished_at: audit.occurred_at, detail: run_detail(action, data))
   end
 
-  # A auditoria não repete o conteúdo da ação (texto, escalação, encerramento); ele está em
-  # ai_turns.response, que guarda só a primeira ação recebida para o turno.
+  # A auditoria do consumer (AgentActions::Apply) repete o conteúdo de cada ação (reply, escalation,
+  # resolution, RF-54), inclusive de uma segunda ação descartada. Registros sem ele (anteriores a isso)
+  # buscam o conteúdo em ai_turns.response, que só guarda a primeira ação recebida para o turno; o
+  # conteúdo da auditoria, quando existe, prevalece.
   def content_for(data)
     response = responses[data["event_id"]]
     response ? response.slice("reply", "escalation", "resolution").merge(data) : data
