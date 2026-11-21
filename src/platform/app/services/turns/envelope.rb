@@ -4,12 +4,13 @@ module Turns
   class Envelope
     AUTHORS = { "customer" => "customer", "bot" => "bot", "analyst" => "analyst", "system" => "system" }.freeze
 
-    def initialize(ticket:, event_id:, turn:, pending:, history:, deadline_at:)
+    def initialize(ticket:, event_id:, turn:, context:, deadline_at:)
       @ticket = ticket
       @event_id = event_id
       @turn = turn
-      @pending = pending
-      @history = history
+      @pending = context.pending
+      @history = context.history
+      @previous_tickets = context.previous_tickets
       @deadline_at = deadline_at
     end
 
@@ -20,10 +21,7 @@ module Turns
         "occurred_at" => iso(Time.current), "conversation_id" => self.class.conversation_id(@ticket),
         "brand" => @ticket.brand.slug, "locale" => @ticket.brand.locale, "ticket" => ticket_data,
         "customer" => customer_data, "message" => { "id" => "msg_#{latest.id}", "seq" => latest.seq, "text" => latest.body },
-        "context" => {
-          "pending_messages" => @pending.map { { "seq" => _1.seq, "text" => _1.body } },
-          "history" => @history.map { { "seq" => _1.seq, "author" => AUTHORS.fetch(_1.author_type), "text" => _1.body } }
-        },
+        "context" => context_data,
         "turn" => @turn, "context_until_seq" => @ticket.latest_customer_seq,
         "assignment_version" => @ticket.assignment_version, "deadline_at" => iso(@deadline_at)
       }
@@ -32,6 +30,18 @@ module Turns
     def self.conversation_id(ticket) = "tkt_#{ticket.id}"
 
     private
+
+    # RN-49: pendentes, histórico e atendimentos anteriores. `summary` fica ausente até existir resumo
+    # gravado (bloco 10); `previous_tickets` só vai quando há algum.
+    def context_data
+      data = {
+        "pending_messages" => @pending.map { { "seq" => _1.seq, "text" => _1.body } },
+        "history" => @history.map { { "seq" => _1.seq, "author" => AUTHORS.fetch(_1.author_type), "text" => _1.body } }
+      }
+      return data if @previous_tickets.empty?
+
+      data.merge("previous_tickets" => @previous_tickets.map { { "id" => "tkt_#{_1.id}", "summary" => _1.summary } })
+    end
 
     def ticket_data
       { "state" => @ticket.state, "channel" => @ticket.channel, "category" => @ticket.category,
