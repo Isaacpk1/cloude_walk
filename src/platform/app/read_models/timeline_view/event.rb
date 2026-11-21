@@ -8,6 +8,8 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     received: "Recebimento",
     persisted: "Gravação",
     intentional_wait: "Espera intencional (janela de agrupamento)",
+    turn_opened: "Abertura do turno",
+    turn_not_opened: "Turno não aberto",
     published: "Publicação no broker",
     publish_failed: "Falha na publicação",
     publish_discarded: "Publicação cancelada",

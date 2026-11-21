@@ -1,0 +1,11 @@
+<%# Bloco 06, RN-55: fase de agrupamento enquanto o turno da última mensagem não abriu (ConversationView::Grouping). %>
+<section class="card grouping" aria-label="Fase de agrupamento">
+  <h2>Agrupando mensagens</h2>
+  <p>Aguardando: <strong>seq <%= grouping.pending_seqs.join(", ") %></strong></p>
+  <dl class="turn__facts">
+    <dt>janela do canal</dt><dd><%= grouping.no_window? ? "sem janela (#{grouping.channel})" : "#{grouping.window_ms} ms (#{grouping.channel})" %></dd>
+    <dt>turno sai às</dt><dd><time datetime="<%= grouping.dispatch_due_at.iso8601(3) %>"><%= panel_time(grouping.dispatch_due_at, precise: true) %></time></dd>
+    <dt>teto</dt><dd><time datetime="<%= grouping.ceiling_at.iso8601(3) %>"><%= panel_time(grouping.ceiling_at, precise: true) %></time> <span class="muted">(primeira pendente + 4 s)</span></dd>
+  </dl>
+  <p class="muted"><%= grouping.summary %></p>
+</section>
