@@ -120,25 +120,32 @@ module Outbox
       outcome = if item.attempts > MAX_RETRIES then "retentativas_esgotadas"
       elsif turn && retry_at >= turn.deadline_at then "prazo_vencido"
       end
-      # O evento pode ter chegado ao Kafka e o agente, respondido antes de a resposta HTTP se perder (07, seção
-      # 6: o ACK posterior atualiza só a publicação). Um turno que deixou de ser elegível não tem falha definitiva
-      # de publicação a registrar: o item encerra como descarte, como na revalidação antes de publicar.
-      stale = outcome && turn && !turn.reload.eligible? && "turno_#{turn.status}"
-      return discard(stale) if stale
-
       data = { origin:, http_status:, error:, retry: outcome.nil? }
+      return terminal(outcome, data) if outcome
 
-      if outcome
-        finish(completed_at: Time.current, last_error: error) { audit("agent_event.publish_failed", **data, outcome:) }
-      else
-        finish(next_attempt_at: retry_at, last_error: error) do
-          audit("agent_event.publish_failed", **data, next_attempt_at: retry_at.utc.iso8601(3))
-        end
+      finish(next_attempt_at: retry_at, last_error: error) do
+        audit("agent_event.publish_failed", **data, next_attempt_at: retry_at.utc.iso8601(3))
       end
       JsonLog.warn("outbox.publish_failed", trace_id: item.trace_id, event_id: item.id, attempt: item.attempts, origin:,
                                             http_status:, outcome:)
-      status = { nil => :retry_scheduled, "retentativas_esgotadas" => :exhausted, "prazo_vencido" => :expired }.fetch(outcome)
-      Result.new(status:, next_attempt_at: outcome ? nil : retry_at)
+      Result.new(status: :retry_scheduled, next_attempt_at: retry_at)
+    end
+
+    # Sem nova tentativa. O evento pode ter chegado ao Kafka e o agente, respondido antes de a resposta HTTP se
+    # perder (07, seção 6: o ACK posterior atualiza só a publicação). Com a linha do atendimento travada (a mesma
+    # ordem do resto do sistema: atendimento, depois o item), o turno é relido: se deixou de ser elegível, não há
+    # falha definitiva de publicação a registrar e o item encerra como descarte; senão, publish_failed terminal.
+    def terminal(outcome, data)
+      stale = nil
+      finish(lock_ticket: true, completed_at: Time.current, last_error: data[:error]) do
+        stale = turn && !turn.reload.eligible? && "turno_#{turn.status}"
+        stale ? audit("agent_event.discarded", reason: stale) : audit("agent_event.publish_failed", **data, outcome:)
+      end
+      return discarded(stale) if stale
+
+      JsonLog.warn("outbox.publish_failed", trace_id: item.trace_id, event_id: item.id, attempt: item.attempts,
+                                            origin: data[:origin], http_status: data[:http_status], outcome:)
+      Result.new(status: outcome == "retentativas_esgotadas" ? :exhausted : :expired, next_attempt_at: nil)
     end
 
     # 1, 2, 4, 8, 16 s pela tentativa que falhou, mais até 25% de jitter (só para cima).
@@ -158,13 +165,19 @@ module Outbox
 
     def discard(reason)
       finish(completed_at: Time.current) { audit("agent_event.discarded", reason:) }
+      discarded(reason)
+    end
+
+    def discarded(reason)
       JsonLog.info("outbox.discarded", trace_id: item.trace_id, event_id: item.id, reason:)
       Result.new(status: :discarded, next_attempt_at: nil)
     end
 
-    # Grava o desfecho só se o item ainda for desta tentativa (aberto), na mesma transação da auditoria.
-    def finish(**attrs)
+    # Grava o desfecho só se o item ainda for desta tentativa (aberto), na mesma transação da auditoria. Com
+    # `lock_ticket`, trava antes a linha do atendimento (da marca do item), na ordem atendimento → item.
+    def finish(lock_ticket: false, **attrs)
       ActiveRecord::Base.transaction do
+        Ticket.lock.find_by(id: item.ticket_id, brand_id: item.brand_id) if lock_ticket
         updated = OutboxEvent.where(id: item.id, completed_at: nil).update_all(attrs.merge(lease_until: nil))
         yield if updated == 1
       end
