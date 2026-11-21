@@ -84,6 +84,15 @@ RSpec.describe "Simulador: cenários de rajada (RN-55, RN-56)" do
       expect(body).to include("Corrida dos 3 s", "RN-56", "RN-55")
     end
 
+    it "RN-56: a corrida dos 3 s explica os dois desfechos conforme a latência do agente" do
+      get "/"
+
+      body = last_response.body
+      expect(body).to include("AGENT_PROFILE=lento", "AGENT_LATENCY_MS", "2000", "turno_superado",
+                              "o turno 2 sai aos 4 s com as mensagens 1 e 2",
+                              "AGENT_PROFILE=rapido", "a mensagem dos 3 s abre um ciclo novo")
+    end
+
     it "mostra cada passo com horário planejado, real e HTTP, e as mensagens na conversa" do
       late = ->(at) { ChannelsMock::Clock.freeze(at + 0.04) }
       ChannelsMock::Scenarios.reset!(mode: :manual, waiter: late, out: StringIO.new)
