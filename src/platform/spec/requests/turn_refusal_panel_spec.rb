@@ -87,4 +87,19 @@ RSpec.describe "RN-49, RN-46, RN-55, RF-55, RF-56: recusa terminal do turno no p
       expect(timeline).to include("Turno não aberto (prazo_vencido)", "handoff para humano pendente (bloco 10; RN-46)")
     end
   end
+
+  describe "RN-46, invariante 10: evento do turno fora do contrato" do
+    it "a conversa e a linha do tempo mostram contrato com as violações, e o agrupamento some" do
+      allow_any_instance_of(Turns::Envelope).to receive(:to_h).and_wrap_original { |m| m.call.except("turn") }
+      ticket = ingest_at(t0, "meu repasse não caiu").ticket
+      expect(tick_at(t0 + 1.5.seconds).map(&:status)).to eq([ :invalid ])
+
+      body = page(conversation_path(ticket.id), t0 + 2.seconds)
+      expect(body).not_to include("Agrupando mensagens")
+      expect(refusal_section(body)).to include("Turno não aberto: contrato — handoff pendente (bloco 10)",
+                                               "fora do contrato agent_inbound", "/turn")
+      expect(page(timeline_path(ticket.id), t0 + 2.seconds))
+        .to include("Turno não aberto (contrato)", "/turn", "handoff para humano pendente (bloco 10; RN-46)")
+    end
+  end
 end

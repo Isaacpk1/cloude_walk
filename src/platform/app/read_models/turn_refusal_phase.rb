@@ -15,7 +15,7 @@ class TurnRefusalPhase
     data = audit.data
     ConversationView::TurnRefusal.new(
       reason: data["reason"], pending_seqs: data["pending_seqs"] || pending_seqs, pending_chars: data["pending_chars"],
-      limit: data["limit"], deadline_at: data["deadline_at"]&.then { Time.zone.parse(_1) },
+      limit: data["limit"], violations: data["violations"], deadline_at: data["deadline_at"]&.then { Time.zone.parse(_1) },
       occurred_at: audit.occurred_at, trace_id: audit.trace_id
     )
   end

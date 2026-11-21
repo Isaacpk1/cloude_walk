@@ -3,7 +3,7 @@
 # - Abertura do turno: as mensagens pendentes e as do histórico que o turno levou, os tamanhos em
 #   caracteres, o context_version e o digest abreviado. Sem os campos do bloco 06, usa ai_turns.context.
 # - Turno não aberto: só as recusas terminais (Turns::Open::TERMINAL_REASONS): contexto_excede_limite (RN-49),
-#   com o tamanho das pendentes e o limite, e prazo_vencido/sem_prazo (RN-46). O handoff fica pendente (bloco 10).
+#   com o tamanho das pendentes e o limite, e prazo_vencido, sem_prazo e contrato (RN-46). O handoff fica pendente (bloco 10).
 #   Os outros motivos (coberto, janela_aberta, fora_da_ia...) são rotina do scheduler e ficam fora.
 # Isolamento por marca (invariante 6): auditoria e turnos filtrados pelo brand_id do atendimento.
 class TurnContextEvents
@@ -60,6 +60,7 @@ class TurnContextEvents
     case data["reason"]
     when TOO_LARGE then "#{data['pending_chars']} caracteres pendentes, acima do limite de #{data['limit']}"
     when "prazo_vencido" then "teto do ciclo #{data['deadline_at']} vencido antes da abertura"
+    when "contrato" then "evento fora do contrato agent_inbound (#{Array(data['violations']).join(', ')})"
     else "sem teto do ciclo gravado"
     end
   end
