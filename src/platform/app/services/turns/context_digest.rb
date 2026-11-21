@@ -1,21 +1,25 @@
-# Digest do contexto enviado num turno (RN-49, RN-55; 07, seção 3.4, "Contexto completo, de forma
-# verificável"). Prova que o contexto gravado em ai_turns é o que a IA recebeu.
+# Digest verificável do contexto de um turno (07, seção 3.4, "Contexto completo, de forma verificável";
+# RN-49, RF-33).
 #
 #   Turns::ContextDigest.call(context) # => "sha256:<64 hex>"
 #
-# JSON canônico: chaves ordenadas recursivamente, arrays na ordem, sem espaços, UTF-8. O Turns::Open
-# grava o digest; o painel recalcula e compara.
+# JSON canônico: chaves dos objetos ordenadas recursivamente (como texto), arrays na ordem, sem espaços,
+# UTF-8 sem escapes. O mesmo conteúdo dá o mesmo digest em qualquer ordem de chaves, inclusive depois da
+# ida e volta pelo jsonb; qualquer mudança de valor, ordem de array ou chave muda o digest. O turno grava
+# o digest do `context` que vai no evento, e o painel usa esta mesma função para conferir.
 module Turns
   module ContextDigest
+    PREFIX = "sha256:".freeze
+
     module_function
 
-    def call(context) = "sha256:#{Digest::SHA256.hexdigest(canonical_json(context))}"
+    def call(context) = "#{PREFIX}#{Digest::SHA256.hexdigest(canonical_json(context))}"
 
-    def canonical_json(value) = JSON.generate(canonical(value)).encode(Encoding::UTF_8)
+    def canonical_json(value) = JSON.generate(canonical(value))
 
     def canonical(value)
       case value
-      when Hash then value.to_h { |key, item| [ key.to_s, canonical(item) ] }.sort.to_h
+      when Hash then value.to_h { |k, v| [ k.to_s, canonical(v) ] }.sort.to_h
       when Array then value.map { canonical(_1) }
       else value
       end

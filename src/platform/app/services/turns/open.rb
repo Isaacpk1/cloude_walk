@@ -7,8 +7,9 @@
 # de agrupamento vence, o scheduler grava a ação "turn.dispatch" no outbox e o worker chega aqui.
 #
 # Uma transação, com a linha do atendimento travada (antes do item, na mesma ordem da ingestão):
-# revalida a ação e a encerra. Ou descarta com o motivo auditado, ou monta o contexto com todas as
-# mensagens pendentes (RF-33, RN-49), grava o turno `eligible` e o seu evento no outbox (invariante 2)
+# revalida a ação e a encerra. Ou descarta com o motivo auditado, ou monta o contexto pela RN-49
+# (Turns::ContextBuilder; pendentes acima do limite não abrem turno), grava o turno `eligible` com a
+# versão e o digest do contexto (Turns::ContextDigest) e o seu evento no outbox (invariante 2)
 # e zera dispatch_due_at. first_pending_* e ai_deadline_at ficam até a resposta aplicada (bloco 07).
 # O evento fica pronto e imutável: as retentativas reenviam o mesmo conteúdo com o mesmo event_id
 # (invariante 3). A publicação acontece depois, fora da transação.
@@ -21,7 +22,6 @@ module Turns
 
     DISPATCH_TYPE = Deadlines::DispatchDue::EVENT_TYPE
     EVENT_TYPE = "agent.event".freeze
-    HISTORY_LIMIT = 20 # RN-49
 
     def self.call(...) = new(...).call
 
@@ -82,27 +82,49 @@ module Turns
     end
 
     def open_turn
+      context = ContextBuilder.call(ticket:, policy:, now:)
+      # RN-49: pendentes acima do limite não abrem turno. O handoff com o histórico completo entra no bloco 10.
+      if context.pending_chars > policy.pending_chars_limit
+        return not_opened(:context_too_large, reason: "contexto_excede_limite", pending_chars: context.pending_chars,
+                                              limit: policy.pending_chars_limit)
+      end
+
       event_id = SecureRandom.uuid
       number = ticket.ai_turns.maximum(:turn).to_i + 1
-      payload = Envelope.new(ticket:, event_id:, turn: number, pending:, history:, deadline_at:).to_h
+      payload = Envelope.new(ticket:, event_id:, turn: number, context:, deadline_at:).to_h
       # Invariante 10, RN-44: fora do contrato é falha permanente; nada sai e a ação não é repetida.
       violations = HelpdeskContracts.errors(:agent_inbound, payload)
       return not_opened(:invalid, reason: "contrato", violations: violations.map(&:pointer)) if violations.any?
 
-      turn = ticket.ai_turns.create!(
-        brand_id: ticket.brand_id, turn: number, context_until_seq: ticket.latest_customer_seq,
-        assignment_version: ticket.assignment_version, context: payload.fetch("context"), event_id:,
-        status: "eligible", deadline_at:
-      )
-      OutboxEvent.create!(id: event_id, brand_id: ticket.brand_id, ticket:, event_type: EVENT_TYPE, payload:,
-                          trace_id: item.trace_id, next_attempt_at: now)
+      turn = create_turn(number, event_id, payload)
       dispatch_due_at = ticket.dispatch_due_at
       ticket.update_columns(dispatch_due_at: nil)
       complete_item
-      audit("ai_turn.opened", turn: number, event_id:, context_until_seq: turn.context_until_seq,
-                              pending_seqs: pending.map(&:seq), deadline_at: iso(deadline_at),
-                              dispatch_due_at: iso(dispatch_due_at))
+      audit_opened(turn, context, dispatch_due_at)
       Result.new(status: :opened, turn:)
+    end
+
+    # 07, seção 3.4: o turno guarda o mesmo `context` do evento, a versão do contexto do atendimento lida com
+    # a linha travada e o digest canônico, para conferir depois que o enviado é o gravado.
+    def create_turn(number, event_id, payload)
+      context = payload.fetch("context")
+      turn = ticket.ai_turns.create!(
+        brand_id: ticket.brand_id, turn: number, context_until_seq: ticket.latest_customer_seq,
+        assignment_version: ticket.assignment_version, context:, event_id:, status: "eligible", deadline_at:,
+        context_version: ticket.context_version, context_digest: ContextDigest.call(context)
+      )
+      OutboxEvent.create!(id: event_id, brand_id: ticket.brand_id, ticket:, event_type: EVENT_TYPE, payload:,
+                          trace_id: item.trace_id, next_attempt_at: now)
+      turn
+    end
+
+    def audit_opened(turn, context, dispatch_due_at)
+      audit("ai_turn.opened", turn: turn.turn, event_id: turn.event_id, context_until_seq: turn.context_until_seq,
+                              context_version: turn.context_version, context_digest: turn.context_digest,
+                              pending_seqs: context.pending.map(&:seq), history_seqs: context.history.map(&:seq),
+                              channel: ticket.channel, window_ms: policy.window_for(ticket.channel).in_milliseconds.to_i,
+                              pending_chars: context.pending_chars, context_chars: context.chars,
+                              deadline_at: iso(deadline_at), dispatch_due_at: iso(dispatch_due_at))
     end
 
     def not_opened(status, **data)
@@ -113,23 +135,12 @@ module Turns
 
     def complete_item = item.update!(completed_at: now, lease_until: nil)
 
-    # "Sem resposta": mensagens do cliente depois da última saída visível ao cliente.
-    def pending
-      @pending ||= begin
-        answered_until = ticket.messages.where(direction: "outbound", internal: false).maximum(:seq).to_i
-        ticket.messages.where(direction: "inbound", author_type: "customer").where(seq: (answered_until + 1)..).to_a
-      end
-    end
-
-    def history
-      first_pending = pending.first&.seq || (ticket.latest_customer_seq + 1)
-      ticket.messages.where(internal: false).where(seq: ...first_pending).reorder(seq: :desc).limit(HISTORY_LIMIT).to_a.reverse
-    end
-
     # ADR-020: o turno tem 20 s desde a abertura, sem passar do teto do ciclo.
     def deadline_at
-      @deadline_at ||= Turns::Policy.for(ticket.brand).turn_deadline_at(opened_at: now, cycle_deadline_at: ticket.ai_deadline_at)
+      @deadline_at ||= policy.turn_deadline_at(opened_at: now, cycle_deadline_at: ticket.ai_deadline_at)
     end
+
+    def policy = @policy ||= Turns::Policy.for(ticket.brand)
     def iso(time) = time&.utc&.iso8601(3)
 
     def audit(event_type, **data)
