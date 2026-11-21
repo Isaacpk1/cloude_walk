@@ -167,7 +167,37 @@ RSpec.describe Turns::Open, "RN-49, RF-33, RF-53: contexto do turno completo e v
       expect(item.reload.completed_at).to eq(Time.current)
       expect(last_audit(received.ticket)).to have_attributes(event_type: "ai_turn.not_opened", trace_id: item.trace_id)
       expect(last_audit(received.ticket).data).to include("reason" => "contexto_excede_limite", "pending_chars" => 16_001,
-                                                          "limit" => 16_000)
+                                                          "limit" => 16_000, "pending_seqs" => [ 1, 2 ])
+    end
+
+    it "recusa terminal: zera dispatch_due_at na mesma transação e mantém o ciclo (handoff e timeout nos blocos 08/10)" do
+      ingest("a" * 8_000)
+      received = ingest("b" * 8_001)
+      ticket = received.ticket.reload
+      cycle = ticket.slice(:first_pending_seq, :first_pending_at, :ai_deadline_at)
+
+      expect(described_class.call(due_dispatch(received).id).status).to eq(:context_too_large)
+
+      expect(ticket.reload.dispatch_due_at).to be_nil
+      expect(ticket.slice(*cycle.keys)).to eq(cycle)
+      expect(Deadlines::DispatchDue.call(now: Time.current + 30.seconds, limit: 10)).to be_empty
+    end
+
+    it "mensagem nova do cliente volta a gravar dispatch_due_at e um turno novo é tentado (ainda acima: recusa de novo)" do
+      ingest("a" * 8_000)
+      first_refusal = described_class.call(due_dispatch(ingest("b" * 8_001)).id)
+      expect(first_refusal.status).to eq(:context_too_large)
+
+      travel 10.seconds
+      received = ingest("alguém?")
+      expect(received.ticket.reload.dispatch_due_at).to be_present
+
+      ids = Deadlines::DispatchDue.call(now: Time.current, limit: 10)
+      expect(ids.size).to eq(1)
+      expect(described_class.call(ids.sole).status).to eq(:context_too_large)
+      expect(received.ticket.reload.dispatch_due_at).to be_nil
+      expect(received.ticket.audit_events.where(event_type: "ai_turn.not_opened").pluck(Arel.sql("data->>'cover_until_seq'")))
+        .to eq(%w[2 3])
     end
   end
 

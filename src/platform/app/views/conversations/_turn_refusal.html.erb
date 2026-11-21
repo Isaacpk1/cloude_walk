@@ -1,0 +1,7 @@
+<%# Bloco 06, RN-49 e RN-46: recusa terminal do turno da última mensagem (ConversationView::TurnRefusal), no lugar do agrupamento. %>
+<section class="card turn-refusal" aria-label="Turno não aberto">
+  <h2><%= refusal.headline %></h2>
+  <p>Sem turno: <strong>seq <%= refusal.pending_seqs.join(", ") %></strong></p>
+  <p class="muted"><%= refusal.detail %></p>
+  <p class="muted">Recusado às <time datetime="<%= refusal.occurred_at.iso8601(3) %>"><%= panel_time(refusal.occurred_at, precise: true) %></time> · trace <%= refusal.trace_id %></p>
+</section>

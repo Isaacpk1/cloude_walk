@@ -153,6 +153,17 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
       expect(duplicate.reload.completed_at).to be_present
       expect(last_audit(received.ticket).data).to include("reason" => "coberto", "covered_by_turn" => turn.turn)
     end
+
+    it "RN-55: coberto zera um dispatch_due_at que tenha ficado; só uma mensagem nova pede outro turno" do
+      received = ingest
+      open_for(received)
+      received.ticket.update_columns(dispatch_due_at: start)
+      duplicate = create(:turn_dispatch, for_ticket: received.ticket.reload, dedup_key: "outra-chave")
+
+      expect(described_class.call(duplicate.id).status).to eq(:covered)
+      expect(received.ticket.reload.dispatch_due_at).to be_nil
+      expect(Deadlines::DispatchDue.call(now: start + 30.seconds, limit: 10)).to be_empty
+    end
   end
 
   describe "atribuição" do
@@ -170,6 +181,20 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
                                                           "current_version" => 1)
     end
 
+    it "invariante 4: atribuicao_mudou com o caso ainda na IA mantém dispatch_due_at; a volta seguinte abre na versão nova" do
+      received = ingest
+      item = due_dispatch(received)
+      received.ticket.update_columns(assignment_version: 1)
+
+      expect(described_class.call(item.id).status).to eq(:stale_assignment)
+      expect(received.ticket.reload.dispatch_due_at).to be_present
+
+      ids = Deadlines::DispatchDue.call(now: Time.current, limit: 10)
+      result = described_class.call(ids.sole)
+      expect(result.status).to eq(:opened)
+      expect(result.turn).to have_attributes(assignment_version: 1, context_until_seq: 1)
+    end
+
     it "07, seção 3.3: caso com analista não abre turno; a ação é encerrada com auditoria" do
       received = ingest
       item = due_dispatch(received)
@@ -181,6 +206,16 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
       expect(AiTurn.count).to eq(0)
       expect(item.reload.completed_at).to be_present
       expect(last_audit(received.ticket).data).to include("reason" => "fora_da_ia", "state" => "com_analista")
+    end
+
+    it "07, seção 3.3: fora_da_ia zera dispatch_due_at; o scheduler não volta a esse atendimento" do
+      received = ingest
+      item = due_dispatch(received)
+      received.ticket.update!(state: "com_analista", assignee: create(:user))
+
+      expect(described_class.call(item.id).status).to eq(:skipped)
+      expect(received.ticket.reload.dispatch_due_at).to be_nil
+      expect(Deadlines::DispatchDue.call(now: Time.current + 30.seconds, limit: 10)).to be_empty
     end
   end
 
@@ -212,6 +247,16 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
       expect(item.reload.completed_at).to be_present
       expect(last_audit(received.ticket).data).to include("reason" => "contrato", "violations" => [ "/turn" ])
     end
+
+    it "RN-46: contrato inválido é recusa terminal: zera dispatch_due_at e o scheduler não repete" do
+      item = due_dispatch(received = ingest)
+      allow_any_instance_of(Turns::Envelope).to receive(:to_h).and_wrap_original { |m| m.call.except("turn") }
+
+      expect(described_class.call(item.id).status).to eq(:invalid)
+      expect(received.ticket.reload).to have_attributes(dispatch_due_at: nil, first_pending_seq: 1)
+      expect(Deadlines::DispatchDue.call(now: Time.current + 30.seconds, limit: 10)).to be_empty
+      expect(described_class::TERMINAL_REASONS).to include("contrato")
+    end
   end
 
   describe "tempo no limite (RN-46, RN-55)" do
@@ -231,9 +276,21 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
 
       expect(result.status).to eq(:expired)
       expect(AiTurn.count).to eq(0)
-      expect(received.ticket.reload.dispatch_due_at).to eq(start)
+      # Recusa terminal do ciclo: dispatch_due_at zera (o scheduler não tem o que reemitir); o ciclo fica para o timeout.
+      expect(received.ticket.reload).to have_attributes(dispatch_due_at: nil, first_pending_seq: 1,
+                                                        ai_deadline_at: start + 60.seconds)
       expect(last_audit(received.ticket).data).to include("reason" => "prazo_vencido",
                                                           "deadline_at" => (start + 60.seconds).utc.iso8601(3))
+    end
+
+    it "sem prazo do ciclo (ai_deadline_at nulo) também é terminal: zera dispatch_due_at" do
+      received = ingest
+      item = due_dispatch(received)
+      received.ticket.update_columns(ai_deadline_at: nil)
+
+      expect(described_class.call(item.id).status).to eq(:expired)
+      expect(received.ticket.reload.dispatch_due_at).to be_nil
+      expect(last_audit(received.ticket).data).to include("reason" => "sem_prazo")
     end
 
     it "abre exatamente no fim da janela (dispatch_due_at == agora)" do

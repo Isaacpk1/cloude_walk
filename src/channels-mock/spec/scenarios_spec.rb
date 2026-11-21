@@ -119,13 +119,22 @@ RSpec.describe ChannelsMock::Scenarios do
   end
 
   describe "RN-55: rajada longa (teto de 4 s)" do
-    it "envia uma mensagem por segundo de t=0 a t=5 s" do
+    it "envia seis mensagens a cada 0,9 s, sem empate com o teto de 4 s: a última, aos 4,5 s, cai depois dele" do
       accept_all
       run_scenario("rajada-longa")
 
       described_class.drain!
 
-      expect(webhooks.map { Time.iso8601(_1["sent_at"]) - start }).to eq([ 0.0, 1.0, 2.0, 3.0, 4.0, 5.0 ])
+      offsets = webhooks.map { (Time.iso8601(_1["sent_at"]) - start).round(3) }
+      expect(offsets).to eq([ 0.0, 0.9, 1.8, 2.7, 3.6, 4.5 ])
+      expect(offsets).not_to include(4.0)
+    end
+
+    it "descreve o turno 1 no teto com as mensagens até 3,6 s e o turno 2 com todas as pendentes depois da de 4,5 s" do
+      text = described_class::CATALOG.fetch("rajada-longa").demonstrates
+
+      expect(text).to include("teto de 4 s", "até 3,6 s", "4,5 s", "RN-56", "volta seguinte do scheduler",
+                              "todas as pendentes")
     end
   end
 

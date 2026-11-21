@@ -1,6 +1,6 @@
 # Apresentação do painel: selos, rótulos e formatação de tempo. Sem regra de negócio.
 module PanelHelper
-  DISPLAY_TIME_ZONE = "America/Sao_Paulo".freeze
+  DISPLAY_TIME_ZONE = PanelClock::TIME_ZONE
   RESERVED_SECTIONS = %w[Filas Evals Configuração].freeze
 
   def nav_link(label, path, active:)
@@ -37,9 +37,7 @@ module PanelHelper
     "cobre seq #{turn.covered_seqs.to_sentence(words_connector: ', ', two_words_connector: ' e ', last_word_connector: ' e ')}"
   end
 
-  def panel_time(time, precise: false)
-    time.in_time_zone(DISPLAY_TIME_ZONE).strftime(precise ? "%d/%m/%Y %H:%M:%S.%L" : "%d/%m/%Y %H:%M:%S")
-  end
+  def panel_time(time, precise: false) = PanelClock.format(time, precise:)
 
   def duration_text(ms)
     ms.nil? ? "sem fim registrado" : "#{ms} ms"

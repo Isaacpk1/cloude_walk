@@ -2,7 +2,8 @@
 # ai_turn.opened e ai_turn.not_opened (formato do bloco 06).
 # - Abertura do turno: as mensagens pendentes e as do histórico que o turno levou, os tamanhos em
 #   caracteres, o context_version e o digest abreviado. Sem os campos do bloco 06, usa ai_turns.context.
-# - Turno não aberto: só o motivo contexto_excede_limite (RN-49), com o tamanho das pendentes e o limite.
+# - Turno não aberto: só as recusas terminais (Turns::Open::TERMINAL_REASONS): contexto_excede_limite (RN-49),
+#   com o tamanho das pendentes e o limite, e prazo_vencido, sem_prazo e contrato (RN-46). O handoff fica pendente (bloco 10).
 #   Os outros motivos (coberto, janela_aberta, fora_da_ia...) são rotina do scheduler e ficam fora.
 # Isolamento por marca (invariante 6): auditoria e turnos filtrados pelo brand_id do atendimento.
 class TurnContextEvents
@@ -40,8 +41,9 @@ class TurnContextEvents
     )
   end
 
+  # Só as recusas terminais do ciclo (Turns::Open::TERMINAL_REASONS); o handoff com o histórico é do bloco 10.
   def not_opened_event(audit)
-    return unless audit.event_type == "ai_turn.not_opened" && audit.data["reason"] == TOO_LARGE
+    return unless audit.event_type == "ai_turn.not_opened" && Turns::Open::TERMINAL_REASONS.include?(audit.data["reason"])
 
     data = audit.data
     seqs = Array(data["pending_seqs"])
@@ -49,11 +51,23 @@ class TurnContextEvents
     TimelineView::Event.new(
       kind: :turn_not_opened, started_at: audit.occurred_at, finished_at: audit.occurred_at, ticket_id: @ticket.id.to_s,
       seq:, turn: nil, trace_id: audit.trace_id, source: DataSource::SYSTEM,
-      detail: "Turno não aberto (#{TOO_LARGE}): #{data['pending_chars']} caracteres pendentes, acima do limite de " \
-              "#{data['limit']}#{seqs.any? ? " nas mensagens seq #{list(seqs)}" : " até a seq #{seq}"}; o caso vai para humano (RN-49)"
+      detail: "Turno não aberto (#{data['reason']}): #{refusal_numbers(data)}" \
+              "#{seqs.any? ? " nas mensagens seq #{list(seqs)}" : " até a seq #{seq}"}; #{pending_handoff(data['reason'])}"
     )
   end
 
+  def refusal_numbers(data)
+    case data["reason"]
+    when TOO_LARGE then "#{data['pending_chars']} caracteres pendentes, acima do limite de #{data['limit']}"
+    when "prazo_vencido" then "teto do ciclo #{panel_time(data['deadline_at'])} vencido antes da abertura"
+    when "contrato" then "evento fora do contrato agent_inbound (#{Array(data['violations']).join(', ')})"
+    else "sem teto do ciclo gravado"
+    end
+  end
+
+  def pending_handoff(reason) = "handoff para humano pendente (bloco 10; #{reason == TOO_LARGE ? 'RN-49' : 'RN-46'})"
+
+  def panel_time(iso) = iso && PanelClock.format(Time.zone.parse(iso), precise: true)
   def chars(items) = Array(items).sum { _1["text"].to_s.length }
   def list(seqs) = seqs.empty? ? "nenhuma" : seqs.join(", ")
 

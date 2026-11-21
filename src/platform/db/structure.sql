@@ -64,6 +64,8 @@ CREATE TABLE public.ai_turns (
     CONSTRAINT ai_turns_applied_event_check CHECK ((((status)::text = 'applied'::text) = (applied_event_id IS NOT NULL))),
     CONSTRAINT ai_turns_context_digest_check CHECK (((context_digest IS NULL) OR ((context_digest)::text ~ '^sha256:[0-9a-f]{64}$'::text))),
     CONSTRAINT ai_turns_context_until_seq_check CHECK ((context_until_seq >= 1)),
+    CONSTRAINT ai_turns_context_version_check CHECK (((context_version IS NULL) OR (context_version >= 0))),
+    CONSTRAINT ai_turns_context_version_digest_check CHECK (((context_version IS NULL) = (context_digest IS NULL))),
     CONSTRAINT ai_turns_status_check CHECK (((status)::text = ANY (ARRAY[('eligible'::character varying)::text, ('applied'::character varying)::text, ('superseded'::character varying)::text, ('expired'::character varying)::text]))),
     CONSTRAINT ai_turns_turn_check CHECK ((turn >= 1))
 );

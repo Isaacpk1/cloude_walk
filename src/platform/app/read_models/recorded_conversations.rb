@@ -48,8 +48,14 @@ class RecordedConversations
       title: ticket.messages.first&.body.to_s.truncate(60), assignee: WAITING,
       assignment_version: ticket.assignment_version, latest_customer_seq: ticket.latest_customer_seq,
       messages: ticket.messages.map { message(ticket, _1, deliveries) }, turns: turns(ticket, deliveries),
-      escalations: [], source: DataSource::SYSTEM, grouping: GroupingPhase.new(ticket).view
+      escalations: [], source: DataSource::SYSTEM, **phase(ticket)
     )
+  end
+
+  # A recusa terminal do turno da última mensagem substitui a fase de agrupamento (RN-49, RN-46).
+  def phase(ticket)
+    refusal = TurnRefusalPhase.new(ticket).view
+    { turn_refusal: refusal, grouping: refusal ? nil : GroupingPhase.new(ticket).view }
   end
 
   def message(ticket, record, deliveries)

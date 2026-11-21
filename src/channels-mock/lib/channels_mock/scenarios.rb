@@ -25,8 +25,12 @@ module ChannelsMock
     CATALOG = [
       Scenario.new(
         name: "corrida-3s", title: "Corrida dos 3 s", rule: "RN-56",
-        demonstrates: "A mensagem 2 chega aos 3 s, depois de o turno 1 sair (janela de 1,5 s). A resposta do turno 1 " \
-                      "é rejeitada por não cobrir a mensagem 2, e o turno 2 sai no teto de 4 s com as duas mensagens.",
+        demonstrates: "O turno 1 sai aos 1,5 s (janela do chat) com a mensagem 1, e a mensagem 2 chega aos 3 s. " \
+                      "O desfecho depende da latência do agente. Com o agente lento (AGENT_PROFILE=lento ou " \
+                      "AGENT_LATENCY_MS de 2000 ou mais), a resposta do turno 1 chega depois dos 3 s e é rejeitada " \
+                      "com turno_superado; o turno 2 sai aos 4 s com as mensagens 1 e 2 (teto desde a primeira " \
+                      "pendente). Com o agente rápido (AGENT_PROFILE=rapido, padrão do Compose), o turno 1 é " \
+                      "respondido e entregue antes dos 3 s, e a mensagem dos 3 s abre um ciclo novo.",
         steps: [ Step.new(at: 0.0, text: "meu repasse não caiu"), Step.new(at: 3.0, text: "é o de ontem, R$ 1.200") ]
       ),
       Scenario.new(
@@ -38,10 +42,14 @@ module ChannelsMock
       ),
       Scenario.new(
         name: "rajada-longa", title: "Rajada longa (teto de 4 s)", rule: "RN-55",
-        demonstrates: "Uma mensagem por segundo de 0 a 5 s: a janela nunca fecha, então o turno sai no teto de 4 s " \
-                      "desde a primeira, antes do fim da rajada. A mensagem dos 5 s fica para o turno seguinte.",
+        demonstrates: "Seis mensagens a cada 0,9 s (0; 0,9; 1,8; 2,7; 3,6 e 4,5 s), com pausas menores que a " \
+                      "janela de 1,5 s: a janela nunca fecha e o turno 1 sai no teto de 4 s desde a primeira, com " \
+                      "as mensagens até 3,6 s. A de 4,5 s é gravada depois do teto e supera o turno 1 (RN-56); o " \
+                      "turno 2 sai na volta seguinte do scheduler com todas as pendentes. Isso vale com o agente " \
+                      "lento; com o rápido, a resposta do turno 1 pode ser aplicada antes dos 4,5 s, e a última " \
+                      "mensagem abre um ciclo novo, como na corrida dos 3 s.",
         steps: [ "oi", "meu repasse não caiu", "era para ontem", "no valor de R$ 1.200", "na conta de sempre",
-                 "alguém pode ver?" ].each_with_index.map { |text, i| Step.new(at: i.to_f, text:) }
+                 "alguém pode ver?" ].each_with_index.map { |text, i| Step.new(at: (i * 0.9).round(1), text:) }
       )
     ].to_h { [ _1.name, _1 ] }.freeze
 
