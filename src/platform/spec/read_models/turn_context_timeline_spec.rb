@@ -63,7 +63,8 @@ RSpec.describe RecordedConversations, "RN-55, RN-49, RF-56: a linha do tempo mos
 
     expect(event).to have_attributes(started_at: audit.occurred_at, trace_id: audit.trace_id, seq: 1, turn: nil)
     expect(event.detail).to include("contexto_excede_limite", "16800 caracteres pendentes", "limite de 16000",
-                                    "seq 1", "vai para humano (RN-49)")
+                                    "seq 1", "handoff para humano pendente (bloco 10; RN-49)")
+    expect(event.detail).not_to include("o caso vai para humano")
     expect(event.error).to be_nil
   end
 

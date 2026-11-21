@@ -42,6 +42,7 @@
 
   <aside class="conversation__side">
     <% if c.grouping %><%= render "conversations/grouping", grouping: c.grouping %><% end %>
+    <% if c.turn_refusal %><%= render "conversations/turn_refusal", refusal: c.turn_refusal %><% end %>
 
     <section class="card">
       <h2>Responsável atual</h2>

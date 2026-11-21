@@ -3,7 +3,9 @@
 # context_digest, e a auditoria ai_turn.opened com pending_seqs, history_seqs, window_ms, channel,
 # pending_chars, context_chars, context_version e context_digest. O contexto é montado como o do
 # Turns::Open: pendentes = mensagens do cliente depois da última saída visível; histórico = o que veio antes.
-# `ai_turn.not_opened` com motivo contexto_excede_limite traz pending_chars e limit.
+# `ai_turn.not_opened` com motivo contexto_excede_limite grava o mesmo que o Turns::Open real (recusa terminal):
+# zera dispatch_due_at, mantém o ciclo (first_pending_*, ai_deadline_at) e audita dispatch_id, cover_until_seq,
+# pending_seqs, pending_chars e limit. O caminho real está em spec/requests/turn_refusal_panel_spec.rb.
 module TurnContextRecordHelpers
   def ingest_on(channel, text = "meu repasse não caiu", brand: "infinitepay", identity: "cliente@example.test", **)
     message = normalized_message(text:, brand:, identity:, **)
@@ -46,7 +48,7 @@ module TurnContextRecordHelpers
     pending, = pending_and_history(ticket)
     ticket.update_columns(dispatch_due_at: nil)
     AuditEvent.create!(brand_id: ticket.brand_id, ticket:, actor_type: "system", event_type: "ai_turn.not_opened",
-                       trace_id:, data: { reason: "contexto_excede_limite", pending_chars:, limit:,
+                       trace_id:, data: { dispatch_id: SecureRandom.uuid, reason: "contexto_excede_limite", pending_chars:, limit:,
                                           pending_seqs: pending.map(&:seq), cover_until_seq: ticket.latest_customer_seq })
   end
 

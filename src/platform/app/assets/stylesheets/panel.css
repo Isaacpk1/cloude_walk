@@ -135,6 +135,7 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .turn__messages { margin: .4rem 0; padding-left: 1.1rem; font-size: .9rem; }
 .turn-context h4 { margin: .5rem 0 .2rem; font-size: .85rem; }
 .grouping { border-left: 4px solid #c99a1e; }
+.turn-refusal { border-left: 4px solid #b3261e; }
 .turn__facts { display: grid; grid-template-columns: max-content 1fr; gap: .1rem .75rem; margin: 0; font-size: .85rem; }
 .turn__facts dt { color: var(--muted); }
 .turn__facts dd { margin: 0; }
