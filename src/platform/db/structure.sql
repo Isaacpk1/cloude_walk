@@ -47,6 +47,19 @@ END;
 $$;
 
 
+--
+-- Name: tickets_evaluation_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.tickets_evaluation_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'tickets.evaluation não muda depois da criação';
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -430,6 +443,7 @@ CREATE TABLE public.provider_accounts (
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    evaluation boolean DEFAULT false NOT NULL,
     CONSTRAINT provider_accounts_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT provider_accounts_whatsapp_phone_check CHECK ((((channel)::text <> 'whatsapp'::text) OR (phone_number_id IS NOT NULL)))
 );
@@ -626,6 +640,7 @@ CREATE TABLE public.tickets (
     dispatch_due_at timestamp(6) without time zone,
     ai_deadline_at timestamp(6) without time zone,
     context_version integer DEFAULT 0 NOT NULL,
+    evaluation boolean DEFAULT false NOT NULL,
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
     CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
@@ -1359,6 +1374,13 @@ CREATE TRIGGER queue_versions_immutable BEFORE DELETE OR UPDATE ON public.queue_
 
 
 --
+-- Name: tickets tickets_evaluation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER tickets_evaluation_immutable BEFORE UPDATE OF evaluation ON public.tickets FOR EACH ROW WHEN ((new.evaluation IS DISTINCT FROM old.evaluation)) EXECUTE FUNCTION public.tickets_evaluation_immutable();
+
+
+--
 -- Name: ai_turns fk_ai_turns_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1677,6 +1699,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261121040000'),
 ('20261121030000'),
 ('20261121020000'),
 ('20261121010000'),

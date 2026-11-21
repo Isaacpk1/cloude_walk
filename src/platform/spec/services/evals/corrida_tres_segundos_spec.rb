@@ -220,6 +220,17 @@ RSpec.describe "RN-56, ADR-023: eval corrida-3s" do
   end
 
   describe "marca" do
+    it "o eval da JIM não registra nada para um atendimento vencido da InfinitePay (nem de outro atendimento)" do
+      other = ingest("mensagem da infinitepay").ticket
+      before = [ OutboxEvent.where(brand_id: infinitepay.id).count, AuditEvent.where(brand_id: infinitepay.id).count ]
+
+      run = run_eval(brand: jim)
+
+      expect(run.status).to eq("passed")
+      expect([ OutboxEvent.where(brand_id: infinitepay.id).count, AuditEvent.where(brand_id: infinitepay.id).count ]).to eq(before)
+      expect(OutboxEvent.where(ticket_id: other.id, event_type: "turn.dispatch")).to be_empty
+    end
+
     it "JIM funciona igual e não toca dados da InfinitePay" do
       run = run_eval(brand: jim)
 
@@ -260,6 +271,33 @@ RSpec.describe "RN-56, ADR-023: eval corrida-3s" do
       expect(output).to include("status" => "passed", "scenario" => "corrida-3s", "brand" => "infinitepay",
                                 "eval_url" => "/evals/#{run.id}", "turn_url" => "/conversas/#{run.ticket_id}#turn-1")
       expect(output["checks"].map { _1["name"] }).to eq(check_names)
+    end
+
+    it "com RAILS_LOG_TO_STDOUT (logger no stdout, debug), a saída padrão é só o JSON, sem SQL nem texto de mensagem" do
+      loggers = [ Rails.logger, ActiveRecord::Base.logger, ActiveJob::Base.logger ]
+      previous = [ $stdout, $stderr ]
+      $stdout = StringIO.new
+      $stderr = StringIO.new
+      stdout_logger = ActiveSupport::TaggedLogging.logger($stdout).tap { _1.level = :debug }
+      Rails.logger = ActiveRecord::Base.logger = ActiveJob::Base.logger = stdout_logger
+      ENV["RAILS_LOG_TO_STDOUT"] = "1"
+      begin
+        Rake::Task["evals:run"].invoke("corrida-3s")
+        out = $stdout.string
+        err = $stderr.string
+        after = [ Rails.logger, ActiveRecord::Base.logger, ActiveJob::Base.logger ]
+      ensure
+        $stdout, $stderr = previous
+        ENV.delete("RAILS_LOG_TO_STDOUT")
+        Rails.logger, ActiveRecord::Base.logger, ActiveJob::Base.logger = loggers
+      end
+
+      expect { JSON.parse(out) }.not_to raise_error, out.lines.first(5).join
+      expect(JSON.parse(out)).to include("status" => "passed")
+      texts = Evals::Scenarios::CorridaTresSegundos::FIXTURE.values_at("messages", "actions").flatten.map { _1["text"] }
+      expect(out).not_to include(*texts)
+      expect(err).to include("INSERT INTO \"eval_runs\"", "eval.finished") # o log foi para o stderr, não sumiu
+      expect(after).to all(be(stdout_logger)) # o task devolve os loggers no fim
     end
 
     it "BRAND=jim roda na JIM" do

@@ -5,8 +5,9 @@
 # Chamado pelo OutboxJob para o item "delivery.requested". Duas transações curtas, com a chamada HTTP
 # entre elas e fora de qualquer transação (invariante 2):
 #
-# 1. Autoriza (trava o atendimento e depois o item, a mesma ordem do resto do sistema). Só a primeira
-#    saída aberta do atendimento, por seq, sai (07, seção 3.2). Uma tentativa com reserva vigente não é
+# 1. Autoriza (trava o atendimento e depois o item, a mesma ordem do resto do sistema). A saída de um
+#    atendimento de eval (ADR-023, item 5) não sai: encerra como `cancelled` (delivery.cancelled, motivo
+#    eval). Só a primeira saída aberta do atendimento, por seq, sai (07, seção 3.2). Uma tentativa com reserva vigente não é
 #    repetida. Autorizada, a entrega vai a `sending`, com `attempts + 1` e `lease_until`; o despertador
 #    do item fica no fim da reserva, para a recuperação retomar uma tentativa abandonada.
 # 2. Chama o provedor com o mesmo corpo e o mesmo delivery_id (Idempotency-Key) em toda tentativa.
@@ -27,6 +28,7 @@
 module Deliveries
   class Send
     EVENT_TYPE = "delivery.requested".freeze
+    EVAL_REASON = "eval".freeze
     Result = Data.define(:status, :next_attempt_at)
     Attempt = Data.define(:delivery, :item, :number, :body, :secret, :headers)
 
@@ -73,12 +75,13 @@ module Deliveries
         delivery = ticket&.deliveries&.find_by(brand_id: item.brand_id, delivery_id: item.payload["delivery_id"])
         next discard(item, ticket) unless delivery
 
-        decide(item, delivery, now)
+        decide(item, ticket, delivery, now)
       end
     end
 
-    def decide(item, delivery, now)
+    def decide(item, ticket, delivery, now)
       return already_closed(item, delivery) unless Delivery::OPEN.include?(delivery.status)
+      return cancel(item, delivery, reason: EVAL_REASON) if ticket.evaluation
       return wait_previous(item, delivery, now) if previous_open?(delivery)
       return in_flight(item, delivery) if delivery.status == "sending" && delivery.lease_until && delivery.lease_until >= now
       return reconcile(item, delivery, error: delivery.last_error) if delivery.attempts >= Policy::MAX_ATTEMPTS
@@ -224,6 +227,17 @@ module Deliveries
       log(:warn, "delivery.failed", delivery, attempt:, reason:, http_status:)
       wake_next(delivery)
       result(:failed)
+    end
+
+    # Saída de um atendimento de eval (ADR-023, item 5): nada vai ao canal. A entrega encerra como `cancelled`,
+    # com a auditoria delivery.cancelled, e a ordem do atendimento avança.
+    def cancel(item, delivery, reason:)
+      delivery.update!(status: "cancelled", lease_until: nil, last_error: reason)
+      complete(item, last_error: reason)
+      audit(delivery, "delivery.cancelled", seq: delivery.seq, reason:)
+      log(:info, "delivery.cancelled", delivery, reason:)
+      wake_next(delivery)
+      result(:cancelled)
     end
 
     def superseded(delivery, attempt)

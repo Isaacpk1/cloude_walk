@@ -24,6 +24,7 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     delivery_retry_scheduled: "Retentativa da entrega agendada",
     delivered: "Entrega ao canal",
     delivery_failed: "Falha na entrega",
+    delivery_cancelled: "Entrega cancelada",
     delivery_reconciliation: "Entrega em conciliação",
     delivery_status: "Status do provedor"
   }.freeze
