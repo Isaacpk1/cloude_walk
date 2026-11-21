@@ -220,6 +220,17 @@ RSpec.describe "RN-56, ADR-023: eval corrida-3s" do
   end
 
   describe "marca" do
+    it "o eval da JIM não registra nada para um atendimento vencido da InfinitePay (nem de outro atendimento)" do
+      other = ingest("mensagem da infinitepay").ticket
+      before = [ OutboxEvent.where(brand_id: infinitepay.id).count, AuditEvent.where(brand_id: infinitepay.id).count ]
+
+      run = run_eval(brand: jim)
+
+      expect(run.status).to eq("passed")
+      expect([ OutboxEvent.where(brand_id: infinitepay.id).count, AuditEvent.where(brand_id: infinitepay.id).count ]).to eq(before)
+      expect(OutboxEvent.where(ticket_id: other.id, event_type: "turn.dispatch")).to be_empty
+    end
+
     it "JIM funciona igual e não toca dados da InfinitePay" do
       run = run_eval(brand: jim)
 

@@ -181,7 +181,8 @@ module Evals
         at_ms = t_ms
         opened_at = @clock.call
         current = Ticket.find_by!(id: ticket.id, brand_id: @brand.id)
-        Deadlines::DispatchDue.call(now: @clock.call, limit: 100)
+        # Só o atendimento do eval, na marca do eval: o eval não registra prazos de outros atendimentos.
+        Deadlines::DispatchDue.call(now: @clock.call, limit: 1, brand_id: @brand.id, ticket_ids: [ ticket.id ])
         item = OutboxEvent.find_by(brand_id: @brand.id, dedup_key: Deadlines::DispatchDue.dedup_key(current))
         Turns::Open.call(item.id) if item
 

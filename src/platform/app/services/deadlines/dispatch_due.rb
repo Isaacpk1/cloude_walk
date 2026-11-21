@@ -1,6 +1,7 @@
 # Abertura de turno vencida (07, seção 3.4, "Registro dos prazos"; ADR-016). Uma volta do scheduler:
 #
 #   Deadlines::DispatchDue.call(now: Time.current, limit: 100) # => ids dos itens criados
+#   Deadlines::DispatchDue.call(now:, limit: 1, brand_id:, ticket_ids: [id]) # só esse atendimento (eval)
 #
 # Numa transação, trava com FOR UPDATE SKIP LOCKED os atendimentos com dispatch_due_at <= now cuja chave
 # de abertura ainda não está no outbox, e grava um `turn.dispatch` por atendimento. O próprio item é o
@@ -22,9 +23,13 @@ module Deadlines
 
     def self.dedup_key(ticket) = "#{EVENT_TYPE}:#{ticket.id}:#{ticket.assignment_version}:#{ticket.latest_customer_seq}"
 
-    def initialize(now:, limit:)
+    # brand_id e ticket_ids restringem a volta (o eval só toca o próprio atendimento, ADR-023). O scheduler
+    # chama sem escopo: todas as marcas.
+    def initialize(now:, limit:, brand_id: nil, ticket_ids: nil)
       @now = now
       @limit = limit
+      @brand_id = brand_id
+      @ticket_ids = ticket_ids
     end
 
     def call
@@ -38,7 +43,10 @@ module Deadlines
     attr_reader :now
 
     def due_tickets
-      Ticket.where(dispatch_due_at: ..now)
+      scope = Ticket.where(dispatch_due_at: ..now)
+      scope = scope.where(brand_id: @brand_id) if @brand_id
+      scope = scope.where(id: @ticket_ids) if @ticket_ids
+      scope
             .where("NOT EXISTS (SELECT 1 FROM outbox_events o WHERE o.dedup_key = #{DEDUP_KEY_SQL})")
             .order(:dispatch_due_at, :id).limit(@limit).lock("FOR UPDATE SKIP LOCKED").to_a
     end
