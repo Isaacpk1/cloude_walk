@@ -113,6 +113,12 @@ module Outbox
       outcome = if item.attempts > MAX_RETRIES then "retentativas_esgotadas"
       elsif turn && retry_at >= turn.deadline_at then "prazo_vencido"
       end
+      # O evento pode ter chegado ao Kafka e o agente, respondido antes de a resposta HTTP se perder (07, seção
+      # 6: o ACK posterior atualiza só a publicação). Um turno que deixou de ser elegível não tem falha definitiva
+      # de publicação a registrar: o item encerra como descarte, como na revalidação antes de publicar.
+      stale = outcome && turn && !turn.reload.eligible? && "turno_#{turn.status}"
+      return discard(stale) if stale
+
       data = { origin:, http_status:, error:, retry: outcome.nil? }
 
       if outcome
