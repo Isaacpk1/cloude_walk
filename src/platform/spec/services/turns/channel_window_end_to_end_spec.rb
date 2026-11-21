@@ -238,4 +238,3 @@ RSpec.describe "RN-55: janela de agrupamento por canal, da ingestão ao turno" d
     end
   end
 end
-
