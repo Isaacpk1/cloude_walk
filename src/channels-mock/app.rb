@@ -3,12 +3,14 @@ require "helpdesk_contracts"
 require_relative "lib/channels_mock/providers/chat"
 require_relative "lib/channels_mock/platform_client"
 require_relative "lib/channels_mock/inbox"
+require_relative "lib/channels_mock/chat_sender"
 require_relative "lib/channels_mock/clock"
 require_relative "lib/channels_mock/faults"
 require_relative "lib/channels_mock/chat_deliveries"
 require_relative "lib/channels_mock/status_callbacks"
 require_relative "lib/channels_mock/providers/chat_api"
 require_relative "lib/channels_mock/conversation_view"
+require_relative "lib/channels_mock/scenarios"
 
 module ChannelsMock
   # Provedores simulados e simulador do cliente (RF-04, ADR-012). Bloco 02: só o chat do app, na entrada.
@@ -102,17 +104,9 @@ module ChannelsMock
     end
 
     def send_chat(account, params)
-      payload = Providers::Chat.webhook(account_id: params["account_id"].to_s, customer_ref: params["customer_ref"].to_s,
-                                        text: params["text"].to_s, message_id: params["message_id"].to_s)
-      deliver(account, payload, tamper_signature: params["tamper_signature"] == "1")
-    rescue HelpdeskContracts::InvalidPayload => e
-      Inbox.add(channel: "chat", account:, payload: params.slice("account_id", "customer_ref", "text", "message_id"),
-                response: nil, error: e.message)
+      ChatSender.call(client: CLIENT, account:, fields: params, tamper_signature: params["tamper_signature"] == "1")
     end
 
-    def deliver(account, payload, tamper_signature: false)
-      response = CLIENT.deliver(channel: "chat", account:, payload:, tamper_signature:)
-      Inbox.add(channel: "chat", account:, payload:, response:, error: nil, tampered: tamper_signature)
-    end
+    def deliver(account, payload) = ChatSender.deliver(client: CLIENT, account:, payload:)
   end
 end
