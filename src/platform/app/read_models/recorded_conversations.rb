@@ -70,7 +70,7 @@ class RecordedConversations
   def turns(ticket, deliveries)
     actions = AgentActionEvents.new(ticket)
     first_received = ticket.messages.to_h { [ _1.seq, _1.received_at ] }
-    records = ticket.ai_turns.order(:turn).to_a
+    records = ticket.ai_turns.where(brand_id: ticket.brand_id).order(:turn).to_a
     publications = OutboxEvent.where(brand_id: ticket.brand_id, id: records.map(&:event_id)).index_by(&:id)
     records.map do |record|
       agent_action = actions.for_turn(record)
@@ -114,7 +114,7 @@ class RecordedConversations
       context_until_seq: record.context_until_seq, assignment_version: record.assignment_version,
       event_id: record.event_id, action: record.response&.dig("action") || "—",
       note:, tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] },
-      agent_action:, stages:
+      agent_action:, stages:, context: ConversationView::TurnContext.from(record)
     )
   end
 
