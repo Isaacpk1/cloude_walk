@@ -24,4 +24,40 @@ RSpec.describe Ticket do
       expect(ticket(assignee: build(:user, :bot))).to be_with_ai
     end
   end
+
+  describe "RN-55, RF-33: versão do contexto (#bump_context_version!)" do
+    let(:saved) { described_class.create!(brand:, customer:, channel: "chat", state: "novo") }
+
+    it "começa em 0 e sobe 1 no banco, devolvendo o novo valor" do
+      expect(saved.context_version).to eq(0)
+
+      expect(saved.bump_context_version!).to eq(1)
+      expect(saved.bump_context_version!).to eq(2)
+      expect(saved.reload.context_version).to eq(2)
+    end
+
+    it "soma ao valor do banco, não ao valor em memória (cópia desatualizada não perde incremento)" do
+      stale = described_class.find(saved.id)
+      saved.bump_context_version!
+
+      expect(stale.bump_context_version!).to eq(2)
+      expect(saved.reload.context_version).to eq(2)
+    end
+
+    it "deixa o atributo em memória igual ao banco e sem alteração pendente" do
+      saved.bump_context_version!
+
+      expect(saved.context_version).to eq(1)
+      expect(saved).not_to be_changed
+      saved.update!(latest_customer_seq: 1)
+      expect(saved.reload.context_version).to eq(1)
+    end
+
+    it "invariante 6: atendimento inexistente (ou de outra marca) é erro" do
+      other = described_class.new(id: saved.id, brand: create(:brand, :jim), customer:, channel: "chat")
+
+      expect { other.bump_context_version! }.to raise_error(ActiveRecord::RecordNotFound)
+      expect(saved.reload.context_version).to eq(0)
+    end
+  end
 end
