@@ -59,7 +59,10 @@ CREATE TABLE public.ai_turns (
     response_received_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    context_version integer,
+    context_digest character varying,
     CONSTRAINT ai_turns_applied_event_check CHECK ((((status)::text = 'applied'::text) = (applied_event_id IS NOT NULL))),
+    CONSTRAINT ai_turns_context_digest_check CHECK (((context_digest IS NULL) OR ((context_digest)::text ~ '^sha256:[0-9a-f]{64}$'::text))),
     CONSTRAINT ai_turns_context_until_seq_check CHECK ((context_until_seq >= 1)),
     CONSTRAINT ai_turns_status_check CHECK (((status)::text = ANY (ARRAY[('eligible'::character varying)::text, ('applied'::character varying)::text, ('superseded'::character varying)::text, ('expired'::character varying)::text]))),
     CONSTRAINT ai_turns_turn_check CHECK ((turn >= 1))
@@ -264,12 +267,12 @@ CREATE TABLE public.deliveries (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT deliveries_attempts_check CHECK ((attempts >= 0)),
-    CONSTRAINT deliveries_channel_check CHECK (((channel)::text = ANY ((ARRAY['chat'::character varying, 'whatsapp'::character varying, 'email'::character varying])::text[]))),
+    CONSTRAINT deliveries_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT deliveries_delivered_at_check CHECK ((((status)::text = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT deliveries_delivered_confirmation_check CHECK ((((status)::text <> 'delivered'::text) OR (provider_message_id IS NOT NULL))),
-    CONSTRAINT deliveries_kind_check CHECK (((kind)::text = ANY ((ARRAY['reply'::character varying, 'resolution'::character varying, 'progress'::character varying, 'handoff_notice'::character varying, 'analyst'::character varying])::text[]))),
+    CONSTRAINT deliveries_kind_check CHECK (((kind)::text = ANY (ARRAY[('reply'::character varying)::text, ('resolution'::character varying)::text, ('progress'::character varying)::text, ('handoff_notice'::character varying)::text, ('analyst'::character varying)::text]))),
     CONSTRAINT deliveries_seq_check CHECK ((seq >= 1)),
-    CONSTRAINT deliveries_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'sending'::character varying, 'delivered'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[])))
+    CONSTRAINT deliveries_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('sending'::character varying)::text, ('delivered'::character varying)::text, ('cancelled'::character varying)::text, ('failed'::character varying)::text])))
 );
 
 
@@ -582,7 +585,9 @@ CREATE TABLE public.tickets (
     first_pending_at timestamp(6) without time zone,
     dispatch_due_at timestamp(6) without time zone,
     ai_deadline_at timestamp(6) without time zone,
+    context_version integer DEFAULT 0 NOT NULL,
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
+    CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
     CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
     CONSTRAINT tickets_first_pending_pair_check CHECK (((first_pending_seq IS NULL) = (first_pending_at IS NULL))),
     CONSTRAINT tickets_first_pending_seq_check CHECK (((first_pending_seq IS NULL) OR (first_pending_seq >= 1))),
@@ -1029,7 +1034,7 @@ CREATE UNIQUE INDEX index_deliveries_on_ticket_id_and_seq ON public.deliveries U
 -- Name: index_deliveries_open; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_deliveries_open ON public.deliveries USING btree (ticket_id, seq) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'sending'::character varying])::text[]));
+CREATE INDEX index_deliveries_open ON public.deliveries USING btree (ticket_id, seq) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('sending'::character varying)::text]));
 
 
 --
@@ -1572,6 +1577,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261121020000'),
 ('20261121010000'),
 ('20261121000000'),
 ('20261120010000'),
