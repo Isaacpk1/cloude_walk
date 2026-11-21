@@ -1,7 +1,7 @@
 # Fonte dos registros reais para as telas de conversa e linha do tempo (ROADMAP 02).
 # Lê tickets, messages e outbox_events (07, seção 4) e devolve os mesmos ConversationView e
 # TimelineView dos exemplos, marcados como DataSource::SYSTEM. A espera da janela de agrupamento
-# (TurnWindowEvents) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03).
+# (TurnWindowEvents), a abertura e a recusa do turno com o contexto (TurnContextEvents, bloco 06) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03).
 # A ação recebida do agente (AgentActionEvents) vem de ai_turns.response e da auditoria (bloco 04).
 # As mensagens de saída e a entrega ao canal (DeliveryEvents) vêm de deliveries e da auditoria
 # delivery.* (bloco 05). Escalações entram aqui quando suas tabelas existirem (bloco 10).
@@ -23,6 +23,7 @@ class RecordedConversations
     outbox = OutboxEvent.where(ticket:, event_type: "message.received").index_by { _1.payload["message_id"] }
     events = ticket.messages.select { _1.direction == "inbound" }.flat_map { message_events(ticket, _1, outbox[_1.id]) }
     events += TurnWindowEvents.new(ticket).events
+    events += TurnContextEvents.new(ticket).events
     events += PublicationEvents.new(ticket).events
     events += AgentActionEvents.new(ticket).events
     events += DeliveryEvents.new(ticket).events
