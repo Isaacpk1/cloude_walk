@@ -47,9 +47,10 @@ module DeliveryRecordHelpers
                                                          "next_attempt_at" => next_attempt_at.utc.iso8601(3))
   end
 
-  def record_delivery_failed(delivery, attempt: 1, reason: "seq_anterior", http_status: 409)
+  def record_delivery_failed(delivery, attempt: 1, reason: "seq_anterior", http_status: 409, **detail)
     delivery.update_columns(status: "failed", last_error: reason, lease_until: nil)
-    delivery_audit(delivery, "delivery.failed", "attempt" => attempt, "reason" => reason, "http_status" => http_status)
+    delivery_audit(delivery, "delivery.failed", { "attempt" => attempt, "reason" => reason, "http_status" => http_status }
+                                                  .merge(detail.transform_keys(&:to_s)))
   end
 
   def record_reconciliation_needed(delivery, attempts: delivery.attempts)

@@ -350,7 +350,7 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
   end
 
   describe "rejeição definitiva (4xx)" do
-    [ [ 409, "seq_anterior", "seq_anterior" ], [ 409, "seq_repetida", "seq_anterior" ], [ 401, "assinatura_invalida", "assinatura" ],
+    [ [ 409, "seq_anterior", "seq_anterior" ], [ 409, "seq_repetida", "seq_repetida" ], [ 401, "assinatura_invalida", "assinatura" ],
       [ 422, "contrato_invalido", "contrato" ], [ 422, "idempotency_key_reutilizada", "contrato" ],
       [ 422, "recusada_pelo_provedor", "recusada_pelo_provedor" ], [ 404, "conta_desconhecida", "recusada_pelo_provedor" ] ]
       .each do |status, provider_error, reason|
@@ -374,9 +374,22 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
 
       expect(send_delivery(delivery).status).to eq(:failed)
       expect(channel_requests).to be_empty
-      expect(audits("delivery.failed").sole.data).to include("reason" => "contrato", "http_status" => nil,
+      expect(audits("delivery.failed").sole.data).to include("reason" => "plataforma", "http_status" => nil,
                                                              "platform_error" => "fora_do_contrato_chat_send")
       expect(audits("delivery.sending")).to be_empty
+    end
+
+    { "canal_sem_adaptador" => ->(d) { d.update_columns(channel: "whatsapp") },
+      "conta_inexistente" => ->(d) { d.update_columns(provider_account: "conta-que-nao-existe") } }.each do |platform_error, change|
+      it "erro da própria plataforma (#{platform_error}) falha com reason plataforma, sem chamar o provedor" do
+        delivery = requested_delivery(ticket).tap { change.call(_1) }
+        stub_channels
+
+        expect(send_delivery(delivery).status).to eq(:failed)
+        expect(channel_requests).to be_empty
+        expect(audits("delivery.failed").sole.data).to include("reason" => "plataforma", "http_status" => nil, "platform_error" => platform_error)
+        expect(delivery.reload.last_error).to eq("#{platform_error} (plataforma)")
+      end
     end
   end
 

@@ -85,7 +85,8 @@ module Deliveries
 
       prepared = Request.build(delivery)
       if prepared.error
-        return failed(item, delivery, attempt: delivery.attempts, reason: "contrato", http_status: nil, platform_error: prepared.error)
+        # Erro da própria plataforma (sem adaptador, sem conta, corpo fora do contrato): nada sai (RN-44).
+        return failed(item, delivery, attempt: delivery.attempts, reason: "plataforma", http_status: nil, platform_error: prepared.error)
       end
 
       start_attempt(item, delivery, prepared, now)
@@ -207,7 +208,7 @@ module Deliveries
     CONTRACT_ERRORS = %w[contrato_invalido idempotency_key_reutilizada].freeze
 
     def rejection_reason(status, provider_error)
-      if status == 409 then "seq_anterior"
+      if status == 409 then provider_error == "seq_repetida" ? "seq_repetida" : "seq_anterior"
       elsif [ 401, 403 ].include?(status) then "assinatura"
       elsif status == 422 && CONTRACT_ERRORS.include?(provider_error) then "contrato"
       else "recusada_pelo_provedor"

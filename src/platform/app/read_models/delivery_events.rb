@@ -63,6 +63,7 @@ class DeliveryEvents
       delivery_id: delivery.delivery_id, seq: delivery.seq, kind: delivery.kind, status: delivery.status,
       attempts: delivery.attempts, provider_message_id: delivery.provider_message_id, delivered_at: delivery.delivered_at,
       last_error: delivery.last_error, failure_reason: failed&.data&.dig("reason"),
+      platform_error: failed&.data&.dig("platform_error"),
       http_status: failed&.data&.dig("http_status"),
       reconciliation_needed: history.any? { _1.event_type == "delivery.reconciliation_needed" },
       next_attempt_at: scheduled_retry_at(delivery, history),
@@ -118,7 +119,10 @@ class DeliveryEvents
       delivery_error(origin: "provedor_transitorio", message: data["error"], attempt: data["attempt"], retry: true,
                      next_attempt_at: parse_time(data["next_attempt_at"]))
     when :delivery_failed
-      delivery_error(origin: data["reason"], http_status: data["http_status"], attempt: data["attempt"])
+      # "plataforma" na publicação é outra coisa (evento fora do contrato do broker): a entrega tem origem própria.
+      origin = data["reason"] == "plataforma" ? "entrega_plataforma" : data["reason"]
+      delivery_error(origin:, http_status: data["http_status"], attempt: data["attempt"],
+                     message: data["platform_error"] || data["error"])
     when :delivery_reconciliation
       delivery_error(origin: "conciliacao", attempt: data["attempts"], outcome: "conciliacao_pendente")
     end
