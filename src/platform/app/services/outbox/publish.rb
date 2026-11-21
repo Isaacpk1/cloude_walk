@@ -3,7 +3,8 @@
 #   Outbox::Publish.call(outbox_event_id) # => Result(status:, next_attempt_at:)
 #
 # 1. Reserva o item (lease) com uma atualização condicional: dois workers não chamam o broker juntos.
-# 2. Revalida o turno: superado, vencido ou de outra atribuição não sai (07, seção 6, backlog).
+# 2. Atendimento de eval (ADR-023, item 5) não sai: o item encerra como descarte `eval`.
+#    Revalida o turno: superado, vencido ou de outra atribuição não sai (07, seção 6, backlog).
 # 3. Valida o contrato na saída (invariante 10).
 # 4. Chama o broker FORA de qualquer transação (invariante 2), com o mesmo corpo e o mesmo event_id
 #    em todas as tentativas (invariante 3).
@@ -20,6 +21,7 @@ module Outbox
     MAX_RETRIES = 5
     MAX_JITTER = 0.25
     DEFAULT_JITTER = -> { rand }
+    EVAL_REASON = "eval".freeze
 
     def self.call(...) = new(...).call
 
@@ -34,6 +36,9 @@ module Outbox
 
       @item = OutboxEvent.find(@id)
       @turn = AiTurn.find_by(event_id: @item.id)
+      # ADR-023, item 5: o turno de um atendimento de eval não sai para o broker; o gabarito responde por ele.
+      return discard(EVAL_REASON) if evaluation?
+
       stale = stale_reason
       return discard(stale) if stale
 
@@ -59,6 +64,8 @@ module Outbox
       due = current && current.completed_at.nil? && current.next_attempt_at > Time.current
       Result.new(status: due ? :not_due : :skipped, next_attempt_at: due ? current.next_attempt_at : nil)
     end
+
+    def evaluation? = Ticket.where(id: item.ticket_id, brand_id: item.brand_id).pick(:evaluation) == true
 
     def stale_reason
       return unless turn

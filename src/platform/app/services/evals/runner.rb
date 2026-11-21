@@ -3,8 +3,9 @@
 #   Evals::Runner.call("corrida-3s", brand: Brand.find_by!(slug: "infinitepay")) # => EvalRun gravado
 #
 # Roda o cenário pelo caminho real da plataforma e grava UMA linha em eval_runs no fim (só inserção).
-# `status`: passed (todas as checagens ok), failed (alguma não) ou error (o cenário levantou; o que foi
-# observado até ali vai em `observed` e a mensagem em `error`).
+# `status`: passed (todas as checagens ok), failed (alguma não) ou error (o cenário levantou, ou outro agente
+# agiu no atendimento do eval: "cenário contaminado"; o que foi observado até ali vai em `observed` e a mensagem
+# em `error`).
 #
 # Relógio e espera são injetáveis. Em produção: Time.current e sleep até o próximo passo. Nos testes: um
 # relógio controlado por travel_to e um sleeper que só avança o relógio.
@@ -25,7 +26,7 @@ module Evals
     def call
       started_at = @clock.call
       scenario = @scenario_class.new(brand: @brand, clock: @clock, sleeper: @sleeper)
-      error = run(scenario)
+      error = run(scenario) || contamination(scenario)
       record(scenario, started_at, error)
     end
 
@@ -37,6 +38,15 @@ module Evals
     rescue StandardError => e
       JsonLog.warn("eval.error", trace_id: scenario.trace_id, scenario: @scenario_class::NAME, error: e.class.name)
       "#{e.class.name}: #{e.message}"
+    end
+
+    # ADR-023, item 5: uma ação de outro agente no atendimento do eval (ex.: um agent-mock respondendo por fora)
+    # invalida a execução. O resultado não diz nada sobre a regra da plataforma: é `error`, não `failed`.
+    def contamination(scenario)
+      foreign = scenario.observed["foreign_agent_actions"].to_i
+      return if foreign.zero?
+
+      "cenário contaminado: #{foreign} ação(ões) de outro agente no atendimento do eval (esperado só #{@scenario_class::AGENT_MODEL})"
     end
 
     def record(scenario, started_at, error)

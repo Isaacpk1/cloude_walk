@@ -13,6 +13,7 @@ class DeliveryEvents
     "delivery.retry_scheduled" => :delivery_retry_scheduled,
     "delivery.delivered" => :delivered,
     "delivery.failed" => :delivery_failed,
+    "delivery.cancelled" => :delivery_cancelled,
     "delivery.reconciliation_needed" => :delivery_reconciliation,
     "delivery.status_received" => :delivery_status
   }.freeze
@@ -75,7 +76,7 @@ class DeliveryEvents
 
   def status_view(delivery)
     history = audits_for(delivery.delivery_id)
-    failed = history.reverse.find { _1.event_type == "delivery.failed" }
+    failed = history.reverse.find { %w[delivery.failed delivery.cancelled].include?(_1.event_type) }
     ConversationView::DeliveryStatus.new(
       delivery_id: delivery.delivery_id, seq: delivery.seq, kind: delivery.kind, status: delivery.status,
       attempts: delivery.attempts, provider_message_id: delivery.provider_message_id, delivered_at: delivery.delivered_at,
@@ -124,6 +125,7 @@ class DeliveryEvents
         "chamada de #{data['duration_ms']} ms#{replayed}"
     when :delivery_retry_scheduled then "#{head}: tentativa #{data['attempt']} falhou, nova tentativa agendada"
     when :delivery_failed then "#{head}: falha definitiva na tentativa #{data['attempt']}"
+    when :delivery_cancelled then "#{head}: cancelada antes do envio ao provedor"
     when :delivery_reconciliation then "#{head}: resultado incerto após #{data['attempts']} tentativas"
     when :delivery_status
       "#{head}: provedor informou #{data['status']} (#{data['provider_message_id']}, às #{data['provider_timestamp']})"
@@ -140,6 +142,7 @@ class DeliveryEvents
       origin = data["reason"] == "plataforma" ? "entrega_plataforma" : data["reason"]
       delivery_error(origin:, http_status: data["http_status"], attempt: data["attempt"],
                      message: data["platform_error"] || data["error"])
+    when :delivery_cancelled then delivery_error(origin: data["reason"])
     when :delivery_reconciliation
       delivery_error(origin: "conciliacao", attempt: data["attempts"], outcome: "conciliacao_pendente")
     end

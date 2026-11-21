@@ -44,6 +44,7 @@ module Seeds
           [ bot, supervisor, *analysts_for(brand) ].each { |user| TeamMembership.find_or_create_by!(user:, team:) }
           default_queue_for(brand, team, created_by: supervisor)
           provider_accounts_for(brand)
+          ProviderAccount.evaluation_for!(brand, "chat") # ADR-023, item 5: conta do eval, inativa
           customers_for(brand)
         end
       end

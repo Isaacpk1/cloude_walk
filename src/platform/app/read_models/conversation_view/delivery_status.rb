@@ -11,7 +11,8 @@ class ConversationView::DeliveryStatus < Data.define(
     "seq_repetida" => "Provedor recusou: seq repetida, já aceita na conversa com outra chave (409)",
     "provedor_indisponivel" => "Provedor indisponível: nenhuma das tentativas foi processada (RN-43)",
     "assinatura" => "Provedor recusou a assinatura (401)",
-    "contrato" => "Provedor recusou o conteúdo fora do contrato (422)"
+    "contrato" => "Provedor recusou o conteúdo fora do contrato (422)",
+    "eval" => "Atendimento de eval: nada sai para o broker nem para o canal (ADR-023)"
   }.freeze
 
   def status_label = ConversationView::Message::DELIVERY_LABELS.fetch(status)
@@ -26,4 +27,5 @@ class ConversationView::DeliveryStatus < Data.define(
   def delivered? = status == "delivered"
   def failed? = status == "failed"
   def sending? = status == "sending"
+  def cancelled? = status == "cancelled"
 end

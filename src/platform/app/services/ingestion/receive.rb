@@ -90,11 +90,18 @@ module Ingestion
       return [ ticket, false ] if ticket
 
       created = ActiveRecord::Base.transaction(requires_new: true) do
-        Ticket.create!(brand:, customer:, channel:, state: "novo", linked_ticket: ticket_to_link(customer))
+        Ticket.create!(brand:, customer:, channel:, state: "novo", linked_ticket: ticket_to_link(customer),
+                       evaluation: evaluation_account?(brand))
       end
       [ created, true ]
     rescue ActiveRecord::RecordNotUnique
       [ Ticket.open.lock.find_by!(customer:, channel:), false ]
+    end
+
+    # ADR-023, item 5: o atendimento aberto por uma conta de eval da marca nasce marcado, no mesmo commit da
+    # primeira mensagem. O worker não publica o turno nem entrega a saída de um atendimento marcado.
+    def evaluation_account?(brand)
+      ProviderAccount.exists?(brand:, channel:, slug: @msg.fetch("provider_account"), evaluation: true)
     end
 
     # RN-09: o último atendimento fechado no mesmo canal. Senão, RN-04: um aberto em outro canal.

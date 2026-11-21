@@ -1,7 +1,8 @@
 # Eval da corrida dos 3 s (ADR-023; RN-55, RN-56; 04, critério de aceite de turnos; 07, seção 3.4, diagrama
 # da corrida).
 #
-# Num atendimento de chat novo da marca, com cliente sintético verificado e conta `eval_<hex>` própria da execução:
+# Num atendimento de chat novo da marca, marcado como eval (conta de provedor `<marca>-chat-eval`), com cliente
+# sintético verificado e identidade `eval_<hex>` própria da execução:
 #
 #   t=0      mensagem 1 (Ingestion::Receive)
 #   t≈1,5 s  fim da janela: Deadlines::DispatchDue + Turns::Open abrem o turno 1 com [1]
@@ -165,9 +166,10 @@ module Evals
         step!(step, at_ms, seq: result.message.seq)
       end
 
+      # A conta de eval da marca (ADR-023, item 5): o atendimento nasce marcado como eval no commit da mensagem 1,
+      # e o worker real não publica o turno dele no broker nem entrega a saída dele ao canal.
       def provider_account
-        @provider_account ||= ProviderAccount.active.where(brand: @brand, channel: CHANNEL).order(:id).pick(:slug) ||
-                              "#{@brand.slug}-#{CHANNEL}-mock"
+        @provider_account ||= ProviderAccount.evaluation_for!(@brand, CHANNEL).slug
       end
 
       # Espera o fim da janela gravado pela ingestão e faz a volta do scheduler e a abertura pelo worker. Se o
