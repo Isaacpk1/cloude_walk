@@ -47,7 +47,7 @@ class RecordedConversations
       title: ticket.messages.first&.body.to_s.truncate(60), assignee: WAITING,
       assignment_version: ticket.assignment_version, latest_customer_seq: ticket.latest_customer_seq,
       messages: ticket.messages.map { message(ticket, _1, deliveries) }, turns: turns(ticket, deliveries),
-      escalations: [], source: DataSource::SYSTEM
+      escalations: [], source: DataSource::SYSTEM, grouping: GroupingPhase.new(ticket).view
     )
   end
 
