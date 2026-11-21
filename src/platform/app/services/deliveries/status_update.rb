@@ -7,7 +7,8 @@
 # `failed` encerra a entrega como failed (delivery.failed, reason provider_failed); todo callback aceito
 # registra delivery.status_received. Idempotente (RN-47): processed_events com uma chave derivada de
 # (conta, message_id, status, timestamp), gravada na mesma transação do efeito (invariante 3). O mesmo
-# callback repetido não muda nada nem audita de novo; message_id desconhecido não grava nada.
+# callback repetido não muda nada nem audita de novo; message_id desconhecido não grava nada (nem
+# processed_events) e o controller responde 503, para o provedor repetir depois da confirmação gravada.
 module Deliveries
   class StatusUpdate
     Result = Data.define(:status, :delivery)

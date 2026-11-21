@@ -79,6 +79,28 @@ RSpec.describe "ROADMAP 05: entrega no painel (RecordedConversations)" do
       expect(message.delivery.failure_reason_label).to include("seq")
     end
 
+    { "plataforma" => "Recusada pela plataforma antes do envio: canal_sem_adaptador",
+      "provedor_indisponivel" => "Provedor indisponível: nenhuma das tentativas foi processada (RN-43)",
+      "seq_repetida" => "Provedor recusou: seq repetida, já aceita na conversa com outra chave (409)" }
+      .each do |reason, label|
+      it "rótulo do motivo #{reason}" do
+        turn, delivery = applied_turn
+        detail = reason == "plataforma" ? { "platform_error" => "canal_sem_adaptador" } : {}
+        record_delivery_failed(delivery, reason:, http_status: reason == "seq_repetida" ? 409 : nil, **detail)
+
+        expect(outbound_message(source.find(turn.ticket_id.to_s)).delivery.failure_reason_label).to eq(label)
+      end
+    end
+
+    it "erro da plataforma não aparece como recusa do provedor" do
+      turn, delivery = applied_turn
+      record_delivery_failed(delivery, reason: "plataforma", http_status: nil)
+
+      label = outbound_message(source.find(turn.ticket_id.to_s)).delivery.failure_reason_label
+      expect(label).to start_with("Recusada pela plataforma antes do envio")
+      expect(label).not_to include("Provedor")
+    end
+
     it "RNF-16: marca a conciliação pendente" do
       turn, delivery = applied_turn
       record_delivery_sending(delivery, attempt: 3)
@@ -214,6 +236,16 @@ RSpec.describe "ROADMAP 05: entrega no painel (RecordedConversations)" do
       expect(failed.error).to have_attributes(origin: "contrato", http_status: 422, attempt: 2, retry: false)
       expect(events.find { _1.kind == :delivery_reconciliation }.error.outcome).to eq("conciliacao_pendente")
       expect(events.select { _1.kind == :delivery_sending }.map { _1.detail[/tentativa \d/] }).to eq([ "tentativa 1", "tentativa 2" ])
+    end
+
+    it "falha da plataforma antes do envio tem origem própria na linha do tempo, não a do broker" do
+      turn, delivery = applied_turn
+      record_delivery_failed(delivery, attempt: 0, reason: "plataforma", http_status: nil, platform_error: "conta_inexistente")
+
+      failed = source.timeline(turn.ticket_id.to_s).events.find { _1.kind == :delivery_failed }
+
+      expect(failed.error.origin_label).to eq("Recusada pela plataforma antes do envio ao provedor")
+      expect(failed.error.message).to eq("conta_inexistente")
     end
   end
 end

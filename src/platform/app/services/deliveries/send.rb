@@ -11,8 +11,15 @@
 #    do item fica no fim da reserva, para a recuperação retomar uma tentativa abandonada.
 # 2. Chama o provedor com o mesmo corpo e o mesmo delivery_id (Idempotency-Key) em toda tentativa.
 # 3. Aplica o resultado só se a entrega ainda for desta tentativa: 2xx → delivered com a confirmação;
-#    4xx → failed (definitivo); 5xx, 429, timeout ou conexão → nova tentativa com backoff (RN-43) e, ao
-#    esgotar, conciliação: a entrega fica em `sending` e a ordem do atendimento para (07, seção 3.2).
+#    4xx → failed (definitivo); 5xx, 429, timeout ou conexão → nova tentativa com backoff (RN-43). Cada
+#    tentativa transitória é classificada na auditoria delivery.retry_scheduled (`outcome`):
+#    - sem_efeito: a mensagem com certeza não foi processada (conexão recusada, DNS, tempo para abrir a
+#      conexão; 503 ou 429 respondidos pelo provedor);
+#    - incerto: pode ter sido processada (leitura esgotada, conexão cortada depois de enviar, outro 5xx,
+#      2xx sem message_id).
+#    Ao esgotar: todas sem efeito → failed `provedor_indisponivel` e a ordem avança; ao menos uma incerta
+#    (ou abandonada sem retry_scheduled) → conciliação: a entrega fica em `sending` e a ordem do
+#    atendimento para (07, seção 3.2).
 #    Uma saída encerrada (delivered, failed ou cancelled) acorda a próxima saída aberta.
 #
 # A espera da retentativa é só um despertador: o horário que vale é outbox_events.next_attempt_at
@@ -78,7 +85,8 @@ module Deliveries
 
       prepared = Request.build(delivery)
       if prepared.error
-        return failed(item, delivery, attempt: delivery.attempts, reason: "contrato", http_status: nil, platform_error: prepared.error)
+        # Erro da própria plataforma (sem adaptador, sem conta, corpo fora do contrato): nada sai (RN-44).
+        return failed(item, delivery, attempt: delivery.attempts, reason: "plataforma", http_status: nil, platform_error: prepared.error)
       end
 
       start_attempt(item, delivery, prepared, now)
@@ -124,21 +132,30 @@ module Deliveries
       end
     end
 
+    # 503 e 429 do provedor significam "não processado" (07, seção 5.0): sem efeito, como a recusa da conexão.
+    NOT_PROCESSED = [ 429, 503 ].freeze
+
     def classify(item, delivery, number, response, duration_ms:)
-      return transient(item, delivery, number, error: response.message) if response.is_a?(Exception)
+      if response.is_a?(Exception)
+        return transient(item, delivery, number, error: response.message, no_effect: response.no_effect, http_status: nil)
+      end
 
       message_id = response.body["message_id"]
       case response.status
       when 200..299
-        return transient(item, delivery, number, error: "http #{response.status} sem message_id") unless message_id.is_a?(String) && message_id.present?
+        unless message_id.is_a?(String) && message_id.present?
+          return transient(item, delivery, number, error: "http #{response.status} sem message_id", no_effect: false,
+                                                   http_status: response.status)
+        end
 
         delivered(item, delivery, number, message_id, replayed: response.replayed, duration_ms:)
-      when 429 then transient(item, delivery, number, error: "http 429")
+      when *NOT_PROCESSED then transient(item, delivery, number, error: "http #{response.status}", no_effect: true,
+                                                                 http_status: response.status)
       when 400..499
         provider_error = response.body["error"].presence
         failed(item, delivery, attempt: number, reason: rejection_reason(response.status, provider_error), http_status: response.status,
                                provider_error:)
-      else transient(item, delivery, number, error: "http #{response.status}")
+      else transient(item, delivery, number, error: "http #{response.status}", no_effect: false, http_status: response.status)
       end
     end
 
@@ -152,15 +169,29 @@ module Deliveries
       result(:delivered)
     end
 
-    def transient(item, delivery, number, error:)
-      return reconcile(item, delivery, error:) if number >= Policy::MAX_ATTEMPTS
+    def transient(item, delivery, number, error:, no_effect:, http_status:)
+      if number >= Policy::MAX_ATTEMPTS
+        return reconcile(item, delivery, error:) unless no_effect && earlier_attempts_without_effect?(delivery, number)
+
+        return failed(item, delivery, attempt: number, reason: "provedor_indisponivel", http_status:, error:)
+      end
 
       retry_at = Time.current + Policy.backoff(number, jitter: @jitter)
       delivery.update!(lease_until: nil, last_error: error)
       item.update!(next_attempt_at: retry_at, lease_until: nil, last_error: error)
-      audit(delivery, "delivery.retry_scheduled", attempt: number, error:, next_attempt_at: retry_at.utc.iso8601(3))
+      audit(delivery, "delivery.retry_scheduled", attempt: number, error:, outcome: no_effect ? "sem_efeito" : "incerto",
+                                                  next_attempt_at: retry_at.utc.iso8601(3))
       log(:warn, "delivery.retry_scheduled", delivery, attempt: number, error:)
       Result.new(status: :retry_scheduled, next_attempt_at: retry_at)
+    end
+
+    # Cada tentativa anterior a `number` tem um delivery.retry_scheduled sem_efeito. Uma tentativa sem esse
+    # registro (abandonada com a reserva vencida) ou incerta impede afirmar que nada chegou ao provedor.
+    def earlier_attempts_without_effect?(delivery, number)
+      attempts = AuditEvent.where(brand_id: delivery.brand_id, ticket_id: delivery.ticket_id, event_type: "delivery.retry_scheduled")
+                           .where("data->>'delivery_id' = ? AND data->>'outcome' = 'sem_efeito'", delivery.delivery_id)
+                           .distinct.pluck(Arel.sql("(data->>'attempt')::int"))
+      (1...number).all? { attempts.include?(_1) }
     end
 
     # Resultado incerto depois de todas as tentativas: a entrega fica em `sending`, sem reserva, e a
@@ -177,7 +208,7 @@ module Deliveries
     CONTRACT_ERRORS = %w[contrato_invalido idempotency_key_reutilizada].freeze
 
     def rejection_reason(status, provider_error)
-      if status == 409 then "seq_anterior"
+      if status == 409 then provider_error == "seq_repetida" ? "seq_repetida" : "seq_anterior"
       elsif [ 401, 403 ].include?(status) then "assinatura"
       elsif status == 422 && CONTRACT_ERRORS.include?(provider_error) then "contrato"
       else "recusada_pelo_provedor"
@@ -186,7 +217,8 @@ module Deliveries
 
     def failed(item, delivery, attempt:, reason:, http_status:, **detail)
       error = detail.values.compact.first || reason
-      delivery.update!(status: "failed", lease_until: nil, last_error: "#{error} (#{http_status || 'plataforma'})")
+      origin = http_status || (detail[:platform_error] ? "plataforma" : "sem resposta")
+      delivery.update!(status: "failed", lease_until: nil, last_error: "#{error} (#{origin})")
       complete(item, last_error: reason)
       audit(delivery, "delivery.failed", attempt:, reason:, http_status:, **detail.compact)
       log(:warn, "delivery.failed", delivery, attempt:, reason:, http_status:)

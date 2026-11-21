@@ -42,7 +42,7 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
         .to eq([ [ 1, "superseded", [ 1 ], 1 ], [ 2, "eligible", [ 1, 2 ], 2 ] ])
       expect(turns.map(&:event_id)).to eq([ first.event_id, second.event_id ])
       expect(turns.first.note).to include("superado")
-      expect(turns.last.note).to include("aguardando a resposta do agente")
+      expect(turns.last.note).to eq("Aguardando a publicação para o agente.")
     end
 
     it "mostra só os turnos do próprio atendimento" do
@@ -115,6 +115,28 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
       confirmed_at = AuditEvent.find_by!(event_type: "agent_event.published").occurred_at
       expect(events.find { _1.kind == :published }).to have_attributes(started_at: start, finished_at: confirmed_at)
       expect(events.find { _1.kind == :published }.detail).to include("tentativa 2")
+    end
+
+    describe "RF-29, RN-43: nota do turno eligible pelo estado da publicação no outbox" do
+      def note(ticket) = source.find(ticket.id.to_s).turns.last.note
+
+      it "publicado: aguardando a resposta do agente" do
+        expect(note(open_and_publish({ status: 200 }))).to eq("Publicado e aguardando a resposta do agente (bloco 04).")
+      end
+
+      it "retentando: mostra que a publicação falhou e terá nova tentativa" do
+        ticket = open_and_publish({ status: 503 })
+
+        expect(note(ticket)).to start_with("Publicação para o agente falhou na tentativa 1 e será repetida")
+        expect(note(ticket)).not_to include("Publicado")
+      end
+
+      it "falhou de vez (recusa definitiva do broker): não aparece como publicado" do
+        ticket = open_and_publish({ status: 401 })
+
+        expect(note(ticket)).to start_with("Publicação para o agente falhou sem nova tentativa")
+        expect(note(ticket)).not_to include("Publicado")
+      end
     end
 
     it "publicação recusada pelo broker fica sem fim e com a origem (assinatura)" do

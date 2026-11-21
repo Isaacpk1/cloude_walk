@@ -181,6 +181,7 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
       expect(second.body).to eq(first.body)
       expect(delivery.reload).to have_attributes(status: "delivered", attempts: 2)
       expect(audits("delivery.delivered").sole.data).to include("replayed" => true, "attempt" => 2)
+      expect(audits("delivery.retry_scheduled").sole.data["outcome"]).to eq("incerto")
     end
   end
 
@@ -194,6 +195,7 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
       expect(send_delivery(delivery).status).to eq(:delivered)
       expect(channel_requests.map { _1.headers["Idempotency-Key"] }.uniq).to eq([ delivery.delivery_id ])
       expect(audits("delivery.delivered").sole.data["replayed"]).to be(true)
+      expect(audits("delivery.retry_scheduled").sole.data["outcome"]).to eq("incerto")
     end
   end
 
@@ -227,10 +229,10 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
       expect(channel_requests.map(&:body).uniq.size).to eq(1)
     end
 
-    it "backoff 1, 2, 4, 8 e 16 s com jitter, e esgotado pede conciliação sem acordar a próxima" do
+    it "backoff 1, 2, 4, 8 e 16 s com jitter, e esgotado com resultado incerto (500) pede conciliação sem acordar a próxima" do
       delivery = requested_delivery(ticket)
       second = requested_delivery(ticket, text: "Mais alguma dúvida?")
-      stub_channels(*Array.new(6) { { status: 503 } })
+      stub_channels(*Array.new(6) { { status: 500 } })
       waits = []
 
       6.times do
@@ -258,8 +260,98 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
     end
   end
 
+  describe "RN-43, 07 seção 3.2: tentativas esgotadas, não entrega certa ou resultado incerto" do
+    def exhaust(delivery)
+      statuses = []
+      Deliveries::Policy::MAX_ATTEMPTS.times do
+        result = send_delivery(delivery)
+        statuses << result.status
+        break unless result.next_attempt_at
+
+        travel_to(result.next_attempt_at, with_usec: true)
+      end
+      statuses
+    end
+
+    def expect_unavailable_and_order_moves_on(delivery, second, http_status:)
+      expect(delivery.reload).to have_attributes(status: "failed", attempts: 6, lease_until: nil)
+      expect(audits("delivery.failed").sole.data).to include("delivery_id" => delivery.delivery_id, "attempt" => 6,
+                                                             "reason" => "provedor_indisponivel", "http_status" => http_status)
+      expect(audits("delivery.reconciliation_needed")).to be_empty
+      expect(audits("delivery.retry_scheduled").map { _1.data["outcome"] }.uniq).to eq([ "sem_efeito" ])
+      expect(delivery_item(delivery)).to have_attributes(completed_at: Time.current, last_error: "provedor_indisponivel")
+      expect(OutboxJob).to have_been_enqueued.with(delivery_item(second).id)
+      expect(send_delivery(second).status).to eq(:delivered)
+    end
+
+    it "6× conexão recusada: failed provedor_indisponivel, e a segunda saída sai" do
+      delivery = requested_delivery(ticket)
+      second = requested_delivery(ticket, text: "Mais alguma dúvida?")
+      stub_request(:post, DeliveryHelpers::CHANNELS_ENDPOINT).to_raise(Errno::ECONNREFUSED).times(6)
+        .then.to_return(channel_response(status: 200))
+
+      expect(exhaust(delivery).last).to eq(:failed)
+      expect_unavailable_and_order_moves_on(delivery, second, http_status: nil)
+    end
+
+    it "6× 503 (não processado pelo provedor): failed provedor_indisponivel, e a segunda saída sai" do
+      delivery = requested_delivery(ticket)
+      second = requested_delivery(ticket, text: "Mais alguma dúvida?")
+      stub_channels(*Array.new(6) { { status: 503 } }, { status: 200 })
+
+      expect(exhaust(delivery).last).to eq(:failed)
+      expect_unavailable_and_order_moves_on(delivery, second, http_status: 503)
+    end
+
+    it "um timeout de leitura no meio torna o resultado incerto: conciliação, e a segunda não sai" do
+      delivery = requested_delivery(ticket)
+      second = requested_delivery(ticket, text: "Mais alguma dúvida?")
+      stub_request(:post, DeliveryHelpers::CHANNELS_ENDPOINT).to_return(channel_response(status: 503)).times(2)
+        .then.to_raise(Net::ReadTimeout).then.to_return(channel_response(status: 503)).times(3)
+
+      expect(exhaust(delivery).last).to eq(:reconciliation_needed)
+      expect(audits("delivery.retry_scheduled").map { _1.data["outcome"] })
+        .to eq(%w[sem_efeito sem_efeito incerto sem_efeito sem_efeito])
+      expect(delivery.reload).to have_attributes(status: "sending", attempts: 6)
+      expect(audits("delivery.failed")).to be_empty
+      expect(delivery_item(delivery).last_error).to eq("reconciliation_needed")
+      expect(send_delivery(second).status).to eq(:waiting_previous)
+    end
+
+    [ [ "5xx diferente de 503", { status: 500 } ], [ "2xx sem message_id", { status: 200, body: "{}" } ],
+      [ "conexão cortada depois de enviar", :reset ] ].each do |label, response|
+      it "#{label} é incerto" do
+        delivery = requested_delivery(ticket)
+        stub = stub_request(:post, DeliveryHelpers::CHANNELS_ENDPOINT)
+        response == :reset ? stub.to_raise(Errno::ECONNRESET) : stub.to_return(response)
+
+        expect(send_delivery(delivery).status).to eq(:retry_scheduled)
+        expect(audits("delivery.retry_scheduled").sole.data["outcome"]).to eq("incerto")
+      end
+    end
+
+    it "429 e falha ao abrir a conexão (open timeout, DNS) são sem efeito" do
+      delivery = requested_delivery(ticket)
+      stub_request(:post, DeliveryHelpers::CHANNELS_ENDPOINT).to_return(status: 429, body: "{}")
+        .then.to_raise(Net::OpenTimeout).then.to_raise(SocketError)
+      2.times { travel_to(send_delivery(delivery).next_attempt_at, with_usec: true) }
+      send_delivery(delivery)
+
+      expect(audits("delivery.retry_scheduled").map { _1.data["outcome"] }).to eq(%w[sem_efeito sem_efeito sem_efeito])
+    end
+
+    it "tentativa abandonada (reserva vencida, sem retry_scheduled) conta como incerta no fim" do
+      delivery = requested_delivery(ticket)
+      delivery.update_columns(status: "sending", attempts: 5, lease_until: start - 1.second)
+      stub_channels({ status: 503 })
+
+      expect(send_delivery(delivery).status).to eq(:reconciliation_needed)
+      expect(audits("delivery.failed")).to be_empty
+    end
+  end
+
   describe "rejeição definitiva (4xx)" do
-    [ [ 409, "seq_anterior", "seq_anterior" ], [ 409, "seq_repetida", "seq_anterior" ], [ 401, "assinatura_invalida", "assinatura" ],
+    [ [ 409, "seq_anterior", "seq_anterior" ], [ 409, "seq_repetida", "seq_repetida" ], [ 401, "assinatura_invalida", "assinatura" ],
       [ 422, "contrato_invalido", "contrato" ], [ 422, "idempotency_key_reutilizada", "contrato" ],
       [ 422, "recusada_pelo_provedor", "recusada_pelo_provedor" ], [ 404, "conta_desconhecida", "recusada_pelo_provedor" ] ]
       .each do |status, provider_error, reason|
@@ -283,9 +375,22 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
 
       expect(send_delivery(delivery).status).to eq(:failed)
       expect(channel_requests).to be_empty
-      expect(audits("delivery.failed").sole.data).to include("reason" => "contrato", "http_status" => nil,
+      expect(audits("delivery.failed").sole.data).to include("reason" => "plataforma", "http_status" => nil,
                                                              "platform_error" => "fora_do_contrato_chat_send")
       expect(audits("delivery.sending")).to be_empty
+    end
+
+    { "canal_sem_adaptador" => ->(d) { d.update_columns(channel: "whatsapp") },
+      "conta_inexistente" => ->(d) { d.update_columns(provider_account: "conta-que-nao-existe") } }.each do |platform_error, change|
+      it "erro da própria plataforma (#{platform_error}) falha com reason plataforma, sem chamar o provedor" do
+        delivery = requested_delivery(ticket).tap { change.call(_1) }
+        stub_channels
+
+        expect(send_delivery(delivery).status).to eq(:failed)
+        expect(channel_requests).to be_empty
+        expect(audits("delivery.failed").sole.data).to include("reason" => "plataforma", "http_status" => nil, "platform_error" => platform_error)
+        expect(delivery.reload.last_error).to eq("#{platform_error} (plataforma)")
+      end
     end
   end
 

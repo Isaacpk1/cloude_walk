@@ -17,6 +17,7 @@ class TimelineView::Error < Data.define(:origin, :http_status, :message, :attemp
     "prazo_vencido" => "Prazo do atendimento vencido (RN-46)",
     "atribuicao_mudou" => "Atendimento mudou de responsável desde o turno",
     "provedor_transitorio" => "Provedor: falha transitória (5xx, timeout ou conexão)",
+    "entrega_plataforma" => "Recusada pela plataforma antes do envio ao provedor",
     "conciliacao" => "Confirmação do provedor incerta: a entrega precisa de conciliação (07, seção 6)"
   }.merge(ConversationView::DeliveryStatus::FAILURE_REASONS).freeze
 

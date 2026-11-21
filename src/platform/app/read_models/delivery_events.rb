@@ -32,9 +32,26 @@ class DeliveryEvents
     requested.values.select { _1.data["turn"] == turn_number }.min_by { _1.data["seq"].to_i }
   end
 
-  # Horário da confirmação do provedor: deliveries.delivered_at, ou a auditoria delivery.delivered.
+  # Horário da confirmação do provedor, só enquanto a entrega está delivered: deliveries.delivered_at, ou a
+  # auditoria delivery.delivered. Uma entrega que o provedor depois avisou como failed não conta como entregue.
   def delivered_at(delivery_id)
-    deliveries_by_id[delivery_id]&.delivered_at || audits_for(delivery_id).find { _1.event_type == "delivery.delivered" }&.occurred_at
+    delivery = deliveries_by_id[delivery_id]
+    return unless delivery&.status == "delivered"
+
+    delivery.delivered_at || audits_for(delivery_id).find { _1.event_type == "delivery.delivered" }&.occurred_at
+  end
+
+  # Estado da entrega para o estágio "Resposta entregue" do turno: delivered, failed_after_delivered
+  # (confirmada e depois o callback de status avisou falha), not_delivered (failed ou cancelled) ou pending.
+  def stage_state(delivery_id)
+    delivery = deliveries_by_id[delivery_id]
+    case delivery&.status
+    when "delivered" then :delivered
+    when "failed"
+      audits_for(delivery_id).any? { _1.event_type == "delivery.delivered" } ? :failed_after_delivered : :not_delivered
+    when "cancelled" then :not_delivered
+    else :pending
+    end
   end
 
   def events = audits.filter_map { event_for(_1) }
@@ -59,16 +76,27 @@ class DeliveryEvents
   def status_view(delivery)
     history = audits_for(delivery.delivery_id)
     failed = history.reverse.find { _1.event_type == "delivery.failed" }
-    retry_audit = history.reverse.find { _1.event_type == "delivery.retry_scheduled" }
     ConversationView::DeliveryStatus.new(
       delivery_id: delivery.delivery_id, seq: delivery.seq, kind: delivery.kind, status: delivery.status,
       attempts: delivery.attempts, provider_message_id: delivery.provider_message_id, delivered_at: delivery.delivered_at,
       last_error: delivery.last_error, failure_reason: failed&.data&.dig("reason"),
+      platform_error: failed&.data&.dig("platform_error"),
       http_status: failed&.data&.dig("http_status"),
       reconciliation_needed: history.any? { _1.event_type == "delivery.reconciliation_needed" },
-      next_attempt_at: delivery.status == "pending" ? parse_time(retry_audit&.data&.dig("next_attempt_at")) : nil,
+      next_attempt_at: scheduled_retry_at(delivery, history),
       turn: requested[delivery.delivery_id]&.data&.dig("turn")
     )
+  end
+
+  # A retentativa agendada pelo Deliveries::Send: a entrega fica em `sending` sem reserva (lease_until nulo
+  # ou vencido) e o último registro da tentativa é um delivery.retry_scheduled posterior ao delivery.sending.
+  # Com a reserva vigente, a tentativa seguinte está em curso; encerrada, não há retentativa.
+  def scheduled_retry_at(delivery, history)
+    return unless Delivery::OPEN.include?(delivery.status)
+    return if delivery.lease_until && delivery.lease_until > Time.current
+
+    last = history.reverse.find { %w[delivery.sending delivery.retry_scheduled delivery.reconciliation_needed].include?(_1.event_type) }
+    parse_time(last.data["next_attempt_at"]) if last&.event_type == "delivery.retry_scheduled"
   end
 
   def event_for(audit)
@@ -108,7 +136,10 @@ class DeliveryEvents
       delivery_error(origin: "provedor_transitorio", message: data["error"], attempt: data["attempt"], retry: true,
                      next_attempt_at: parse_time(data["next_attempt_at"]))
     when :delivery_failed
-      delivery_error(origin: data["reason"], http_status: data["http_status"], attempt: data["attempt"])
+      # "plataforma" na publicação é outra coisa (evento fora do contrato do broker): a entrega tem origem própria.
+      origin = data["reason"] == "plataforma" ? "entrega_plataforma" : data["reason"]
+      delivery_error(origin:, http_status: data["http_status"], attempt: data["attempt"],
+                     message: data["platform_error"] || data["error"])
     when :delivery_reconciliation
       delivery_error(origin: "conciliacao", attempt: data["attempts"], outcome: "conciliacao_pendente")
     end
