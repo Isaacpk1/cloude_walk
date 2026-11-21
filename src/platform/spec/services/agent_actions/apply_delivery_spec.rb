@@ -295,4 +295,3 @@ RSpec.describe AgentActions::Apply, "RF-31, RF-06: saída gravada na aplicação
     end
   end
 end
-

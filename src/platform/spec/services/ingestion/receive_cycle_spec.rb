@@ -224,4 +224,3 @@ RSpec.describe Ingestion::Receive do
     end
   end
 end
-
