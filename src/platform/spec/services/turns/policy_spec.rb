@@ -14,6 +14,10 @@ RSpec.describe Turns::Policy, "ADR-020: os tempos do atendimento pela IA ficam n
     expect(policy.window_for("email")).to eq(0.seconds)
   end
 
+  it "RN-49: limites de tamanho do contexto em caracteres de texto (06, parâmetros)" do
+    expect(described_class.for(infinitepay)).to have_attributes(pending_chars_limit: 16_000, context_chars_limit: 32_000)
+  end
+
   it "vale para qualquer marca até o bloco 12 ligar a configuração por marca" do
     expect(described_class.for(jim)).to eq(described_class.for(infinitepay))
   end
