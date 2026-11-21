@@ -104,6 +104,33 @@ RSpec.describe "ROADMAP 05: entrega no painel" do
       expect(stages).to include("Tempo total percebido 8000 ms", "inclui a janela de agrupamento")
     end
 
+    it "RF-06: entregue e depois o provedor avisou falha: sem o estágio entregue e sem o tempo total" do
+      turn, delivery = applied_turn
+      deliver(delivery)
+      travel_to(t0 + 9)
+      # Como o Deliveries::StatusUpdate grava o callback failed: delivered_at apagado, a auditoria fica.
+      delivery.update_columns(status: "failed", delivered_at: nil, last_error: "provider_failed")
+      record_status_received(delivery, status: "failed")
+      record_delivery_failed(delivery, reason: "provider_failed", http_status: nil)
+
+      get conversation_path(turn.ticket_id)
+
+      stages = Nokogiri::HTML(response.body).at_css(".turn-stages").text.squish
+      expect(stages).to include("Resposta aplicada", "Entregue e depois o provedor avisou falha")
+      expect(stages).not_to include("Resposta entregue 20/11", "Tempo total percebido")
+    end
+
+    it "RF-06: falha sem ter sido entregue não aparece como aguardando confirmação" do
+      turn, delivery = applied_turn
+      record_delivery_failed(delivery, reason: "seq_anterior", http_status: 409)
+
+      get conversation_path(turn.ticket_id)
+
+      stages = Nokogiri::HTML(response.body).at_css(".turn-stages").text.squish
+      expect(stages).to include("Resposta não entregue: a entrega falhou")
+      expect(stages).not_to include("aguardando a confirmação", "Tempo total percebido")
+    end
+
     it "RN-56: turno descartado não mostra os estágios aplicada e entregue" do
       turn = open_turn_for(ingest("meu repasse não caiu"))
       ingest("é o de ontem")

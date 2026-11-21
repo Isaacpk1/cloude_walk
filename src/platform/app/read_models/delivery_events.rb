@@ -32,9 +32,26 @@ class DeliveryEvents
     requested.values.select { _1.data["turn"] == turn_number }.min_by { _1.data["seq"].to_i }
   end
 
-  # Horário da confirmação do provedor: deliveries.delivered_at, ou a auditoria delivery.delivered.
+  # Horário da confirmação do provedor, só enquanto a entrega está delivered: deliveries.delivered_at, ou a
+  # auditoria delivery.delivered. Uma entrega que o provedor depois avisou como failed não conta como entregue.
   def delivered_at(delivery_id)
-    deliveries_by_id[delivery_id]&.delivered_at || audits_for(delivery_id).find { _1.event_type == "delivery.delivered" }&.occurred_at
+    delivery = deliveries_by_id[delivery_id]
+    return unless delivery&.status == "delivered"
+
+    delivery.delivered_at || audits_for(delivery_id).find { _1.event_type == "delivery.delivered" }&.occurred_at
+  end
+
+  # Estado da entrega para o estágio "Resposta entregue" do turno: delivered, failed_after_delivered
+  # (confirmada e depois o callback de status avisou falha), not_delivered (failed ou cancelled) ou pending.
+  def stage_state(delivery_id)
+    delivery = deliveries_by_id[delivery_id]
+    case delivery&.status
+    when "delivered" then :delivered
+    when "failed"
+      audits_for(delivery_id).any? { _1.event_type == "delivery.delivered" } ? :failed_after_delivered : :not_delivered
+    when "cancelled" then :not_delivered
+    else :pending
+    end
   end
 
   def events = audits.filter_map { event_for(_1) }

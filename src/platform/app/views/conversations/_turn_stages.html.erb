@@ -12,6 +12,10 @@
       <% if stages.delivered_at %>
         <li><strong>Resposta entregue</strong> <time><%= panel_time(stages.delivered_at) %></time>
           <span class="mono"><%= duration_text(stages.delivered_ms) %></span> <span class="muted">desde a resposta aplicada</span></li>
+      <% elsif stages.failed_after_delivered? %>
+        <li><strong>Entregue e depois o provedor avisou falha</strong> <span class="muted">(callback de status failed): a resposta não conta como entregue.</span></li>
+      <% elsif stages.not_delivered? %>
+        <li class="muted">Resposta não entregue: a entrega falhou ou foi cancelada.</li>
       <% else %>
         <li class="muted">Resposta entregue: aguardando a confirmação do canal.</li>
       <% end %>

@@ -86,6 +86,7 @@ class RecordedConversations
     ConversationView::TurnStages.new(
       opened_at: record.created_at, received_at: actions.received_at(record), applied_at: requested&.occurred_at,
       delivered_at: requested && deliveries.delivered_at(requested.data["delivery_id"]),
+      delivery_state: requested && deliveries.stage_state(requested.data["delivery_id"]),
       first_customer_at: first_received[covered.min], discarded: agent_action.rejected?
     )
   end
