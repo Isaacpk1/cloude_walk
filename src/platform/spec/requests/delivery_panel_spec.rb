@@ -40,14 +40,14 @@ RSpec.describe "ROADMAP 05: entrega no painel" do
                               "entregue às 20/11/2026 09:00:08", "Resposta do turno 1", delivery.delivery_id)
     end
 
-    it "pendente, com a retentativa agendada" do
+    it "enviando sem reserva, com a retentativa agendada" do
       turn, delivery = applied_turn
       record_delivery_sending(delivery)
       record_delivery_retry(delivery, error: "503 falha simulada", next_attempt_at: t0 + 9)
 
       get conversation_path(turn.ticket_id)
 
-      expect(response.body).to include("Pendente", "nova tentativa às 20/11/2026 09:00:09", "503 falha simulada")
+      expect(response.body).to include("Enviando", "nova tentativa às 20/11/2026 09:00:09", "503 falha simulada")
     end
 
     it "RNF-15: enviando, com o número de tentativas" do

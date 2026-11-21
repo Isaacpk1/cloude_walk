@@ -59,16 +59,26 @@ class DeliveryEvents
   def status_view(delivery)
     history = audits_for(delivery.delivery_id)
     failed = history.reverse.find { _1.event_type == "delivery.failed" }
-    retry_audit = history.reverse.find { _1.event_type == "delivery.retry_scheduled" }
     ConversationView::DeliveryStatus.new(
       delivery_id: delivery.delivery_id, seq: delivery.seq, kind: delivery.kind, status: delivery.status,
       attempts: delivery.attempts, provider_message_id: delivery.provider_message_id, delivered_at: delivery.delivered_at,
       last_error: delivery.last_error, failure_reason: failed&.data&.dig("reason"),
       http_status: failed&.data&.dig("http_status"),
       reconciliation_needed: history.any? { _1.event_type == "delivery.reconciliation_needed" },
-      next_attempt_at: delivery.status == "pending" ? parse_time(retry_audit&.data&.dig("next_attempt_at")) : nil,
+      next_attempt_at: scheduled_retry_at(delivery, history),
       turn: requested[delivery.delivery_id]&.data&.dig("turn")
     )
+  end
+
+  # A retentativa agendada pelo Deliveries::Send: a entrega fica em `sending` sem reserva (lease_until nulo
+  # ou vencido) e o último registro da tentativa é um delivery.retry_scheduled posterior ao delivery.sending.
+  # Com a reserva vigente, a tentativa seguinte está em curso; encerrada, não há retentativa.
+  def scheduled_retry_at(delivery, history)
+    return unless Delivery::OPEN.include?(delivery.status)
+    return if delivery.lease_until && delivery.lease_until > Time.current
+
+    last = history.reverse.find { %w[delivery.sending delivery.retry_scheduled delivery.reconciliation_needed].include?(_1.event_type) }
+    parse_time(last.data["next_attempt_at"]) if last&.event_type == "delivery.retry_scheduled"
   end
 
   def event_for(audit)

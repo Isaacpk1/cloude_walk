@@ -39,9 +39,11 @@ module DeliveryRecordHelpers
                                                    "duration_ms" => duration_ms, "replayed" => replayed)
   end
 
-  def record_delivery_retry(delivery, attempt: 1, error: "503 falha simulada", next_attempt_at: 2.seconds.from_now)
-    delivery.update_columns(status: "pending", last_error: error, lease_until: nil)
-    delivery_audit(delivery, "delivery.retry_scheduled", "attempt" => attempt, "error" => error,
+  # Como o Deliveries::Send grava: a entrega continua em `sending`, sem reserva, com o erro da tentativa.
+  def record_delivery_retry(delivery, attempt: 1, error: "503 falha simulada", next_attempt_at: 2.seconds.from_now,
+                            outcome: "sem_efeito")
+    delivery.update_columns(status: "sending", attempts: attempt, last_error: error, lease_until: nil)
+    delivery_audit(delivery, "delivery.retry_scheduled", "attempt" => attempt, "error" => error, "outcome" => outcome,
                                                          "next_attempt_at" => next_attempt_at.utc.iso8601(3))
   end
 
