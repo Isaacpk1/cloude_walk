@@ -39,6 +39,9 @@ RSpec.describe Ticket do
     it "soma ao valor do banco, não ao valor em memória (cópia desatualizada não perde incremento)" do
       stale = described_class.find(saved.id)
       saved.bump_context_version!
+      # Outra gravação sobe o lock_version: um update_columns da cópia antiga filtraria por ele e mudaria 0 linhas.
+      saved.update!(latest_customer_seq: 5)
+      expect(saved.reload.lock_version).to be > stale.lock_version
 
       expect(stale.bump_context_version!).to eq(2)
       expect(saved.reload.context_version).to eq(2)

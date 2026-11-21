@@ -201,4 +201,41 @@ RSpec.describe "RN-55: janela de agrupamento por canal, da ingestão ao turno" d
       expect([ Ticket.count, Message.count, OutboxEvent.count, AuditEvent.count ]).to eq([ 0, 0, 0, 0 ])
     end
   end
+
+  describe "RN-55, RF-33: a versão do contexto do turno acompanha as gravações (07, seção 3.4)" do
+    # A ação do agente é julgada pelo relógio do banco, que não anda com o travel_to: o cenário começa agora.
+    let(:t0) { Time.current.utc.change(usec: 0) }
+
+    def apply(turn, text)
+      AgentActions::Apply.call(agent_action_for(turn, reply: { "text" => text }), traceparent: AgentActionHelpers::TRACEPARENT)
+    end
+
+    it "mensagem, turno, mensagem que supera, turno, saída aplicada e nova mensagem: cada turno leva a versão vigente" do
+      ticket = ingest_at(t0, "chat", "meu repasse não caiu").ticket                      # v1
+      turn1 = tick_at(t0 + 1.5.seconds).sole.turn
+      expect(turn1).to have_attributes(context_version: 1, context_until_seq: 1)
+
+      ingest_at(t0 + 3.seconds, "chat", "é o de ontem, R$ 1.200")                          # v2
+      expect(turn1.reload.status).to eq("superseded")
+      turn2 = tick_at(t0 + 4.seconds).sole.turn
+      expect(turn2).to have_attributes(context_version: 2, context_until_seq: 2)
+
+      expect(apply(turn1, "Qual repasse?").reason).to eq("turno_superado")                 # rejeição: não sobe
+      expect(ticket.reload.context_version).to eq(2)
+      expect(apply(turn2, "O de ontem cai hoje.").status).to eq(:applied)                   # saída seq 3: v3
+      expect(AuditEvent.find_by!(event_type: "delivery.requested").data).to include("seq" => 3, "context_version" => 3)
+
+      ingest_at(t0 + 10.seconds, "chat", "e o de hoje?")                                    # v4
+      turn3 = tick_at(t0 + 11.5.seconds).sole.turn
+
+      expect(turn3).to have_attributes(context_version: 4, context_until_seq: 4)
+      expect(ticket.reload.context_version).to eq(4)
+      expect(pending_seqs(turn3)).to eq([ 4 ])
+      expect(turn3.context.fetch("history").map { _1["seq"] }).to eq([ 1, 2, 3 ])
+      expect(turn3.context_digest).to eq(Turns::ContextDigest.call(turn3.context))
+      expect(AuditEvent.where(event_type: "message.received").order(:id).map { _1.data.values_at("seq", "context_version") })
+        .to eq([ [ 1, 1 ], [ 2, 2 ], [ 4, 4 ] ])
+    end
+  end
 end
+
