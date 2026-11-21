@@ -20,4 +20,6 @@ Rails.application.routes.draw do
   root "conversations#index"
   resources :conversations, path: "conversas", only: %i[index show]
   resources :timelines, path: "linha-do-tempo", only: %i[index show]
+  # Bloco 07 (ADR-023): execuções gravadas em eval_runs.
+  resources :evals, only: %i[index show]
 end

@@ -100,7 +100,15 @@ class AgentActionEvents
 
   def outcome_detail(action, data)
     head = "Ação #{action.action} do turno #{data['turn']} (event_id #{action.event_id.to_s.first(8)})"
-    action.applied? ? "#{head} aplicada" : "#{head} descartada: #{action.rejection_reason_label}"
+    return "#{head} aplicada" if action.applied?
+
+    "#{head} descartada: #{action.rejection_reason_label}#{superseded_text(data['turn'])}"
+  end
+
+  # Bloco 07 (RN-56): a rejeição de um turno superado diz por qual mensagem, ligando-se ao evento "Turno superado".
+  def superseded_text(turn)
+    superseded = (@superseded ||= TurnSupersededEvents.new(@ticket)).for_turn(turn)
+    superseded ? "; turno #{turn} superado pela mensagem seq #{superseded.by_seq}" : ""
   end
 
   def event(audit, action, kind, **attrs)

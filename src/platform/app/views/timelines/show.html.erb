@@ -44,7 +44,7 @@
         <td><%= link_to timeline_path(c.id, evento: position), class: "timeline__pick", title: "Escolher o evento" do %><strong><%= event.label %></strong><% end %><% if event.error? %> <span class="badge badge--error">erro</span><% end %><% if event.detail %><div class="muted small"><%= event.detail %></div><% end %></td>
         <td class="mono"><%= duration_text(event.duration_ms) %></td>
         <td class="timeline__bar-col"><div class="bar"><span class="bar__fill bar__fill--<%= event.kind %>" style="<%= timeline_bar_style(t, event) %>"></span></div></td>
-        <td class="mono small"><%= event.ticket_id %> · <%= event.seq ? "seq #{event.seq}" : "—" %> · <%= event.turn ? "turno #{event.turn}" : "—" %></td>
+        <td class="mono small"><%= event.ticket_id %> · <%= event.seq ? link_to("seq #{event.seq}", conversation_path(c.id, anchor: "seq-#{event.seq}")) : "—" %> · <%= event.turn ? link_to("turno #{event.turn}", conversation_path(c.id, anchor: "turn-#{event.turn}")) : "—" %></td>
         <td><code class="small"><%= event.trace_id %></code></td>
         <td><%= source_badge(event.source) %></td>
       </tr>

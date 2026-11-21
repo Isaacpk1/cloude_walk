@@ -25,6 +25,7 @@ class RecordedConversations
     events += TurnWindowEvents.new(ticket).events
     events += TurnContextEvents.new(ticket).events
     events += PublicationEvents.new(ticket).events
+    events += TurnSupersededEvents.new(ticket).events
     events += AgentActionEvents.new(ticket).events
     events += DeliveryEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
@@ -76,13 +77,15 @@ class RecordedConversations
 
   def turns(ticket, deliveries)
     actions = AgentActionEvents.new(ticket)
+    superseded = TurnSupersededEvents.new(ticket)
     first_received = ticket.messages.to_h { [ _1.seq, _1.received_at ] }
     records = ticket.ai_turns.where(brand_id: ticket.brand_id).order(:turn).to_a
     publications = OutboxEvent.where(brand_id: ticket.brand_id, id: records.map(&:event_id)).index_by(&:id)
     records.map do |record|
       agent_action = actions.for_turn(record)
       note = record.status == "eligible" ? publication_note(publications[record.event_id]) : TURN_NOTES[record.status]
-      turn(record, agent_action, stages(record, agent_action, actions, deliveries, first_received), note)
+      turn(record, agent_action, stages(record, agent_action, actions, deliveries, first_received), note,
+           superseded.for_turn(record.turn))
     end
   end
 
@@ -114,14 +117,16 @@ class RecordedConversations
 
   # Bloco 03: o turno gravado em ai_turns. As mensagens cobertas são as pendentes do contexto enviado.
   # Bloco 04: a ação recebida do agente (ai_turns.response) e o seu desfecho.
-  def turn(record, agent_action, stages, note)
+  # Bloco 07: no turno superado, a mensagem que o superou e quando (RN-56).
+  def turn(record, agent_action, stages, note, superseded)
     ConversationView::Turn.new(
       number: record.turn, status: record.status,
       covered_seqs: Array(record.context["pending_messages"]).map { _1["seq"] },
       context_until_seq: record.context_until_seq, assignment_version: record.assignment_version,
       event_id: record.event_id, action: record.response&.dig("action") || "—",
       note:, tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] },
-      agent_action:, stages:, context: ConversationView::TurnContext.from(record)
+      agent_action:, stages:, context: ConversationView::TurnContext.from(record),
+      superseded_by_seq: superseded&.by_seq, superseded_at: superseded&.at
     )
   end
 

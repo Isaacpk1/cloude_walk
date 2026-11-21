@@ -56,7 +56,7 @@ class SyntheticConversations
     b.message(3, "bot", names[:bot], "Achei o repasse de ontem, de R$ 1.200,00. Ele foi liberado hoje às 9h e cai na sua conta até as 18h.",
               at: 6_041, delivery_status: "delivered", trace_seq: 1)
     b.turn(1, "superseded", covered_seqs: [ 1 ], assignment_version: 1, action: "reply", tool_calls: %w[consultar_repasse],
-                            note: "Superado pela gravação da seq 2 aos 3 s. Resposta das 3,5 s descartada",
+                            note: "Superado pela gravação da seq 2 aos 3 s. Resposta das 3,5 s descartada", superseded_by: [ 2, 3_036 ],
                             agent_action: agent_action("Qual repasse você quer consultar?", agent_ms: 1_860, outcome: :rejected,
                                                                                                rejection_reason: "turno_superado"))
     b.turn(2, "applied", covered_seqs: [ 1, 2 ], assignment_version: 1, action: "reply", tool_calls: %w[consultar_repasse],
@@ -66,6 +66,8 @@ class SyntheticConversations
     b.cycle(turn: 1, trace_seq: 1, wait: 36..1_536, publish: 1_540..1_602, agent: 1_640..3_500,
             wait_detail: "Janela de 1,5 s sem nova mensagem (RN-55)", agent_detail: "Turno 1 com context_until_seq 1")
     b.ingestion(seq: 2, at: 3_000, persisted_detail: "latest_customer_seq = 2 no mesmo commit: turno 1 superado (RN-56)")
+    b.event(:turn_superseded, 3_036..3_036, seq: 2, turn: 1, trace_seq: 2,
+                                            detail: "Turno 1 superado pela mensagem seq 2 no mesmo commit (RN-56)")
     b.event(:discarded, 3_500..3_512, seq: 1, turn: 1, trace_seq: 1,
                                       detail: "Resposta do turno 1 rejeitada: context_until_seq 1 < latest_customer_seq 2")
     b.cycle(turn: 2, trace_seq: 1, wait: 3_035..4_000, publish: 4_003..4_061, agent: 4_100..6_000,
@@ -157,10 +159,11 @@ class SyntheticConversations
       )
     end
 
-    def turn(number, status, covered_seqs:, assignment_version:, action:, tool_calls:, note:, agent_action: nil)
+    def turn(number, status, covered_seqs:, assignment_version:, action:, tool_calls:, note:, agent_action: nil, superseded_by: nil)
+      by_seq, at = superseded_by
       @turns << ConversationView::Turn.new(
         number:, status:, covered_seqs:, context_until_seq: covered_seqs.max, assignment_version:,
-        event_id: uuid("turn-#{number}"), action:, tool_calls:, note:,
+        event_id: uuid("turn-#{number}"), action:, tool_calls:, note:, superseded_by_seq: by_seq, superseded_at: at && time(at),
         agent_action: agent_action&.with(event_id: uuid("action-#{number}"))
       )
     end
