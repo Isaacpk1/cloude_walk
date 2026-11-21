@@ -20,7 +20,7 @@
 #    invariante 8) e a auditoria (RN-37, RF-54). Aplicada com texto para o cliente (`reply.text` ou
 #    `resolution.text`), grava também a saída (bloco 05; 07, seções 3.1 passo 6 e 3.2): a mensagem `outbound`
 #    com o próximo seq do atendimento travado, pelo canal e pela conta da última mensagem do cliente (RF-06),
-#    a entrega `pending` (delivery_id estável, RNF-15), o item `delivery.requested` no outbox e a auditoria
+#    a versão do contexto (`Ticket#bump_context_version!`), a entrega `pending` (delivery_id estável, RNF-15), o item `delivery.requested` no outbox e a auditoria
 #    `delivery.requested`. Rejeitada, duplicada ou inválida não grava saída.
 # 4. Fora da transação (invariante 2): a DLQ pelo produtor do Karafka, se for o caso, o despertador do envio
 #    (OutboxJob com o item delivery.requested; o envio HTTP é do worker) e depois o log JSON.
@@ -227,6 +227,8 @@ module AgentActions
         brand_id: @ticket.brand_id, ticket: @ticket, direction: "outbound", author_type: "bot", body: text, seq:,
         channel: origin.channel, provider_account: origin.provider_account, external_id: nil, trace_id:, received_at: @now
       )
+      # RN-55, RF-33: a saída visível muda o que a IA veria no próximo turno (07, seção 3.4). Linha travada.
+      context_version = @ticket.bump_context_version!
       delivery = Delivery.create!(
         brand_id: @ticket.brand_id, ticket: @ticket, message:, seq:, channel: message.channel,
         provider_account: message.provider_account, kind:, status: "pending",
@@ -240,7 +242,7 @@ module AgentActions
       AuditEvent.create!(
         brand_id: @ticket.brand_id, ticket: @ticket, actor_type: "system", event_type: DELIVERY_EVENT, trace_id:,
         data: { delivery_id: delivery.delivery_id, message_id: message.id, seq:, kind:, turn: @turn.turn,
-                context_until_seq: @turn.context_until_seq }
+                context_until_seq: @turn.context_until_seq, context_version: }
       )
     end
 
