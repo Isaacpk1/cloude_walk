@@ -1,10 +1,13 @@
 # Callback de status de entrega do chat do app (07, seção 5.0; interface do bloco 05, item 3).
 # Autentica a assinatura da conta antes de ler o corpo (RNF-23, ADR-019), valida o contrato chat_status
-# (invariante 10) e delega ao Deliveries::StatusUpdate. 202 para aceito, repetido ou desconhecido: o
-# provedor não tem o que corrigir nesses casos e não deve repetir.
+# (invariante 10) e delega ao Deliveries::StatusUpdate. 202 para aceito ou repetido. message_id ainda
+# desconhecido na conta → 503 com Retry-After, sem gravar nada: o provedor manda o callback logo depois
+# de aceitar a mensagem, e ele pode chegar antes de a plataforma gravar a confirmação (transação 2 do
+# Deliveries::Send). O provedor repete 5xx com backoff; a repetição encontra a entrega (RNF-15).
 module Webhooks
   class ChatStatusesController < ActionController::API
     DATABASE_DOWN = ChannelsController::DATABASE_DOWN
+    UNKNOWN_RETRY_AFTER = "2".freeze
 
     rescue_from ProviderAccount::NotFound do |error|
       render json: { status: "not_found", error: error.message }, status: :not_found
@@ -32,7 +35,10 @@ module Webhooks
       payload = JSON.parse(HelpdeskContracts.validate!(:chat_status, request.raw_post))
 
       result = Deliveries::StatusUpdate.call(account:, payload:)
-      render json: { status: result.status.to_s }, status: :accepted
+      return render(json: { status: result.status.to_s }, status: :accepted) unless result.status == :unknown
+
+      response.set_header("Retry-After", UNKNOWN_RETRY_AFTER)
+      render json: { status: "unknown" }, status: :service_unavailable
     end
   end
 end

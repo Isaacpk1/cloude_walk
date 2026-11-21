@@ -95,16 +95,30 @@ RSpec.describe "Callback de status do chat (POST /webhooks/chat/:provider_accoun
     end
   end
 
-  describe "message_id desconhecido" do
-    it "responde 202 sem efeito" do
+  describe "RNF-15: message_id ainda desconhecido na conta (callback antes da confirmação gravada)" do
+    it "responde 503 com Retry-After: 2 e não grava nada, para o provedor repetir" do
       delivery
 
       post_status(body(message_id: "chat_out_999999"))
 
-      expect(response).to have_http_status(:accepted)
+      expect(response).to have_http_status(:service_unavailable)
+      expect(response.headers["Retry-After"]).to eq("2")
       expect(response.parsed_body).to include("status" => "unknown")
       expect(AuditEvent.where("event_type LIKE 'delivery.status%' OR event_type = 'delivery.failed'")).to be_empty
       expect(ProcessedEvent.count).to eq(0)
+    end
+
+    it "o mesmo callback repetido depois de a confirmação ser gravada tem efeito" do
+      pending_delivery = requested_delivery(customer_message.ticket)
+      post_status(body(status: "failed"))
+      expect(response).to have_http_status(:service_unavailable)
+
+      pending_delivery.update_columns(status: "delivered", provider_message_id: "chat_out_000456", delivered_at: start, attempts: 1)
+      post_status(body(status: "failed"))
+
+      expect(response).to have_http_status(:accepted)
+      expect(pending_delivery.reload.status).to eq("failed")
+      expect(audits("delivery.status_received").count).to eq(1)
     end
   end
 
@@ -114,7 +128,7 @@ RSpec.describe "Callback de status do chat (POST /webhooks/chat/:provider_accoun
 
       post_status(body(status: "failed"), account: "jim-chat-mock")
 
-      expect(response).to have_http_status(:accepted)
+      expect(response).to have_http_status(:service_unavailable)
       expect(response.parsed_body).to include("status" => "unknown")
       expect(delivery.reload.status).to eq("delivered")
       expect(audits("delivery.failed")).to be_empty
