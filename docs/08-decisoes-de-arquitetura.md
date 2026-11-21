@@ -608,6 +608,7 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 2. **O eval roda o caminho real da plataforma**: ingestão, `scheduler`, abertura do turno e aplicação da ação, com o relógio real, num atendimento sintético da marca. As ações do agente vêm de um gabarito fixo do cenário, válido no contrato `agent_outbound` e identificado como `eval-fixture`, para que o resultado dependa só da regra da plataforma.
 3. **Disparo** por comando (`bin/rails evals:run[corrida-3s]`, `make eval`), fora do `rspec`. O `rspec` testa o executor com o relógio controlado.
 4. **Painel**: a aba de evals mostra cada cenário conhecido, a última execução e o histórico; cenário que nunca rodou aparece como "nunca executado".
+5. **Isolamento da pilha real.** O atendimento do eval nasce marcado no commit da mensagem 1: a mensagem vem da conta de provedor de eval da marca (`<marca>-chat-eval`, `provider_accounts.evaluation = true`, inativa, criada pelo seed ou pelo eval), e a ingestão grava `tickets.evaluation = true`, que não muda depois (trigger). O worker não publica no broker o turno de um atendimento de eval (`agent_event.discarded`, `reason: eval`) nem entrega a saída dele ao canal (`deliveries.status = cancelled`, auditoria `delivery.cancelled`, `reason: eval`). O eval faz ele mesmo a volta do worker na saída e registra o desfecho em `observed.deliveries`. Uma ação de outro agente no atendimento torna a execução `error` ("cenário contaminado"), não `failed`. O eval só registra a abertura do próprio atendimento (`DispatchDue` com `brand_id` e `ticket_ids`). O executor não exercita a publicação no broker nem a entrega ao provedor: esses trechos têm testes próprios (blocos 03 e 05).
 
 **Alternativas consideradas.**
 
@@ -623,6 +624,8 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - (+) O bloco 16 reaproveita a tabela e o executor para os outros cenários.
 - (−) O eval com gabarito fixo não mede a qualidade do agente, só a regra da plataforma.
 - (−) Uma execução leva alguns segundos de relógio real.
+- (+) O eval passa com o `scheduler`, o worker e o agent-mock no ar, e nada do eval chega ao agente nem ao cliente.
+- (−) Atendimentos de eval ficam no banco como dados sintéticos, fora do fluxo de saída. Um eval de ponta a ponta pelo simulador (bloco 16) vai precisar de outro desenho.
 
 ---
 
