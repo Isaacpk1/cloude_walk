@@ -29,6 +29,7 @@ Formato: ADR curto (contexto → decisão → alternativas → consequências). 
 | Contas e autenticação dos webhooks de entrada | Conta do provedor na URL e cadastrada na tabela `provider_accounts`, com segredo criptografado. Cada canal confere a assinatura do seu provedor | [ADR-019](#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada) |
 | Prazo da IA | 20 s por turno, teto de 60 s por ciclo, escalação imediata em falha definitiva da publicação. Configurável por marca no bloco 12 | [ADR-020](#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo) |
 | Entrega ao canal | Identidade e ordem da entrega em cabeçalhos; aceite do provedor vale como entregue; falha certa avança a fila e só o resultado incerto vai para conciliação (proposto) | [ADR-021](#adr-021--entrega-ao-canal-identidade-aceite-e-conciliação) |
+| Contexto do turno | Versão do contexto no atendimento, digest SHA-256 do JSON canônico no turno e limites de tamanho do RN-49 (proposto) | [ADR-022](#adr-022--versão-e-prova-do-contexto-do-turno) |
 
 ### Orçamento de memória (RNF-29: 4 vCPU, 8 GB)
 
@@ -562,6 +563,37 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - (+) Uma queda do provedor não trava o atendimento; só a dúvida real trava.
 - (−) A conciliação precisa de tela e ação do analista (bloco 09). Até lá, uma conversa em conciliação para de receber saídas.
 - (−) O `channels-mock` guarda o estado em memória: reiniciá-lo zera a deduplicação, e recriar o banco com o mock no ar colide nas conversas (`make reset` reinicia o mock).
+
+## ADR-022 — Versão e prova do contexto do turno
+
+**Proposto em 21/11/2026, no bloco 06. Aguarda aprovação.** Detalha a seção 3.4 do [07](07-arquitetura.md) e a RN-49. Mantém o [ADR-016](#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox) e o [ADR-020](#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo).
+
+**Contexto.** O ROADMAP pede a "versão do contexto" e que "o turno persistido corresponda ao contexto enviado", mas a documentação não dizia o que é essa versão nem como provar a correspondência. A RN-49 fala em "limite de tamanho" sem valor e em resumos de atendimentos anteriores que ainda não existem.
+
+**Decisão.**
+
+1. **Versão do contexto.** `tickets.context_version` começa em 0 e sobe 1, na mesma transação e com a linha travada, a cada gravação que muda o que a IA veria no próximo turno: mensagem do cliente e mensagem de saída visível. Não sobe em duplicata, rejeição, descarte, `escalate` nem `resolve` sem texto. O incremento é feito no banco (`UPDATE ... SET context_version = context_version + 1 ... RETURNING`), para não depender da cópia em memória nem do `lock_version`.
+2. **Prova do contexto.** O turno grava `context_version` e `context_digest = "sha256:" + SHA-256(JSON canônico do context)`. JSON canônico: objetos com as chaves como texto, ordenadas por bytes em todos os níveis; arrays na ordem; números e textos como o `JSON.generate` do Ruby os escreve, sem espaços, UTF-8 sem escapes de não ASCII. Não é a RFC 8785: `1` e `1.0` dão digests diferentes. O `context` gravado é o mesmo objeto do evento no outbox, e o painel recalcula o digest para conferir. O banco exige versão e digest juntos.
+3. **Limites do RN-49.** 16 000 caracteres de `text` nas mensagens pendentes e 32 000 no contexto inteiro (pendentes, histórico, resumo e resumos de atendimentos anteriores). O histórico perde as mais antigas até caber. Acima do limite das pendentes, o turno não abre (`contexto_excede_limite`) e o ciclo espera o handoff (bloco 10).
+4. **Atendimentos anteriores até o bloco 10.** Até existir o resumo do atendimento, `previous_tickets[].summary` leva só fatos gravados (canal, data de abertura, estado, categoria), com o prefixo "Sem resumo gravado.", e a janela de 90 dias conta pela abertura do atendimento anterior.
+5. **Canal sem janela.** Canal sem janela de agrupamento na política da marca é erro na ingestão: nada é gravado.
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Usar só `context_until_seq` como versão | Não muda quando a resposta da IA ou o analista escrevem, e não prova o conteúdo enviado |
+| Comparar o `context` gravado com o do outbox, sem digest | Exige guardar e ler o evento inteiro para sempre; o digest é curto e serve também ao eval |
+| JSON canônico pela RFC 8785 | Exige biblioteca e regras de número que o Ruby não traz; a forma própria está documentada aqui |
+| Truncar mensagens pendentes grandes | A RN-49 manda mandar todas por inteiro; cortar mudaria o que o cliente disse |
+| Omitir `previous_tickets` até o bloco 10 | O agente perderia o vínculo com o atendimento anterior (RN-09) sem ganho de segurança |
+
+**Consequências.**
+
+- (+) Dá para provar, turno a turno, o que a IA recebeu, inclusive em evals (bloco 16).
+- (+) Um contexto grande não trava o agente nem estoura o modelo.
+- (−) Até o bloco 10, um caso com pendentes acima do limite fica com a IA, sem turno, até o prazo do ciclo.
+- (−) Os limites são proposta; devem ser calibrados com o agente real.
 
 ---
 
