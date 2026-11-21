@@ -81,10 +81,12 @@ RSpec.describe "RN-49, RN-46, RN-55, RF-55, RF-56: recusa terminal do turno no p
       body = page(conversation_path(ticket.id), t0 + 61.seconds)
       expect(body).not_to include("Agrupando mensagens")
       expect(refusal_section(body)).to include("Turno não aberto: prazo_vencido — handoff pendente (bloco 10)",
-                                               "seq 1", "teto do ciclo")
+                                               "seq 1", "teto do ciclo 21/11/2026 10:41:00.000")
 
       timeline = page(timeline_path(ticket.id), t0 + 61.seconds)
-      expect(timeline).to include("Turno não aberto (prazo_vencido)", "handoff para humano pendente (bloco 10; RN-46)")
+      expect(timeline).to include("Turno não aberto (prazo_vencido)", "teto do ciclo 21/11/2026 10:41:00.000",
+                                  "handoff para humano pendente (bloco 10; RN-46)")
+      expect(timeline).not_to include("2026-11-21T13:41:00")
     end
   end
 

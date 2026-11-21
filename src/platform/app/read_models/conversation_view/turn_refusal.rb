@@ -12,7 +12,7 @@ class ConversationView::TurnRefusal < Data.define(:reason, :pending_seqs, :pendi
     when "contexto_excede_limite"
       "#{pending_chars} caracteres pendentes, acima do limite de #{limit} (RN-49)"
     when "prazo_vencido"
-      "teto do ciclo #{deadline_at&.utc&.iso8601(3)} vencido antes de o turno abrir (RN-46)"
+      "teto do ciclo #{deadline_at && PanelClock.format(deadline_at, precise: true)} vencido antes de o turno abrir (RN-46)"
     when "contrato"
       "evento do turno fora do contrato agent_inbound (#{Array(violations).join(', ')}); publicação definitivamente falha (RN-46)"
     else

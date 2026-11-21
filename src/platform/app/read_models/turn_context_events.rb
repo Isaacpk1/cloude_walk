@@ -59,7 +59,7 @@ class TurnContextEvents
   def refusal_numbers(data)
     case data["reason"]
     when TOO_LARGE then "#{data['pending_chars']} caracteres pendentes, acima do limite de #{data['limit']}"
-    when "prazo_vencido" then "teto do ciclo #{data['deadline_at']} vencido antes da abertura"
+    when "prazo_vencido" then "teto do ciclo #{panel_time(data['deadline_at'])} vencido antes da abertura"
     when "contrato" then "evento fora do contrato agent_inbound (#{Array(data['violations']).join(', ')})"
     else "sem teto do ciclo gravado"
     end
@@ -67,6 +67,7 @@ class TurnContextEvents
 
   def pending_handoff(reason) = "handoff para humano pendente (bloco 10; #{reason == TOO_LARGE ? 'RN-49' : 'RN-46'})"
 
+  def panel_time(iso) = iso && PanelClock.format(Time.zone.parse(iso), precise: true)
   def chars(items) = Array(items).sum { _1["text"].to_s.length }
   def list(seqs) = seqs.empty? ? "nenhuma" : seqs.join(", ")
 
