@@ -10,9 +10,11 @@
 #   t=3,5 s  a resposta do turno 1 chega (AgentActions::Apply) e é rejeitada como turno_superado
 #   t=4 s    teto da janela: o turno 2 abre com [1, 2]
 #   +0,5 s   a resposta do turno 2 é aplicada: uma única saída ao cliente
+#   depois   a volta do worker na saída: atendimento de eval, a entrega encerra como cancelled (motivo eval)
 #
 # As respostas vêm do gabarito fixo (FIXTURE), válidas no contrato agent_outbound, com o modelo `eval-fixture`:
-# o resultado depende só da regra da plataforma. O evento do turno é lido do outbox, sem passar pelo broker.
+# o resultado depende só da regra da plataforma. O evento do turno é lido do outbox, sem passar pelo broker: o
+# worker real descarta a publicação do turno de um atendimento de eval (motivo eval) e não entrega a saída dele.
 # O scheduler real pode abrir o turno antes do eval: o eval usa o item e o turno que encontrar.
 module Evals
   module Scenarios
@@ -92,6 +94,7 @@ module Evals
 
         wait_until(opened_at + ms(FIXTURE["actions"][1]["after_open_ms"]))
         respond(2, step: "resposta do turno 2")
+        conclude_deliveries
       end
 
       # O que foi observado até agora: o estado final dos turnos e das saídas, lido do banco, e os passos.
@@ -102,7 +105,7 @@ module Evals
           "rejections" => @results.filter_map { |turn, r| { "turn" => turn, "reason" => r[:reason] } if r[:status] == "rejected" },
           "actions" => @results.map { |turn, r| { "turn" => turn }.merge(r.transform_keys(&:to_s)) },
           "turn1_status_after_message_2" => @snapshots[:turn1_after_message2],
-          "foreign_agent_actions" => foreign_agent_actions, "steps" => @steps
+          "deliveries" => deliveries_summary, "foreign_agent_actions" => foreign_agent_actions, "steps" => @steps
         }
       end
 
@@ -161,13 +164,24 @@ module Evals
           "received_at" => @clock.call.utc.iso8601(3), "trace_id" => trace
         }
         at_ms = t_ms
-        result = Ingestion::Receive.call(normalized, provider_payload: { "source" => "eval", "scenario" => NAME })
+        result = Ingestion::Receive.call(normalized, provider_payload: chat_webhook(customer, normalized))
         @ticket = result.ticket
         step!(step, at_ms, seq: result.message.seq)
       end
 
       # A conta de eval da marca (ADR-023, item 5): o atendimento nasce marcado como eval no commit da mensagem 1,
       # e o worker real não publica o turno dele no broker nem entrega a saída dele ao canal.
+      # O webhook cru do chat, como o da ingestão real (contrato chat_webhook): o customer_ref é o destino da
+      # resposta (07, seção 5.0). Sem ele, a saída seria recusada pela plataforma antes de qualquer envio.
+      def chat_webhook(customer, normalized)
+        identity = customer.identities.sole.external_id
+        HelpdeskContracts.validate!(:chat_webhook, {
+          "message_id" => normalized.fetch("external_id"), "account_id" => identity,
+          "customer_ref" => "cus_#{identity}", "text" => normalized.dig("content", "text"),
+          "sent_at" => normalized.fetch("received_at")
+        })
+      end
+
       def provider_account
         @provider_account ||= ProviderAccount.evaluation_for!(@brand, CHANNEL).slug
       end
@@ -239,6 +253,29 @@ module Evals
                           .to_h { [ _1.data["seq"], _1.data["turn"] ] }
         Message.where(brand_id: @brand.id, ticket_id: ticket.id, direction: "outbound").order(:seq).pluck(:seq)
                .map { { "seq" => _1, "turn" => turns[_1] } }
+      end
+
+      # A volta do worker na saída do eval (Deliveries::Send, o mesmo caminho do OutboxJob): o atendimento é de
+      # eval, então a entrega encerra como cancelled, motivo eval, sem chegar a um provedor (ADR-023, item 5). Se
+      # o worker real já concluiu o item, o Send só confirma o estado.
+      def conclude_deliveries
+        OutboxEvent.where(brand_id: @brand.id, ticket_id: ticket.id, event_type: Deliveries::Send::EVENT_TYPE, completed_at: nil)
+                   .order(:id).pluck(:id).each { Deliveries::Send.call(_1) }
+      end
+
+      # O desfecho de cada entrega do atendimento, com o motivo da auditoria que a encerrou.
+      def deliveries_summary
+        return [] unless ticket
+
+        audits = AuditEvent.where(brand_id: @brand.id, ticket_id: ticket.id,
+                                  event_type: %w[delivery.requested delivery.cancelled delivery.failed])
+                           .order(:id).group_by { _1.data["delivery_id"] }
+        Delivery.where(brand_id: @brand.id, ticket_id: ticket.id).order(:seq).map do |delivery|
+          history = audits.fetch(delivery.delivery_id, [])
+          closing = history.reverse.find { _1.event_type != "delivery.requested" }
+          { "seq" => delivery.seq, "turn" => history.find { _1.event_type == "delivery.requested" }&.data&.dig("turn"),
+            "status" => delivery.status, "reason" => closing&.data&.dig("reason") }
+        end
       end
 
       # Ações de outro agente no atendimento do eval (ex.: o agent-mock respondendo pelo Kafka no Compose).
