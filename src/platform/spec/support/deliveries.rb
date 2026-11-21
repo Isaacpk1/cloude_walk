@@ -42,7 +42,7 @@ module DeliveryHelpers
   def delivery_item(delivery) = OutboxEvent.find_by!(dedup_key: "delivery:#{delivery.delivery_id}")
 
   # Respostas como as do channels-mock (interface combinada, item 2). `{ timeout: true }` simula o
-  # tempo esgotado. Cada requisição guarda quantas transações havia abertas na conexão, além da do
+  # tempo de leitura esgotado (Net::ReadTimeout: o corpo já saiu, resultado incerto). Cada requisição guarda quantas transações havia abertas na conexão, além da do
   # próprio teste, no momento da chamada (invariante 2).
   def stub_channels(*responses)
     responses = [ { status: 200 } ] if responses.empty?
@@ -56,7 +56,7 @@ module DeliveryHelpers
     end
     responses.each_with_index do |response, i|
       stub = stub.then unless i.zero?
-      stub = response[:timeout] ? stub.to_timeout : stub.to_return(channel_response(response))
+      stub = response[:timeout] ? stub.to_raise(Net::ReadTimeout) : stub.to_return(channel_response(response))
     end
     stub
   end

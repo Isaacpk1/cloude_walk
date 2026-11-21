@@ -181,6 +181,7 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
       expect(second.body).to eq(first.body)
       expect(delivery.reload).to have_attributes(status: "delivered", attempts: 2)
       expect(audits("delivery.delivered").sole.data).to include("replayed" => true, "attempt" => 2)
+      expect(audits("delivery.retry_scheduled").sole.data["outcome"]).to eq("incerto")
     end
   end
 
