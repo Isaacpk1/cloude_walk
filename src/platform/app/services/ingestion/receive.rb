@@ -112,7 +112,10 @@ module Ingestion
         external_id: @msg.fetch("external_id"), seq:, trace_id:, provider_payload: @provider_payload,
         received_at: Time.iso8601(@msg.fetch("received_at"))
       )
-      ticket.update!(latest_customer_seq: seq, **cycle_deadlines(ticket, seq))
+      window = window_for(ticket)
+      ticket.update!(latest_customer_seq: seq, **cycle_deadlines(ticket, seq, window))
+      # RN-55, RF-33: a mensagem muda o que a IA veria. Mesma transação, linha travada (07, seção 3.4).
+      context_version = ticket.bump_context_version!
       supersede_turns(ticket, seq)
 
       audit(ticket, "ticket.created", state: ticket.state, channel:, linked_ticket_id: ticket.linked_ticket_id) if opened
@@ -121,7 +124,9 @@ module Ingestion
                                         provider_account: message.provider_account, external_id: message.external_id,
                                         first_pending_seq: ticket.first_pending_seq,
                                         dispatch_due_at: ticket.dispatch_due_at&.iso8601(3),
-                                        ai_deadline_at: ticket.ai_deadline_at&.iso8601(3))
+                                        ai_deadline_at: ticket.ai_deadline_at&.iso8601(3),
+                                        window_ms: window&.in_milliseconds&.round,
+                                        ceiling_at: ceiling_at(ticket), context_version:)
       notice = OutboxEvent.create!(
         brand_id: ticket.brand_id, ticket:, event_type: "message.received", trace_id:, next_attempt_at: Time.current,
         payload: { ticket_id: ticket.id, message_id: message.id, seq: }
@@ -130,11 +135,17 @@ module Ingestion
       Result.new(status: :created, ticket:, message:, outbox_event_id: notice.id)
     end
 
+    # RN-55 (ADR-020): a janela do canal na política da marca. Canal sem parâmetro é erro (KeyError), não
+    # janela padrão. Caso fora da IA não usa janela.
+    def window_for(ticket)
+      Turns::Policy.for(ticket.brand).window_for(ticket.channel) if ticket.with_ai?
+    end
+
     # RN-55, RN-46 (07, seção 3.4; ADR-016, ADR-020): com a linha travada, a mensagem abre o ciclo pendente, se
     # não houver um, e empurra o fim da janela de agrupamento até o teto de 4 s. O `scheduler` abre o
     # turno quando dispatch_due_at vence. Caso fora da IA não ganha prazos da IA.
-    def cycle_deadlines(ticket, seq)
-      return {} unless ticket.with_ai?
+    def cycle_deadlines(ticket, seq, window)
+      return {} unless window
 
       now = Time.current
       policy = Turns::Policy.for(ticket.brand)
@@ -145,6 +156,13 @@ module Ingestion
       end
       first_pending_at = cycle.fetch(:first_pending_at, ticket.first_pending_at)
       cycle.merge(dispatch_due_at: Turns::Window.dispatch_due_at(channel: ticket.channel, now:, first_pending_at:, policy:))
+    end
+
+    # Teto da janela do ciclo pendente (RN-55): first_pending_at + 4 s, para a auditoria.
+    def ceiling_at(ticket)
+      return unless ticket.with_ai? && ticket.first_pending_at
+
+      (ticket.first_pending_at + Turns::Policy.for(ticket.brand).ceiling).utc.iso8601(3)
     end
 
     # RN-56, invariante 4: no mesmo commit, todo turno elegível que não cobre esta mensagem perde a
