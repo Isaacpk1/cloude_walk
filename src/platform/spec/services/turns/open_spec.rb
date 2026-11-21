@@ -231,9 +231,21 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
 
       expect(result.status).to eq(:expired)
       expect(AiTurn.count).to eq(0)
-      expect(received.ticket.reload.dispatch_due_at).to eq(start)
+      # Recusa terminal do ciclo: dispatch_due_at zera (o scheduler não tem o que reemitir); o ciclo fica para o timeout.
+      expect(received.ticket.reload).to have_attributes(dispatch_due_at: nil, first_pending_seq: 1,
+                                                        ai_deadline_at: start + 60.seconds)
       expect(last_audit(received.ticket).data).to include("reason" => "prazo_vencido",
                                                           "deadline_at" => (start + 60.seconds).utc.iso8601(3))
+    end
+
+    it "sem prazo do ciclo (ai_deadline_at nulo) também é terminal: zera dispatch_due_at" do
+      received = ingest
+      item = due_dispatch(received)
+      received.ticket.update_columns(ai_deadline_at: nil)
+
+      expect(described_class.call(item.id).status).to eq(:expired)
+      expect(received.ticket.reload.dispatch_due_at).to be_nil
+      expect(last_audit(received.ticket).data).to include("reason" => "sem_prazo")
     end
 
     it "abre exatamente no fim da janela (dispatch_due_at == agora)" do

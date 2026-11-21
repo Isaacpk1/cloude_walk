@@ -11,6 +11,7 @@
 # (Turns::ContextBuilder; pendentes acima do limite não abrem turno), grava o turno `eligible` com a
 # versão e o digest do contexto (Turns::ContextDigest) e o seu evento no outbox (invariante 2)
 # e zera dispatch_due_at. first_pending_* e ai_deadline_at ficam até a resposta aplicada (bloco 07).
+# Nas recusas terminais do ciclo (TERMINAL_REASONS) dispatch_due_at também zera.
 # O evento fica pronto e imutável: as retentativas reenviam o mesmo conteúdo com o mesmo event_id
 # (invariante 3). A publicação acontece depois, fora da transação.
 #
@@ -22,6 +23,8 @@ module Turns
 
     DISPATCH_TYPE = Deadlines::DispatchDue::EVENT_TYPE
     EVENT_TYPE = "agent.event".freeze
+    # Recusas terminais do ciclo atual (ver #refused). O painel lê a mesma lista.
+    TERMINAL_REASONS = %w[sem_prazo prazo_vencido contexto_excede_limite].freeze
 
     def self.call(...) = new(...).call
 
@@ -75,8 +78,8 @@ module Turns
     # RN-46, ADR-020: o teto do ciclo (ai_deadline_at) não reinicia. Vencido, o turno não abre.
     def check_deadline
       cycle_deadline_at = ticket.ai_deadline_at
-      return not_opened(:expired, reason: "sem_prazo") unless cycle_deadline_at
-      return not_opened(:expired, reason: "prazo_vencido", deadline_at: iso(cycle_deadline_at)) if now >= cycle_deadline_at
+      return refused(:expired, reason: "sem_prazo") unless cycle_deadline_at
+      return refused(:expired, reason: "prazo_vencido", deadline_at: iso(cycle_deadline_at)) if now >= cycle_deadline_at
 
       open_turn
     end
@@ -85,8 +88,8 @@ module Turns
       context = ContextBuilder.call(ticket:, policy:, now:)
       # RN-49: pendentes acima do limite não abrem turno. O handoff com o histórico completo entra no bloco 10.
       if context.pending_chars > policy.pending_chars_limit
-        return not_opened(:context_too_large, reason: "contexto_excede_limite", pending_chars: context.pending_chars,
-                                              limit: policy.pending_chars_limit)
+        return refused(:context_too_large, reason: "contexto_excede_limite", pending_chars: context.pending_chars,
+                                           limit: policy.pending_chars_limit, pending_seqs: context.pending.map(&:seq))
       end
 
       event_id = SecureRandom.uuid
@@ -125,6 +128,15 @@ module Turns
                               channel: ticket.channel, window_ms: policy.window_for(ticket.channel).in_milliseconds.to_i,
                               pending_chars: context.pending_chars, context_chars: context.chars,
                               deadline_at: iso(deadline_at), dispatch_due_at: iso(dispatch_due_at))
+    end
+
+    # Recusa terminal do ciclo atual (TERMINAL_REASONS): nenhuma volta do
+    # scheduler muda o resultado, então dispatch_due_at zera na mesma transação e o painel não fica esperando
+    # um turno que não vem. first_pending_* e ai_deadline_at ficam para o timeout e o handoff (blocos 08 e 10).
+    # Uma mensagem nova do cliente volta a gravar dispatch_due_at pela ingestão, e um turno novo é tentado.
+    def refused(status, **data)
+      ticket.update_columns(dispatch_due_at: nil)
+      not_opened(status, **data)
     end
 
     def not_opened(status, **data)
