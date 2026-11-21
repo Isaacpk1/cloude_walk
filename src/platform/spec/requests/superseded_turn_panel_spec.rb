@@ -29,6 +29,7 @@ RSpec.describe "RN-56, RF-56: turno superado no painel" do
     it "liga a rejeição da resposta do turno 1 ao turno superado, com o motivo" do
       race = record_three_second_race
       expect(race[:rejected].reason).to eq("turno_superado")
+      expect(race[:applied].status).to eq(:applied)
 
       get timeline_path(race[:ticket].id)
 
