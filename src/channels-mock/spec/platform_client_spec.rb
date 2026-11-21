@@ -16,7 +16,7 @@ RSpec.describe ChannelsMock::PlatformClient do
   it "RNF-23 / ADR-019: assina o corpo bruto com o segredo da conta" do
     stub = stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").with { |request|
       HelpdeskContracts::Signature.verify!(request.body, request.headers["X-Helpdesk-Signature"],
-                                           secret: "dev-secret-infinitepay-chat-mock")
+                                           secret: "dev-secret-infinitepay-chat-mock", now: ChannelsMock::Clock.now)
     }.to_return(status: 202, body: "{}")
 
     client.deliver(channel: "chat", account: "infinitepay-chat-mock", payload:)
@@ -31,7 +31,7 @@ RSpec.describe ChannelsMock::PlatformClient do
 
     expect(WebMock).to(have_requested(:post, %r{/webhooks/}).with do |request|
       HelpdeskContracts::Signature.verify!(request.body, request.headers["X-Helpdesk-Signature"],
-                                           secret: "dev-secret-infinitepay-chat-mock")
+                                           secret: "dev-secret-infinitepay-chat-mock", now: ChannelsMock::Clock.now)
       false
     rescue HelpdeskContracts::Signature::Invalid
       true

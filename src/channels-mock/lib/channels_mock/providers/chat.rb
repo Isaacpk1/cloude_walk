@@ -1,5 +1,6 @@
 require "securerandom"
 require "time"
+require_relative "../clock"
 
 module ChannelsMock
   module Providers
@@ -9,7 +10,7 @@ module ChannelsMock
 
       module_function
 
-      def webhook(account_id:, customer_ref:, text:, message_id: nil, sent_at: Time.now)
+      def webhook(account_id:, customer_ref:, text:, message_id: nil, sent_at: Clock.now)
         payload = {
           "message_id" => message_id.to_s.empty? ? "chat_msg_#{SecureRandom.hex(6)}" : message_id,
           "account_id" => account_id, "customer_ref" => customer_ref, "text" => text,

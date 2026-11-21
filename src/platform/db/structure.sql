@@ -239,6 +239,60 @@ ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
 
 
 --
+-- Name: deliveries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.deliveries (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint NOT NULL,
+    message_id bigint NOT NULL,
+    delivery_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    seq integer NOT NULL,
+    channel character varying NOT NULL,
+    provider_account character varying NOT NULL,
+    kind character varying NOT NULL,
+    ai_assignment_version integer,
+    ai_first_pending_seq integer,
+    status character varying DEFAULT 'pending'::character varying NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    lease_until timestamp(6) without time zone,
+    provider_message_id character varying,
+    last_error text,
+    trace_id character varying NOT NULL,
+    delivered_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT deliveries_attempts_check CHECK ((attempts >= 0)),
+    CONSTRAINT deliveries_channel_check CHECK (((channel)::text = ANY ((ARRAY['chat'::character varying, 'whatsapp'::character varying, 'email'::character varying])::text[]))),
+    CONSTRAINT deliveries_delivered_at_check CHECK ((((status)::text = 'delivered'::text) = (delivered_at IS NOT NULL))),
+    CONSTRAINT deliveries_delivered_confirmation_check CHECK ((((status)::text <> 'delivered'::text) OR (provider_message_id IS NOT NULL))),
+    CONSTRAINT deliveries_kind_check CHECK (((kind)::text = ANY ((ARRAY['reply'::character varying, 'resolution'::character varying, 'progress'::character varying, 'handoff_notice'::character varying, 'analyst'::character varying])::text[]))),
+    CONSTRAINT deliveries_seq_check CHECK ((seq >= 1)),
+    CONSTRAINT deliveries_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'sending'::character varying, 'delivered'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[])))
+);
+
+
+--
+-- Name: deliveries_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.deliveries_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: deliveries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.deliveries_id_seq OWNED BY public.deliveries.id;
+
+
+--
 -- Name: messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -632,6 +686,13 @@ ALTER TABLE ONLY public.customers ALTER COLUMN id SET DEFAULT nextval('public.cu
 
 
 --
+-- Name: deliveries id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deliveries ALTER COLUMN id SET DEFAULT nextval('public.deliveries_id_seq'::regclass);
+
+
+--
 -- Name: messages id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -733,6 +794,14 @@ ALTER TABLE ONLY public.customer_identities
 
 ALTER TABLE ONLY public.customers
     ADD CONSTRAINT customers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: deliveries deliveries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deliveries
+    ADD CONSTRAINT deliveries_pkey PRIMARY KEY (id);
 
 
 --
@@ -912,6 +981,55 @@ CREATE INDEX index_customers_on_brand_id ON public.customers USING btree (brand_
 --
 
 CREATE UNIQUE INDEX index_customers_on_id_and_brand_id ON public.customers USING btree (id, brand_id);
+
+
+--
+-- Name: index_deliveries_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_deliveries_on_brand_id ON public.deliveries USING btree (brand_id);
+
+
+--
+-- Name: index_deliveries_on_delivery_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_deliveries_on_delivery_id ON public.deliveries USING btree (delivery_id);
+
+
+--
+-- Name: index_deliveries_on_message_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_deliveries_on_message_id ON public.deliveries USING btree (message_id);
+
+
+--
+-- Name: index_deliveries_on_provider_message; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_deliveries_on_provider_message ON public.deliveries USING btree (brand_id, channel, provider_account, provider_message_id) WHERE (provider_message_id IS NOT NULL);
+
+
+--
+-- Name: index_deliveries_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_deliveries_on_ticket_id ON public.deliveries USING btree (ticket_id);
+
+
+--
+-- Name: index_deliveries_on_ticket_id_and_seq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_deliveries_on_ticket_id_and_seq ON public.deliveries USING btree (ticket_id, seq);
+
+
+--
+-- Name: index_deliveries_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_deliveries_open ON public.deliveries USING btree (ticket_id, seq) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'sending'::character varying])::text[]));
 
 
 --
@@ -1184,6 +1302,14 @@ ALTER TABLE ONLY public.customer_identities
 
 
 --
+-- Name: deliveries fk_deliveries_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deliveries
+    ADD CONSTRAINT fk_deliveries_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
 -- Name: messages fk_messages_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1253,6 +1379,14 @@ ALTER TABLE ONLY public.queues
 
 ALTER TABLE ONLY public.customer_identities
     ADD CONSTRAINT fk_rails_22532c432d FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: deliveries fk_rails_4feecaaa86; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deliveries
+    ADD CONSTRAINT fk_rails_4feecaaa86 FOREIGN KEY (message_id) REFERENCES public.messages(id);
 
 
 --
@@ -1336,6 +1470,14 @@ ALTER TABLE ONLY public.outbox_events
 
 
 --
+-- Name: deliveries fk_rails_92b2b08057; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deliveries
+    ADD CONSTRAINT fk_rails_92b2b08057 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
 -- Name: ai_turns fk_rails_ad9c9534a9; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1400,6 +1542,14 @@ ALTER TABLE ONLY public.tickets
 
 
 --
+-- Name: deliveries fk_rails_ed71b29557; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deliveries
+    ADD CONSTRAINT fk_rails_ed71b29557 FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
+
+
+--
 -- Name: queue_versions fk_rails_efffefcebd; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1422,6 +1572,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261121010000'),
 ('20261121000000'),
 ('20261120010000'),
 ('20261120000000'),

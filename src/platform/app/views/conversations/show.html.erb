@@ -34,6 +34,7 @@
             <code class="muted" title="trace_id"><%= message.trace_id.first(8) %></code>
             <%= source_badge(c.source) %>
           </div>
+          <% if message.delivery %><%= render "conversations/delivery", delivery: message.delivery %><% end %>
         </li>
       <% end %>
     </ol>
@@ -90,6 +91,7 @@
             <% if turn.note %><p class="muted"><%= turn.note %></p><% end %>
             <% if turn.agent_action %>
               <%= render "shared/agent_action", action: turn.agent_action %>
+              <% if turn.stages %><%= render "conversations/turn_stages", stages: turn.stages %><% end %>
             <% elsif !c.source.synthetic? %>
               <p class="turn__response-state"><strong><%= turn.response_state_label %></strong></p>
             <% end %>

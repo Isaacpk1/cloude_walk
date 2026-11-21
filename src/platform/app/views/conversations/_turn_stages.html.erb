@@ -1,0 +1,30 @@
+<%# ROADMAP 05, RNF-05: estágios da resposta do turno, com os tempos do sistema (ConversationView::TurnStages). %>
+<section class="turn-stages" aria-label="Estágios da resposta">
+  <h4>Estágios da resposta</h4>
+  <ol class="turn-stages__list">
+    <li><strong>Ação recebida</strong> <time><%= panel_time(stages.received_at) %></time>
+      <span class="mono"><%= duration_text(stages.received_ms) %></span> <span class="muted">desde a abertura do turno</span></li>
+    <% if stages.discarded? %>
+      <li class="muted">Resposta descartada: não há resposta aplicada nem entrega.</li>
+    <% elsif stages.applied_at %>
+      <li><strong>Resposta aplicada</strong> <time><%= panel_time(stages.applied_at) %></time>
+        <span class="mono"><%= duration_text(stages.applied_ms) %></span> <span class="muted">desde a ação recebida</span></li>
+      <% if stages.delivered_at %>
+        <li><strong>Resposta entregue</strong> <time><%= panel_time(stages.delivered_at) %></time>
+          <span class="mono"><%= duration_text(stages.delivered_ms) %></span> <span class="muted">desde a resposta aplicada</span></li>
+      <% elsif stages.failed_after_delivered? %>
+        <li><strong>Entregue e depois o provedor avisou falha</strong> <span class="muted">(callback de status failed): a resposta não conta como entregue.</span></li>
+      <% elsif stages.not_delivered? %>
+        <li class="muted">Resposta não entregue: a entrega falhou ou foi cancelada.</li>
+      <% else %>
+        <li class="muted">Resposta entregue: aguardando a confirmação do canal.</li>
+      <% end %>
+    <% else %>
+      <li class="muted">Sem mensagem de saída para o cliente neste turno.</li>
+    <% end %>
+  </ol>
+  <% if stages.perceived_total_ms %>
+    <p class="turn-stages__total"><strong>Tempo total percebido</strong> <span class="mono"><%= stages.perceived_total_ms %> ms</span>
+      <span class="muted">da primeira mensagem do cliente no turno até a entrega; inclui a janela de agrupamento (espera intencional, RN-55) (RNF-05)</span></p>
+  <% end %>
+</section>

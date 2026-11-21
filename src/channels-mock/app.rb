@@ -3,6 +3,12 @@ require "helpdesk_contracts"
 require_relative "lib/channels_mock/providers/chat"
 require_relative "lib/channels_mock/platform_client"
 require_relative "lib/channels_mock/inbox"
+require_relative "lib/channels_mock/clock"
+require_relative "lib/channels_mock/faults"
+require_relative "lib/channels_mock/chat_deliveries"
+require_relative "lib/channels_mock/status_callbacks"
+require_relative "lib/channels_mock/providers/chat_api"
+require_relative "lib/channels_mock/conversation_view"
 
 module ChannelsMock
   # Provedores simulados e simulador do cliente (RF-04, ADR-012). Bloco 02: só o chat do app, na entrada.
@@ -19,9 +25,45 @@ module ChannelsMock
     CLIENT = PlatformClient.new(base_url: PLATFORM_URL)
 
     route do |r|
+      # Lado do provedor: a plataforma entrega a resposta ao cliente (07, seção 5.0; RF-06).
+      r.on "provider", "chat" do
+        r.post "faults" do
+          params = JSON.parse(r.body.read.then { _1.empty? ? "{}" : _1 })
+          json_reply(200, Faults.set(params["fault"], times: params.fetch("times", 1)))
+        rescue ArgumentError, TypeError, JSON::ParserError => e
+          json_reply(422, { "error" => "falha_invalida", "details" => e.message })
+        end
+
+        # A tela marca a mensagem como lida ou simula a falha de entrega no aparelho do cliente.
+        r.post "messages", String, "status" do |message_id|
+          record = ChatDeliveries.find(message_id) || r.halt(404, "mensagem #{message_id} não encontrada")
+          StatusCallbacks.enqueue(account: record.account, message_id:, status: r.params["status"].to_s)
+          r.redirect "/"
+        rescue HelpdeskContracts::InvalidPayload => e
+          r.halt(422, e.message)
+        end
+
+        r.post String, "messages" do |account|
+          reply = Providers::ChatApi.call(account:, raw_body: r.body.read, headers: provider_headers(r))
+          json_reply(reply.status, reply.body, reply.headers)
+        end
+      end
+
       r.root do
-        view("index", locals: { entries: Inbox.all, accounts: Providers::Chat::ACCOUNTS, platform_url: PLATFORM_PUBLIC_URL,
-                                last: Inbox.all.first })
+        entries = Inbox.all
+        items, orphans = ConversationView.build(entries:, records: ChatDeliveries.all)
+        refresh = r.params["atualizar"].to_s[/\A[1-9]\d?\z/]
+        view("index", locals: { items:, orphans:, accounts: Providers::Chat::ACCOUNTS, platform_url: PLATFORM_PUBLIC_URL,
+                                last: entries.first, fault: Faults.state, refresh: },
+                      layout_opts: { locals: { refresh: } })
+      end
+
+      # Falha simulada do provedor do chat, escolhida na tela (blocos 05 e 09).
+      r.post "simulador", "falhas" do
+        Faults.set(r.params["fault"].to_s, times: r.params.fetch("times", "1").to_s.then { _1.empty? ? 1 : _1 })
+        r.redirect "/"
+      rescue ArgumentError, TypeError => e
+        r.halt(422, e.message)
       end
 
       r.on "chat", "messages" do
@@ -43,6 +85,21 @@ module ChannelsMock
     end
 
     private
+
+    def provider_headers(r)
+      { HelpdeskContracts::Signature::HEADER => r.get_header("HTTP_X_HELPDESK_SIGNATURE"),
+        "Idempotency-Key" => r.get_header("HTTP_IDEMPOTENCY_KEY"),
+        "X-Conversation-Id" => r.get_header("HTTP_X_CONVERSATION_ID"),
+        "X-Conversation-Seq" => r.get_header("HTTP_X_CONVERSATION_SEQ"),
+        "traceparent" => r.get_header("HTTP_TRACEPARENT") }
+    end
+
+    def json_reply(status, body, headers = {})
+      response.status = status
+      response["Content-Type"] = "application/json"
+      headers.each { |name, value| response[name] = value }
+      JSON.generate(body)
+    end
 
     def send_chat(account, params)
       payload = Providers::Chat.webhook(account_id: params["account_id"].to_s, customer_ref: params["customer_ref"].to_s,
