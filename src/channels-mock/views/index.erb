@@ -33,6 +33,75 @@
   </form>
 </section>
 
+<section class="card" id="cenarios">
+  <h2>Cenários de rajada</h2>
+  <p class="muted">Enviam várias mensagens do mesmo cliente em horários planejados, pelo mesmo webhook do formulário
+    (RN-55, RN-56; 07, seção 3.4). Também por script: <code>POST /simulador/cenarios/&lt;nome&gt;</code> e
+    <code>GET /simulador/cenarios/&lt;id&gt;</code> (README).</p>
+  <form method="post" action="/simulador/cenarios/corrida-3s">
+    <div class="row">
+      <div>
+        <label for="scenario_account">Conta do provedor (define a marca)</label>
+        <select id="scenario_account" name="account">
+          <% accounts.each do |account| %>
+            <option value="<%= account %>" <%= "selected" if last&.account == account %>><%= account %></option>
+          <% end %>
+        </select>
+      </div>
+      <div></div>
+      <div>
+        <label for="scenario_account_id">Conta do cliente no app (account_id)</label>
+        <input id="scenario_account_id" name="account_id" value="<%= last&.payload&.fetch("account_id", nil) || "acc_infinitepay_000021" %>">
+      </div>
+      <div>
+        <label for="scenario_customer_ref">Referência do cliente (customer_ref)</label>
+        <input id="scenario_customer_ref" name="customer_ref" value="<%= last&.payload&.fetch("customer_ref", nil) || "cus_ref_000021" %>">
+      </div>
+    </div>
+    <ul class="scenarios">
+      <% scenarios.each do |scenario| %>
+        <li>
+          <button type="submit" formaction="/simulador/cenarios/<%= scenario.name %>"><%= scenario.title %></button>
+          <span class="muted"><%= scenario.rule %> · <%= scenario.steps.map { ChannelsMock::ScenarioView.offset(_1.at) }.join(", ") %></span>
+          <div class="muted"><%= scenario.demonstrates %></div>
+        </li>
+      <% end %>
+    </ul>
+  </form>
+
+  <% runs.each do |run| %>
+    <h3>#<%= run["id"] %> · <%= run["title"] %> <span class="muted">(<%= run["rule"] %>)</span></h3>
+    <p class="muted"><%= ChannelsMock::ScenarioView.status(run["status"]) %> · passo <%= run["current_step"] %>/<%= run["total_steps"] %>
+      · <%= run["account"] %> · <code><%= run["account_id"] %></code> · <code><%= run["customer_ref"] %></code>
+      · largada <%= ChannelsMock::ScenarioView.clock(run["started_at"]) %></p>
+    <table>
+      <thead><tr><th>Passo</th><th>Mensagem</th><th>Planejado</th><th>Real</th><th>Plataforma</th></tr></thead>
+      <tbody>
+        <% run["steps"].each do |step| %>
+          <tr>
+            <td><%= step["step"] %></td>
+            <td><%= step["text"] %><% if step["message_id"] %><div class="muted"><code><%= step["message_id"] %></code></div><% end %></td>
+            <td><%= ChannelsMock::ScenarioView.offset(step["at"]) %> · <%= ChannelsMock::ScenarioView.clock(step["planned_at"]) %></td>
+            <td>
+              <% if step["sent_at"] %>
+                <%= ChannelsMock::ScenarioView.clock(step["sent_at"]) %> <span class="muted">(<%= ChannelsMock::ScenarioView.delay(step) %>)</span>
+              <% else %><span class="muted">aguardando</span><% end %>
+            </td>
+            <td>
+              <% if step["outcome"] %>
+                <span class="badge badge--<%= { "Confirmada" => "ok", "Duplicada" => "dup" }.fetch(step["outcome"], "err") %>"><%= step["outcome"] %></span>
+                <% if step["http_status"] %><code><%= step["http_status"] %></code><% end %>
+                <% if step["error"] %><div class="muted"><%= step["error"] %></div><% end %>
+                <% if step["trace_id"] %><div class="muted">trace <code><%= step["trace_id"] %></code></div><% end %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>
+
 <section class="card">
   <h2>Provedor do chat: falhas simuladas</h2>
   <p class="muted">A plataforma entrega as respostas em <code>POST /provider/chat/&lt;conta&gt;/messages</code>
