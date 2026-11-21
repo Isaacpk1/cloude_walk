@@ -136,7 +136,7 @@ Passo a passo:
 4. **Broker.** Valida a assinatura e o contrato e publica em `agent.inbound`. Só responde `200` depois de o Kafka confirmar a escrita.
 5. **Agente.** O mock decide, executa consultas simuladas (as "tools") e publica a ação em `agent.outbound`.
 6. **Aplicação da resposta.** O consumer deduplica por `event_id` (RN-47), trava a linha do atendimento e valida prazo, atribuição e contexto com os dados do turno gravado (seção 3.4). A mesma transação grava o resultado, a auditoria (RN-37) e, quando a ação tiver texto para o cliente (`reply.text` ou `resolution.text`), a mensagem de saída, a entrega (`deliveries`, `pending`) e o item `delivery.requested` no outbox (`dedup_key = delivery:<delivery_id>`). `escalate` não gera saída da IA: o aviso de transferência vem do handoff (bloco 10).
-7. **Entrega.** O worker entrega as saídas na ordem do atendimento (seção 3.2), com `delivery_id` estável nas retentativas. O `channels-mock` persiste o resultado por ID e devolve a mesma confirmação quando ela se perde.
+7. **Entrega.** O worker entrega as saídas na ordem do atendimento (seção 3.2), com `delivery_id` estável nas retentativas. O `channels-mock` guarda o resultado por `delivery_id`, em memória enquanto o processo vive (até 1.000 envios), e devolve a mesma confirmação quando ela se perde ([ADR-021](08-decisoes-de-arquitetura.md#adr-021--entrega-ao-canal-identidade-aceite-e-conciliação)).
 
 **Por quê de cada passo.**
 
