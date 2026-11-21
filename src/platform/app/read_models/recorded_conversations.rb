@@ -70,10 +70,24 @@ class RecordedConversations
   def turns(ticket, deliveries)
     actions = AgentActionEvents.new(ticket)
     first_received = ticket.messages.to_h { [ _1.seq, _1.received_at ] }
-    ticket.ai_turns.order(:turn).map do |record|
+    records = ticket.ai_turns.order(:turn).to_a
+    publications = OutboxEvent.where(brand_id: ticket.brand_id, id: records.map(&:event_id)).index_by(&:id)
+    records.map do |record|
       agent_action = actions.for_turn(record)
-      turn(record, agent_action, stages(record, agent_action, actions, deliveries, first_received))
+      note = record.status == "eligible" ? publication_note(publications[record.event_id]) : TURN_NOTES[record.status]
+      turn(record, agent_action, stages(record, agent_action, actions, deliveries, first_received), note)
     end
+  end
+
+  # Turno eligible: o que a nota diz depende da publicação do evento do turno no outbox (Outbox::Publish).
+  # Publicado só com published_at; encerrado sem published_at é falha sem nova tentativa (recusa do
+  # broker, retentativas esgotadas ou prazo); aberto com erro está em retentativa.
+  def publication_note(item)
+    return "Aguardando a publicação para o agente." if item.nil? || (item.completed_at.nil? && item.last_error.nil?)
+    return TURN_NOTES.fetch("eligible") if item.published_at
+    return "Publicação para o agente falhou sem nova tentativa (#{item.last_error || 'descartada'})." if item.completed_at
+
+    "Publicação para o agente falhou na tentativa #{item.attempts} e será repetida (#{item.last_error})."
   end
 
   # Bloco 05: ação recebida → resposta aplicada (applied + saída gravada) → resposta entregue.
@@ -93,13 +107,13 @@ class RecordedConversations
 
   # Bloco 03: o turno gravado em ai_turns. As mensagens cobertas são as pendentes do contexto enviado.
   # Bloco 04: a ação recebida do agente (ai_turns.response) e o seu desfecho.
-  def turn(record, agent_action, stages)
+  def turn(record, agent_action, stages, note)
     ConversationView::Turn.new(
       number: record.turn, status: record.status,
       covered_seqs: Array(record.context["pending_messages"]).map { _1["seq"] },
       context_until_seq: record.context_until_seq, assignment_version: record.assignment_version,
       event_id: record.event_id, action: record.response&.dig("action") || "—",
-      note: TURN_NOTES[record.status], tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] },
+      note:, tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] },
       agent_action:, stages:
     )
   end
