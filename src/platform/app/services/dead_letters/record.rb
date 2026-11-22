@@ -162,22 +162,12 @@ module DeadLetters
 
     def newer_turn? = AiTurn.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id, turn: (@turn.turn + 1)..).exists?
 
+    # Interface item 1: o pedido passa pelo caminho único (Handoff::Request): um por atribuição, pela chave
+    # `handoff:<ticket_id>:<assignment_version>`, com a auditoria handoff.requested e o aviso de progresso encerrado.
     def escalate
-      data = { ticket_id: @ticket.id, reason: HANDOFF_REASON, source: HANDOFF_SOURCE, turn: @turn.turn,
-               first_pending_seq: @ticket.first_pending_seq, assignment_version: @ticket.assignment_version }
-      @handoff_event_id = insert_handoff(data)
-      audit(HANDOFF_EVENT, data) if @handoff_event_id
+      @handoff_event_id = Handoff::Request.call(ticket: @ticket, reason: HANDOFF_REASON, source: HANDOFF_SOURCE,
+                                                turn: @turn.turn, trace_id:)
       finish("escalated")
-    end
-
-    # Interface item 1: um pedido por atribuição. O índice único do dedup_key decide a colisão.
-    def insert_handoff(data)
-      now = Time.current
-      row = { brand_id: @ticket.brand_id, ticket_id: @ticket.id, event_type: HANDOFF_EVENT,
-              dedup_key: "handoff:#{@ticket.id}:#{@ticket.assignment_version}", payload: data, trace_id:,
-              next_attempt_at: now, created_at: now }
-      OutboxEvent.insert_all([ row ], unique_by: :index_outbox_events_on_dedup_key, returning: [ :id ], record_timestamps: false)
-                 .rows.first&.first
     end
 
     def audit_only(invalid)

@@ -65,21 +65,21 @@ RSpec.describe Outbox::Recover, "RNF-17, RF-34 + RF-35: política de recuperaç�
       expect(audits("outbox.recovered").count).to eq(2)
     end
 
-    it "tipos dos blocos 08 e 09 com o ciclo atual são reoferecidos; de ciclo anterior, encerrados" do
-      stub_const("OutboxJob::HANDLED", OutboxJob::HANDLED + [ "progress.notice" ])
+    it "tipos revalidados pelo worker (blocos 08 e 09) nunca são encerrados pela recuperação, nem de ciclo anterior" do
       ticket = start_cycle(ingest.ticket)
       OutboxEvent.where(event_type: "message.received").update_all(completed_at: start)
-      current = OutboxEvent.create!(brand: infinitepay, ticket:, event_type: "progress.notice", trace_id: "t",
-                                    next_attempt_at: start - 10.seconds,
-                                    payload: { "ticket_id" => ticket.id, "first_pending_seq" => ticket.first_pending_seq })
-      old = OutboxEvent.create!(brand: infinitepay, ticket:, event_type: "progress.notice", trace_id: "t",
-                                next_attempt_at: start - 10.seconds,
-                                payload: { "ticket_id" => ticket.id, "first_pending_seq" => ticket.first_pending_seq - 1 })
+      payload = { "ticket_id" => ticket.id, "first_pending_seq" => ticket.first_pending_seq - 1,
+                  "assignment_version" => ticket.assignment_version + 7 }
+      items = %w[handoff.requested turn.timeout cycle.timeout progress.notice].map do |type|
+        OutboxEvent.create!(brand: infinitepay, ticket:, event_type: type, trace_id: "t", next_attempt_at: start - 10.seconds,
+                            dedup_key: "#{type}:#{ticket.id}", payload:)
+      end
+      ticket.update_columns(state: "aguardando_humano", progress_due_at: nil, first_pending_seq: nil, first_pending_at: nil,
+                            dispatch_due_at: nil, ai_deadline_at: nil)
 
-      expect(described_class.call).to eq([ current.id ])
-      expect(old.reload.completed_at).to eq(start)
-      expect(audits("outbox.closed_obsolete").sole.data).to include("outbox_event_id" => old.id, "reason" => "ciclo_anterior",
-                                                                    "event_type" => "progress.notice")
+      expect(described_class.call).to match_array(items.map(&:id))
+      expect(audits("outbox.closed_obsolete")).to be_empty
+      expect(Outbox::Obsolescence::NEVER).to include("handoff.requested", "turn.timeout", "cycle.timeout", "progress.notice")
     end
 
     it "a entrega ao canal nunca é encerrada pela recuperação (a ordem e a conciliação são do Deliveries::Send)" do

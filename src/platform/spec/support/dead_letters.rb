@@ -28,8 +28,6 @@ module DeadLetterHelpers
     action = agent_action_for(turn, **overrides)
     record_dead_letter(JSON.generate(action), headers: dlq_headers(source:, reason:, event_id: action["event_id"]))
   end
-
-  def handoff_items = OutboxEvent.where(event_type: "handoff.requested")
 end
 
 RSpec.configure { |c| c.include DeadLetterHelpers }

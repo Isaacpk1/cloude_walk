@@ -49,6 +49,7 @@
     <% if c.turn_refusal %><%= render "conversations/turn_refusal", refusal: c.turn_refusal %><% end %>
     <% if c.handoff %><%= render "conversations/handoff", handoff: c.handoff %><% end %>
     <% if c.deadlines %><%= render "conversations/deadlines", deadlines: c.deadlines %><% end %>
+    <% c.reconciliations.each do |reconciliation| %><%= render "conversations/reconciliation", reconciliation: %><% end %>
 
     <section class="card">
       <h2>Responsável atual</h2>

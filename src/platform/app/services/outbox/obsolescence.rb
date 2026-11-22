@@ -15,14 +15,17 @@
 #   respondido (ciclo_anterior). Janela aberta e turno já coberto ficam para o Turns::Open, que audita.
 # - "delivery.requested" e "message.received": nunca obsoletos aqui. A entrega tem a ordem por seq e a
 #   conciliação (Deliveries::Send decide e acorda a próxima); o aviso da ingestão vale para a triagem.
-# - Outros tipos tratados pelo worker (handoff.requested, turn.timeout, cycle.timeout, progress.notice,
-#   blocos 08 e 09): obsoletos se o caso saiu da IA, se o payload traz `assignment_version` diferente da
-#   atual ou `first_pending_seq` diferente do ciclo pendente atual (ciclo_anterior).
+# - "handoff.requested", "turn.timeout", "cycle.timeout" e "progress.notice" (blocos 08 e 09): nunca obsoletos
+#   aqui. O worker revalida sob o lock e audita o descarte com o motivo do domínio.
+# - Outros tipos: obsoletos se o caso saiu da IA, se o payload traz `assignment_version` diferente da atual ou
+#   `first_pending_seq` diferente do ciclo pendente atual (ciclo_anterior).
 module Outbox
   module Obsolescence
     AGENT_EVENT = "agent.event".freeze
     DISPATCH = "turn.dispatch".freeze
-    NEVER = %w[delivery.requested message.received].freeze
+    # Os tipos revalidados pelo próprio worker sob o lock (blocos 08 e 09) também: o worker decide e audita o descarte
+    # com o motivo do domínio (handoff.discarded, *.timeout_discarded, progress.notice_discarded).
+    NEVER = %w[delivery.requested message.received handoff.requested turn.timeout cycle.timeout progress.notice].freeze
 
     module_function
 

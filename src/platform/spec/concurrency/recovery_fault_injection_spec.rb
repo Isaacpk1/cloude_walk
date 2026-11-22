@@ -281,9 +281,9 @@ RSpec.describe "RNF-14, RNF-17, RF-34 + RF-35: injeção de falhas e recuperaç�
     it "caso escalado: o evento antigo é encerrado, a resposta atrasada do agente é rejeitada e nenhum turno abre" do
       ticket, turn = turn_waiting_broker
       at(t0 + 4.seconds) do
-        ticket.reload.update_columns(state: "aguardando_humano", assignment_version: ticket.assignment_version + 1,
-                                     first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
-        turn.update_columns(status: "expired")
+        # Caminho real do bloco 08: pedido de handoff e Handoff::Escalate (nova atribuição, turno expirado, ciclo encerrado).
+        Handoff::Escalate.call(request_handoff(ticket, reason: "falha_de_integracao", source: "dlq"))
+        expect(turn.reload.status).to eq("expired")
       end
       clear_enqueued_jobs
       before = history(ticket)

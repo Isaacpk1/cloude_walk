@@ -27,6 +27,7 @@
         <%= nav_link "Conversas", conversations_path, active: controller_name == "conversations" %>
         <%= nav_link "Linha do tempo", timelines_path, active: controller_name == "timelines" %>
         <%= nav_link "Evals", evals_path, active: controller_name == "evals" %>
+        <%= nav_link "DLQ", dead_letters_path, active: controller_name == "dead_letters" %>
         <% PanelHelper::RESERVED_SECTIONS.each do |section| %>
           <%= reserved_nav_item section %>
         <% end %>

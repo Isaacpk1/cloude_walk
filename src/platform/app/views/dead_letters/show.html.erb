@@ -1,0 +1,43 @@
+<% dl = @dead_letter %>
+<% content_for :title, "DLQ #{dl.id}" %>
+
+<div class="page-header">
+  <div>
+    <h1>DLQ <span class="muted"><%= dl.id %></span></h1>
+    <p class="page-header__subtitle"><%= dl.source_label %> · <%= dl.reason_label %> · <%= panel_time(dl.created_at, precise: true) %></p>
+  </div>
+  <div class="page-header__actions">
+    <% if dl.correlated? %>
+      <%= link_to "Abrir conversa", conversation_path(dl.ticket_id), class: "button" %>
+      <%= link_to "Ver linha do tempo", timeline_path(dl.ticket_id), class: "button" %>
+    <% end %>
+    <%= link_to "Voltar para a DLQ", dead_letters_path(marca: params[:marca].presence), class: "button" %>
+  </div>
+</div>
+
+<section class="card dead-letter">
+  <dl class="selected-event__fields">
+    <div><dt>Desfecho (RN-45)</dt><dd><strong><%= dl.outcome_label %></strong></dd></div>
+    <div><dt>Marca · atendimento · turno</dt><dd>
+      <% if dl.correlated? %>
+        <%= dl.brand_name %> · <%= link_to "atendimento #{dl.ticket_id}", conversation_path(dl.ticket_id) %>
+        · <%= dl.turn ? link_to("turno #{dl.turn}", conversation_path(dl.ticket_id, anchor: "turn-#{dl.turn}")) : "sem turno" %>
+      <% else %>
+        <%= dl.brand_name || "—" %> · <span class="badge badge--error">Sem correlação</span> <span class="muted">(nenhum atendimento ligado com segurança, ADR-014)</span>
+      <% end %>
+    </dd></div>
+    <div><dt>Origem</dt><dd><%= dl.source_label %> <code class="muted"><%= dl.source %></code></dd></div>
+    <div><dt>Motivo</dt><dd><%= dl.reason_label %> <code class="muted"><%= dl.reason %></code></dd></div>
+    <div><dt>Violações</dt><dd class="mono"><%= dl.violations_text %></dd></div>
+    <% if dl.error %><div><dt>Erro</dt><dd><%= dl.error %></dd></div><% end %>
+    <div><dt>event_id</dt><dd><code><%= dl.event_id || "—" %></code></dd></div>
+    <div><dt>trace_id</dt><dd><code><%= dl.trace_id || "—" %></code></dd></div>
+    <div><dt>Tópico</dt><dd class="mono"><%= dl.topic %>, partição <%= dl.partition %>, offset <%= dl.offset %></dd></div>
+    <div><dt>Tentativas</dt><dd class="mono"><%= dl.attempts %></dd></div>
+    <div><dt>Reprocessamento</dt><dd><%= dl.reprocessed_at ? "reprocessado às #{panel_time(dl.reprocessed_at)}" : DeadLetterView::REPROCESSING %></dd></div>
+  </dl>
+  <h2>Cabeçalhos</h2>
+  <pre class="dead-letter__headers"><%= dl.headers_text %></pre>
+  <h2>Corpo cru <span class="muted small">(como chegou; pode não ser JSON)</span></h2>
+  <pre class="dead-letter__payload"><%= dl.payload_text %></pre>
+</section>

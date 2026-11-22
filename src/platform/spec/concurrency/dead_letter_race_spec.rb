@@ -41,7 +41,7 @@ RSpec.describe "DLQ da plataforma com processos concorrentes", :concurrency do
   end
 
   describe "RN-45, RN-56, invariante 4: DLQ concorrente com a aplicação de uma resposta válida do mesmo turno" do
-    it "o lock do atendimento ordena: ou a resposta entrou antes e a DLQ só audita, ou a DLQ pede o handoff antes" do
+    it "o lock do atendimento ordena: ou a resposta entrou antes e a DLQ só audita, ou a DLQ escala e a resposta é rejeitada" do
       outcomes = Array.new(6) do |round|
         turn = opened_turn("meu repasse não caiu", identity: "acc_infinitepay_dlq_#{round}")
         action = agent_action_for(turn)
@@ -55,18 +55,18 @@ RSpec.describe "DLQ da plataforma com processos concorrentes", :concurrency do
         end)
         applied, dead_letter = results
 
-        expect(applied.status).to eq(:applied) # o handoff é do worker; o turno segue eligible até lá
         handoff = handoff_items.find_by(ticket_id: turn.ticket_id)
-        applied_audit = AuditEvent.where(ticket_id: turn.ticket_id, event_type: "agent_action.applied").pick(:id)
         if dead_letter.outcome == "audited"
+          expect(applied.status).to eq(:applied)
           expect(handoff).to be_nil
           reason = AuditEvent.where(ticket_id: turn.ticket_id, event_type: "dead_letter.audited").sole.data["reason"]
           expect(reason).to eq("turno_applied")
         else
+          # Uma ação final por turno: com o handoff pedido, a resposta é rejeitada (nunca respondido e escalado).
           expect(dead_letter.outcome).to eq("escalated")
-          requested = AuditEvent.where(ticket_id: turn.ticket_id, event_type: "handoff.requested").sole
-          expect(requested.id).to be < applied_audit
           expect(handoff).to be_present
+          expect(applied).to have_attributes(status: :rejected, reason: "handoff_pedido")
+          expect(Message.where(ticket_id: turn.ticket_id, direction: "outbound")).to be_empty
         end
         dead_letter.outcome
       end
