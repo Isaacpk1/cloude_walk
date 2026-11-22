@@ -53,10 +53,11 @@ RSpec.describe Outbox::Recover, "RNF-17, RF-34 + RF-35: política de recuperaç�
     it "repetição: a volta seguinte não reoferece de novo antes da carência; depois dela, sim (job perdido outra vez)" do
       item = lost_agent_event
       after_grace
-      described_class.call
+      recovered_at = Time.current
+      expect(described_class.call).to eq([ item.id ])
       clear_enqueued_jobs
+      expect(described_class.call).to eq([]) # outra réplica na mesma volta
 
-      recovered_at = item.reload.next_attempt_at
       travel_to(recovered_at + described_class::GRACE - 0.001.seconds, with_usec: true)
       expect(described_class.call).to eq([])
       travel_to(recovered_at + described_class::GRACE, with_usec: true)
