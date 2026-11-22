@@ -41,7 +41,6 @@ module Handoff
       def wake_ids = [ delivery_event_id, summary_event_id ].compact
     end
 
-    AI_KINDS = %w[reply resolution progress].freeze
     REASON = "handoff".freeze
     DELIVERY_EVENT = "delivery.requested".freeze
     SUMMARY_EVENT = "handoff.summary".freeze
@@ -185,7 +184,8 @@ module Handoff
     def request_platform_summary(from)
       row = { brand_id: ticket.brand_id, ticket_id: ticket.id, event_type: SUMMARY_EVENT, dedup_key: "summary:#{ticket.id}:#{from}",
               payload: { ticket_id: ticket.id, from_assignment_version: from, reason: payload["reason"],
-                         escalated_at: now.utc.iso8601(3) },
+                         # RNF-06: o mesmo relógio do Summarize, para o ms_since_escalated não depender do processo.
+                         escalated_at: DatabaseClock.now.utc.iso8601(3) },
               trace_id: item.trace_id, next_attempt_at: now, created_at: now }
       @summary_event_id = OutboxEvent.insert_all([ row ], unique_by: :index_outbox_events_on_dedup_key, returning: [ :id ],
                                                           record_timestamps: false).rows.first&.first
@@ -199,21 +199,9 @@ module Handoff
       turns.each { audit("ai_turn.expired", turn: _1.turn, deadline_at: _1.deadline_at.utc.iso8601(3), reason: REASON) }
     end
 
-    # RN-38: as saídas da IA que ainda não começaram são canceladas. No limite de trocas (RN-33, item 6), as respostas
-    # aplicadas saem antes do aviso (a 10ª é a última troca, não uma resposta superada); só o aviso de progresso cai.
-    def cancelled_kinds = payload["reason"] == "limite_de_trocas" ? AI_KINDS - %w[reply] : AI_KINDS
-
-    def cancel_deliveries
-      deliveries = Delivery.where(brand_id: ticket.brand_id, ticket_id: ticket.id, status: "pending", kind: cancelled_kinds)
-                           .where.not(ai_assignment_version: nil).order(:seq).to_a
-      deliveries.each do |delivery|
-        delivery.update!(status: "cancelled", lease_until: nil, last_error: REASON)
-        OutboxEvent.where(brand_id: ticket.brand_id, dedup_key: "delivery:#{delivery.delivery_id}", completed_at: nil)
-                   .update_all(completed_at: now, lease_until: nil, last_error: REASON)
-        AuditEvent.create!(brand_id: ticket.brand_id, ticket_id: ticket.id, actor_type: "system", event_type: "delivery.cancelled",
-                           trace_id: delivery.trace_id, data: { delivery_id: delivery.delivery_id, seq: delivery.seq, reason: REASON })
-      end
-    end
+    # Defesa: o Request já cancelou no commit do pedido (Handoff::AiDeliveries); uma saída nascida depois não existe,
+    # mas o Escalate confere de novo sob o mesmo lock.
+    def cancel_deliveries = AiDeliveries.cancel(ticket:, handoff_reason: payload["reason"], now:)
 
     # O painel (A3) lê o `data` do pedido mais o motivo do descarte e o motivo pedido.
     def discard(reason, **data)

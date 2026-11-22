@@ -3,9 +3,10 @@ require "rails_helper"
 # Bloco 10: o aviso de transferência contra a última resposta da IA, com o Postgres de verdade, fora da transação
 # de teste (AGENTS.md, item 3; 07, seção 3.2 "Transferência e ordem de entrega"; RN-38, RN-42, RF-43).
 #
-# O Handoff::Escalate e o Deliveries::Send travam o atendimento. Ou o Escalate vence e a resposta pending é
-# cancelada antes de sair (o cliente só recebe o aviso), ou o Send vence e a resposta já está `sending` quando o
-# Escalate roda: o aviso espera o resultado dela. Nunca o aviso antes de uma resposta da IA que acabou entregue.
+# O pedido de handoff (Handoff::Request, que cancela as saídas pending da IA no commit, RN-38) e o Deliveries::Send
+# travam o atendimento. Ou o pedido vence e a resposta pending é cancelada antes de sair (o cliente só recebe o aviso),
+# ou o Send vence e a resposta já está `sending` quando o pedido e o Escalate rodam: o aviso espera o resultado dela.
+# Nunca o aviso antes de uma resposta da IA que acabou entregue.
 RSpec.describe "RN-38, RN-42: aviso de transferência × envio da última resposta da IA", :concurrency do
   let!(:infinitepay) { create(:brand, :infinitepay) }
   let!(:account) { create(:provider_account, brand: infinitepay, slug: "infinitepay-chat-mock") }
@@ -23,7 +24,7 @@ RSpec.describe "RN-38, RN-42: aviso de transferência × envio da última respos
       if gate && first
         first = false
         @in_call << true
-        gate.pop
+        gate.pop(timeout: 10) or raise "o teste não soltou a chamada"
       end
       channel_response(status: 200, message_id: "chat_out_#{SecureRandom.hex(4)}")
     end
@@ -47,17 +48,18 @@ RSpec.describe "RN-38, RN-42: aviso de transferência × envio da última respos
 
   def scenario
     ticket = customer_message.ticket
-    reply = requested_delivery(ticket, text: reply_text)
-    handoff_id = request_handoff(ticket, reason: "pedido_do_cliente", source: "ingestion")
-    [ ticket, reply, handoff_id ]
+    [ ticket, requested_delivery(ticket, text: reply_text) ]
   end
+
+  def ask_human(ticket) = request_handoff(ticket.reload, reason: "pedido_do_cliente", source: "ingestion")
 
   it "corrida livre (Escalate e Send ao mesmo tempo): o aviso nunca sai antes de uma resposta entregue" do
     stub_provider
-    ticket, reply, handoff_id = scenario
+    ticket, reply = scenario
 
-    results = run_concurrently(threads: 2) { |i| i.zero? ? Handoff::Escalate.call(handoff_id) : Deliveries::Send.call(delivery_item(reply).id) }
+    results = run_concurrently(threads: 2) { |i| i.zero? ? ask_human(ticket) : Deliveries::Send.call(delivery_item(reply).id) }
     expect(results).to all(satisfy { !_1.is_a?(Exception) })
+    Handoff::Escalate.call(handoff_items(ticket).sole.id)
     drain(ticket)
 
     texts = provider_texts
@@ -70,10 +72,12 @@ RSpec.describe "RN-38, RN-42: aviso de transferência × envio da última respos
     expect(notice(ticket).reload.status).to eq("delivered")
   end
 
-  it "Escalate primeiro: a resposta pending é cancelada antes de sair e o cliente só recebe o aviso" do
+  it "pedido primeiro: a resposta pending é cancelada no pedido, antes de sair, e o cliente só recebe o aviso" do
     stub_provider
-    ticket, reply, handoff_id = scenario
+    ticket, reply = scenario
 
+    handoff_id = ask_human(ticket)
+    expect(reply.reload.status).to eq("cancelled")
     expect(Handoff::Escalate.call(handoff_id).status).to eq(:escalated)
     expect(Deliveries::Send.call(delivery_item(reply).id).status).to eq(:skipped)
     drain(ticket)
@@ -83,14 +87,16 @@ RSpec.describe "RN-38, RN-42: aviso de transferência × envio da última respos
     expect(notice(ticket).reload.status).to eq("delivered")
   end
 
-  it "Send primeiro: a resposta já está sending quando o Escalate roda e o aviso espera o resultado dela" do
+  it "Send primeiro: a resposta já está sending quando o pedido e o Escalate rodam, e o aviso espera o resultado dela" do
     gate = Queue.new
     stub_provider(gate:)
-    ticket, reply, handoff_id = scenario
+    ticket, reply = scenario
 
     sender = Thread.new { ActiveRecord::Base.connection_pool.with_connection { Deliveries::Send.call(delivery_item(reply).id) } }
-    @in_call.pop # a chamada HTTP da resposta começou, fora de transação
+    @in_call.pop(timeout: 10) or raise "a chamada da resposta não começou" # fora de transação
 
+    handoff_id = ask_human(ticket)
+    expect(reply.reload.status).to eq("sending") # o pedido não cancela uma saída que já começou
     expect(Handoff::Escalate.call(handoff_id).status).to eq(:escalated)
     expect(reply.reload.status).to eq("sending")
     expect(Deliveries::Send.call(delivery_item(notice(ticket)).id).status).to eq(:waiting_previous)

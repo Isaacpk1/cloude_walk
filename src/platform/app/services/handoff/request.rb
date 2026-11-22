@@ -55,6 +55,7 @@ module Handoff
 
       audit(id)
       expire_turns
+      AiDeliveries.cancel(ticket: @ticket, handoff_reason: @reason) # RN-38: no commit do pedido
       # RN-57: com o handoff pedido, o aviso do ciclo não é mais devido (o worker o descartaria por handoff_pedido).
       # No próprio objeto travado de quem chamou: sem tocar o lock_version, para ele seguir válido no resto da transação.
       @ticket.update_columns(progress_due_at: nil) if @ticket.progress_due_at

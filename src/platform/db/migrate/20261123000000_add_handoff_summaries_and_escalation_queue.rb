@@ -23,6 +23,25 @@ class AddHandoffSummariesAndEscalationQueue < ActiveRecord::Migration[8.1]
     add_check_constraint :handoff_summaries,
                          "(status = 'available' AND fields IS NOT NULL) OR (status = 'missing' AND missing_reason IS NOT NULL)",
                          name: "handoff_summaries_status_fields_check"
+    # RN-54, invariante 8: só inserção também no banco, como audit_events. TRUNCATE (limpeza dos testes) não passa por aqui.
+    reversible do |dir|
+      dir.up do
+        execute <<~SQL
+          CREATE FUNCTION handoff_summaries_immutable() RETURNS trigger AS $$
+          BEGIN
+            RAISE EXCEPTION 'handoff_summaries é só inserção (RN-39, RN-54): o primeiro resumo do handoff vale';
+          END;
+          $$ LANGUAGE plpgsql;
+
+          CREATE TRIGGER handoff_summaries_immutable
+            BEFORE UPDATE OR DELETE ON handoff_summaries
+            FOR EACH ROW EXECUTE FUNCTION handoff_summaries_immutable();
+        SQL
+      end
+      dir.down do
+        execute "DROP TRIGGER handoff_summaries_immutable ON handoff_summaries; DROP FUNCTION handoff_summaries_immutable();"
+      end
+    end
 
     # RF-42: a fila humana para onde o handoff vai até o roteamento por regras (bloco 11).
     add_column :queues, :escalation, :boolean, null: false, default: false

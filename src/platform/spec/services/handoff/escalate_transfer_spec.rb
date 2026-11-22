@@ -201,6 +201,7 @@ RSpec.describe Handoff::Escalate, "bloco 10: escala com fila de escalas, aviso e
     it "sem resumo: grava o pedido handoff.summary no outbox para a plataforma montar" do
       ticket = ingest.ticket
       freeze_time
+      allow(DatabaseClock).to receive(:now) { Time.current }
 
       result = escalate(request_handoff(ticket, reason: "prazo_do_turno"))
 
@@ -277,11 +278,26 @@ RSpec.describe Handoff::Escalate, "bloco 10: escala com fila de escalas, aviso e
       ticket = travel_to(t0) { ingest.ticket }
       id = travel_to(t0 + 1.second) { request_handoff(ticket) }
 
-      travel_to(t0 + 3.seconds) { escalate(id) }
+      travel_to(t0 + 3.seconds) do
+        allow(DatabaseClock).to receive(:now) { Time.current }
+        escalate(id)
+      end
 
       item = OutboxEvent.where(ticket_id: ticket.id, event_type: "handoff.summary").sole
       expect(item.payload["escalated_at"]).to eq((t0 + 3.seconds).iso8601(3))
       expect(item.next_attempt_at).to eq(t0 + 3.seconds)
+    end
+
+    it "RNF-06: escalated_at pelo relógio do banco, o mesmo do Summarize (sem desvio entre processos)" do
+      ticket = ingest.ticket
+      id = request_handoff(ticket)
+      db_now = Time.utc(2026, 11, 22, 12, 0, 0, 123_000)
+      allow(DatabaseClock).to receive(:now).and_return(db_now)
+
+      escalate(id)
+
+      item = OutboxEvent.where(ticket_id: ticket.id, event_type: "handoff.summary").sole
+      expect(item.payload["escalated_at"]).to eq(db_now.iso8601(3))
     end
   end
 end

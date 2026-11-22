@@ -174,6 +174,9 @@ module Ingestion
         turn = ticket.ai_turns.eligible.where(brand_id: ticket.brand_id, assignment_version: ticket.assignment_version)
                      .maximum(:turn)
         handoff_event_id = Handoff::Request.call(ticket:, reason: "pedido_do_cliente", source: "ingestion", turn:, trace_id:)
+        # RN-38: com o pedido já gravado por outro gatilho (o limite de trocas mantém as respostas), o pedido explícito
+        # cancela mesmo assim as saídas da IA que não começaram.
+        Handoff::AiDeliveries.cancel(ticket:, handoff_reason: "pedido_do_cliente") unless handoff_event_id
         handoff_event_id ? "handoff_pedido" : "handoff_ja_pedido"
       else
         "registrado"

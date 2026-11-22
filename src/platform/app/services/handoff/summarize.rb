@@ -153,7 +153,16 @@ module Handoff
       @messages ||= Message.where(brand_id: ticket.brand_id, ticket_id: ticket.id, internal: false).order(:seq).to_a
     end
 
-    def bot_messages = messages.select { _1.direction == "outbound" && _1.author_type == "bot" }
+    # RF-41: só conta como dito ao cliente o que não foi cancelado nem falhou (a escalação cancela as saídas que não
+    # começaram, RN-38). As canceladas aparecem à parte, para o analista não supor que o cliente leu.
+    # O aviso de progresso (RN-57) não é resposta: fica fora do resumo.
+    def bot_messages = all_bot_messages.reject { undelivered_seqs.include?(_1.seq) }
+    def cancelled_bot_messages = all_bot_messages.select { undelivered_seqs.include?(_1.seq) }
+    def all_bot_messages = messages.select { _1.direction == "outbound" && _1.author_type == "bot" && !progress_seqs.include?(_1.seq) }
+
+    def ticket_deliveries = @ticket_deliveries ||= Delivery.where(brand_id: ticket.brand_id, ticket_id: ticket.id).pluck(:seq, :kind, :status)
+    def undelivered_seqs = @undelivered_seqs ||= ticket_deliveries.filter_map { |seq, _, status| seq if %w[cancelled failed].include?(status) }.to_set
+    def progress_seqs = @progress_seqs ||= ticket_deliveries.filter_map { |seq, kind, _| seq if kind == "progress" }.to_set
 
     def problem(customer_messages)
       text = "Cliente relatou: #{quote(customer_messages.first.body)}"
@@ -176,6 +185,8 @@ module Handoff
       lines = tool_calls.map { |call| "Consultou #{call['tool']}#{hash_text(call['args'], '(', ')')}#{hash_text(call['result'], ' → ', '')}" }
       replies = bot_messages
       lines << "Respondeu ao cliente #{replies.size}x; última resposta: #{quote(replies.last.body)}" if replies.any?
+      dropped = cancelled_bot_messages
+      lines << "Resposta preparada e não entregue (cancelada no handoff): #{quote(dropped.last.body)}" if dropped.any?
       lines.empty? ? "A IA não registrou consultas nem respostas." : "#{lines.join('; ')}."
     end
 

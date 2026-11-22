@@ -14,13 +14,18 @@ module Handoff
     # Idioma sem texto é erro, como no aviso de progresso: um padrão esconderia uma marca nova sem o aviso.
     def transfer_notice_text(locale) = transfer_notice_texts.fetch(locale)
 
-    # RN-34: o pedido é a mensagem inteira pedir um humano, não a menção a uma pessoa. Compara sem acento e sem
-    # diferenciar maiúsculas, contra as expressões do idioma da marca.
+    # RN-34: o pedido é o cliente pedir um humano, não a menção a uma pessoa nem a vontade de conversar. Compara sem
+    # acento e sem diferenciar maiúsculas, trecho a trecho (vírgula, ponto, dois pontos...): um trecho negado ("não
+    # quero falar com atendente") não conta, e outro trecho da mesma mensagem pode pedir ("não caiu, quero um atendente").
     def human_request?(text, locale)
       return false if text.blank?
 
-      normalized = I18n.transliterate(text.to_s).downcase.squish
-      human_request_patterns.fetch(locale, []).any? { normalized.match?(_1) }
+      patterns = human_request_patterns.fetch(locale, nil) or return false
+      clauses(text).any? { |clause| clause.match?(patterns[:ask]) && !clause.match?(patterns[:negation]) }
+    end
+
+    def clauses(text)
+      I18n.transliterate(text.to_s).downcase.split(/[,.;:!?\n]+/).map(&:squish).reject(&:empty?)
     end
 
     def raise_priority?(reason) = priority_raising_reasons.include?(reason)
@@ -37,19 +42,27 @@ module Handoff
   class Policy
     PRIORITIES = %w[critica alta media baixa].freeze
 
-    PT_BR = [
-      /\b(quero|queria|preciso|posso|gostaria de|me (passa|transfere|coloca)( pra| para)?)\b.*\b(falar|conversar|atendimento|atendente|humano|pessoa)/,
-      /\bfalar com (um|uma|algum|alguma|alguem)?\s*(atendente|humano|pessoa|alguem|especialista)/,
-      /\b(passa|transfere|coloca)\b.*\b(pra|para)\b.*\b(um|uma)\b\s*(atendente|humano|pessoa)/,
-      /\batendimento humano\b/,
-      /\b(um|uma) (atendente|pessoa) de verdade\b/
-    ].freeze
+    HUMAN_PT = "(atendente|humano|pessoa|especialista|alguem de verdade)".freeze
+    PT_BR = {
+      ask: Regexp.union(
+        /\b(quero|queria|preciso|posso|gostaria de|me (passa|transfere|coloca))\b.*\b#{HUMAN_PT}\b/,
+        /\bfalar com (um |uma |algum |alguma |o |a )?(atendente|humano|pessoa|alguem|especialista)\b/,
+        /\batendimento humano\b/,
+        /\b(um|uma) (atendente|pessoa) de verdade\b/,
+        /\A(um |uma |o |a )?(atendente|humano)( por favor| pf| pfv)?\z/
+      ),
+      negation: /\b(nao|nunca|nem)\b/
+    }.freeze
 
-    EN = [
-      /\b(talk|speak|chat)\b.*\b(to|with)\b.*\b(a |an )?(human|person|agent|representative|someone)\b/,
-      /\breal person\b/,
-      /\bhuman (agent|support)\b/
-    ].freeze
+    EN = {
+      ask: Regexp.union(
+        /\b(talk|speak|chat)\b.*\b(to|with)\b.*\b(a |an )?(human|person|agent|representative|someone)\b/,
+        /\breal person\b/,
+        /\bhuman (agent|support)\b/,
+        /\A(a |an )?(human|agent|person|representative)( please)?\z/
+      ),
+      negation: /\b(don'?t|do not|not|never)\b/
+    }.freeze
 
     DEFAULT = new(
       # RN-42: configurável por marca e idioma no bloco 12.

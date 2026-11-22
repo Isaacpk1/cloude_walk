@@ -38,6 +38,19 @@ END $$;
 
 
 --
+-- Name: handoff_summaries_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.handoff_summaries_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'handoff_summaries é só inserção (RN-39, RN-54): o primeiro resumo do handoff vale';
+END;
+$$;
+
+
+--
 -- Name: eval_runs_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1587,6 +1600,13 @@ CREATE TRIGGER audit_events_immutable BEFORE DELETE OR UPDATE ON public.audit_ev
 --
 
 CREATE TRIGGER dead_letters_retention BEFORE DELETE ON public.dead_letters FOR EACH ROW EXECUTE FUNCTION public.dead_letters_retention();
+
+
+--
+-- Name: handoff_summaries handoff_summaries_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER handoff_summaries_immutable BEFORE DELETE OR UPDATE ON public.handoff_summaries FOR EACH ROW EXECUTE FUNCTION public.handoff_summaries_immutable();
 
 
 --

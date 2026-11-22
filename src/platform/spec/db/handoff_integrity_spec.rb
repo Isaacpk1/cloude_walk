@@ -24,6 +24,15 @@ RSpec.describe "Bloco 10: restrições do handoff" do
       expect { summary(from_assignment_version: 2, fields: nil) }.to raise_error(ActiveRecord::StatementInvalid)
     end
 
+    it "RN-54: só inserção também no banco: UPDATE e DELETE são recusados" do
+      record = summary
+      savepoint = ->(&blk) { ActiveRecord::Base.transaction(requires_new: true, &blk) }
+      expect { savepoint.call { HandoffSummary.where(id: record.id).update_all(status: "missing", missing_reason: "x") } }
+        .to raise_error(ActiveRecord::StatementInvalid, /só inserção/)
+      expect { savepoint.call { HandoffSummary.where(id: record.id).delete_all } }
+        .to raise_error(ActiveRecord::StatementInvalid, /só inserção/)
+    end
+
     it "invariante 6: o atendimento é da mesma marca" do
       expect { summary(brand: jim) }.to raise_error(ActiveRecord::InvalidForeignKey)
     end

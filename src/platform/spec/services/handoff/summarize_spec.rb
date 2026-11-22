@@ -11,9 +11,11 @@ RSpec.describe Handoff::Summarize, "RN-39, RN-40: resumo do handoff pela platafo
   let(:last_text) { "Aqui é a maria souza. Já faz dois dias, meu CPF é 123.456.789-09, me liga no +55 11 91234-5678" }
 
   # Histórico: mensagem 1, reply da IA com consulta, mensagem 3 sem resposta; o caso escala por prazo.
-  def escalated_ticket(reason: "prazo_do_turno")
+  def escalated_ticket(reason: "prazo_do_turno", reply_delivered: true)
     turn = opened_turn(first_text)
     AgentActions::Apply.call(agent_action_for(turn), traceparent: AgentActionHelpers::TRACEPARENT)
+    # A resposta chegou ao cliente antes do handoff; sem isso, o pedido a cancela (RN-38).
+    Delivery.where(ticket_id: turn.ticket_id, kind: "reply").update_all(status: "delivered", provider_message_id: "chat_out_1", delivered_at: Time.current) if reply_delivered
     ticket = turn.ticket.reload
     ticket.customer.update_columns(display_name: "Maria Souza")
     ingest(last_text)
@@ -35,6 +37,18 @@ RSpec.describe Handoff::Summarize, "RN-39, RN-40: resumo do handoff pela platafo
 
   def summarize(item) = described_class.call(item.id)
   def summary_audits(ticket) = AuditEvent.where(ticket_id: ticket.id, event_type: %w[handoff.summary_available handoff.summary_missing])
+
+  it "RF-41, RN-39: resposta cancelada no handoff não aparece como enviada; o pendente conta a mensagem dela" do
+    ticket = escalated_ticket(reply_delivered: false)
+    expect(Delivery.find_by!(ticket_id: ticket.id, kind: "reply").status).to eq("cancelled")
+
+    summarize(summary_item(ticket))
+
+    fields = HandoffSummary.find_by!(ticket_id: ticket.id).fields
+    expect(fields["acoes_tomadas"]).not_to include("Respondeu ao cliente")
+    expect(fields["acoes_tomadas"]).to include("Resposta preparada e não entregue (cancelada no handoff)")
+    expect(fields["pendente"]).to include("repasse de R$ 1.200 do dia 28")
+  end
 
   describe "RN-39: caminho feliz" do
     it "grava os cinco campos (source platform, available), audita e conclui o item na mesma transação" do

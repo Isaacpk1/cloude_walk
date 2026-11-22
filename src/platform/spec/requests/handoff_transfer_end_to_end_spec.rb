@@ -64,4 +64,26 @@ RSpec.describe "RN-38, RN-42: cliente pede humano com uma resposta do bot ainda 
     expect(AuditEvent.where(ticket_id: ticket.id, event_type: "ticket.escalated").sole.data)
       .to include("queue_kind" => "escalation", "transfer_delivery_id" => notice.delivery_id, "summary_status" => "pending")
   end
+
+  it "C1 (revisão do bloco 10): o job da resposta roda entre o pedido e o Escalate: mesmo assim, só o aviso sai" do
+    stub_broker
+    stub_channels({ status: 200, message_id: "chat_out_notice" })
+
+    post_chat("meu repasse não caiu")
+    ticket = Ticket.sole
+    perform_enqueued_jobs(only: OutboxJob) { OutboxJob.perform_now(due_dispatch(ticket).id) }
+    turn = AiTurn.sole
+    AgentActions::Apply.call(agent_action_for(turn), traceparent: AgentActionHelpers::TRACEPARENT)
+    reply = Delivery.find_by!(ticket_id: ticket.id, kind: "reply")
+
+    clear_enqueued_jobs
+    post_chat("quero falar com um atendente")
+    clear_enqueued_jobs
+    OutboxJob.perform_now(delivery_item(reply).id) # antes do Escalate
+    handoff_id = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "handoff.requested").id
+    perform_enqueued_jobs(only: OutboxJob) { OutboxJob.perform_now(handoff_id) }
+
+    expect(reply.reload.status).to eq("cancelled")
+    expect(channel_requests.map { JSON.parse(_1.body)["text"] }).to eq([ Handoff::Policy::DEFAULT.transfer_notice_text("pt-BR") ])
+  end
 end
