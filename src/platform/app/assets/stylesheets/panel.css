@@ -241,3 +241,19 @@ a.message__turn { text-decoration: none; }
 .timeline__row--delivery_reconciliation td, .timeline__row--dead_letter td { background: #fff8f7; }
 .dead-letter pre { white-space: pre-wrap; word-break: break-word; font-size: .8rem; background: var(--system-bg); padding: .5rem; }
 .dead-letters__row--escalated td:last-child { color: var(--danger); font-weight: 600; }
+
+/* Bloco 10: fila humana, resumo do handoff e aviso de transferência (RF-42, RF-45, RN-39 a RN-42). */
+.badge--priority { background: #eef1f5; color: #344054; }
+.badge--priority-critica { background: #fde8e6; color: #9b1c12; }
+.badge--priority-alta { background: #fff1db; color: #8a4b00; }
+.badge--priority-baixa { background: #f2f4f7; color: #667085; }
+.human-queue__raised { font-size: .8rem; color: #8a4b00; font-weight: 600; margin-top: .25rem; }
+.human-queue__position { font-weight: 700; }
+.human-queue__summary { font-size: .85rem; font-weight: 600; }
+.human-queue__summary--available { color: #116329; }
+.human-queue__summary--pending { color: #8a4b00; }
+.human-queue__summary--missing { color: #9b1c12; }
+.handoff-summary__fields { display: grid; grid-template-columns: max-content 1fr; gap: .25rem .75rem; margin: 0; }
+.handoff-summary__fields dt { font-weight: 600; }
+.transfer-notice__status { font-weight: 600; }
+.message--system { border-left: 3px solid #8a4b00; }

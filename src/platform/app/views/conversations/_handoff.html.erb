@@ -1,4 +1,4 @@
-<%# Bloco 08, RN-46 e RF-36: pedido de handoff e o seu desfecho (ConversationView::Handoff). Texto gravado só com o escape padrão do ERB. %>
+<%# Bloco 08, RN-46 e RF-36 (bloco 10: fila de escalas, prioridade e RN-41): pedido de handoff e o seu desfecho (ConversationView::Handoff). Texto gravado só com o escape padrão do ERB. %>
 <section class="card handoff handoff--<%= handoff.state %>" aria-label="Handoff para humano">
   <h2><%= handoff.headline %></h2>
   <dl class="turn__facts">
@@ -9,6 +9,8 @@
     <% if handoff.escalated? %>
       <dt>na fila às</dt><dd><time datetime="<%= handoff.resolved_at.iso8601(3) %>"><%= panel_time(handoff.resolved_at, precise: true) %></time><% if handoff.waited_ms %> <span class="muted">(<%= handoff.waited_ms %> ms desde a primeira mensagem pendente; RNF-18)</span><% end %></dd>
       <dt>atribuição</dt><dd>assignment_version <%= handoff.from_assignment_version %> → <%= handoff.to_assignment_version %></dd>
+      <dt>fila</dt><dd><%= handoff.queue_label %></dd>
+      <dt>prioridade</dt><dd><span class="badge badge--priority badge--priority-<%= handoff.priority || 'media' %>"><%= handoff.priority_label %></span><% if handoff.priority_raise_label %> <span class="human-queue__raised"><%= handoff.priority_raise_label %></span><% end %></dd>
     <% elsif handoff.state == :discarded %>
       <dt>descartado às</dt><dd><%= panel_time(handoff.resolved_at, precise: true) %></dd>
       <dt>motivo do descarte</dt><dd><%= handoff.discard_reason_label %></dd>
@@ -22,5 +24,5 @@
       <% end %>
     </ul>
   <% end %>
-  <p class="muted">trace <%= handoff.trace_id %><% if handoff.escalated? %> · aviso de transferência e resumo chegam no bloco 10<% end %></p>
+  <p class="muted">trace <%= handoff.trace_id %><% if handoff.escalated? %> · <%= link_to "ver na fila humana", human_queue_path %><% end %></p>
 </section>

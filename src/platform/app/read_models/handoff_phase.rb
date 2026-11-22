@@ -2,13 +2,27 @@
 # combinado dos blocos 08 e 09 (itens 1 e 5): o último handoff.requested e o seu desfecho, ticket.escalated (mesma
 # from_assignment_version que a assignment_version do pedido) ou handoff.discarded (mesma assignment_version), e as
 # saídas canceladas pelo handoff (delivery.cancelled com reason "handoff"). Também monta o histórico de escalação.
+# Bloco 10 (formato combinado do bloco 10): a fila e a versão com o tipo (queue_kind), a prioridade e a subida
+# (ticket.priority_raised), o resumo da escalação (handoff_summaries, mesma from_assignment_version) e o aviso de
+# transferência (transfer_delivery_id, entrega handoff_notice) com o estado da entrega.
 # Isolamento por marca (invariante 6): auditoria, fila, entregas e mensagens filtradas pelo brand_id do atendimento.
 class HandoffPhase
-  AUDITS = %w[handoff.requested ticket.escalated handoff.discarded delivery.cancelled].freeze
+  AUDITS = %w[handoff.requested ticket.escalated handoff.discarded delivery.cancelled ticket.priority_raised
+              handoff.summary_available handoff.summary_missing].freeze
   AI = "IA".freeze
 
-  def initialize(ticket)
+  # A subida de prioridade (RN-41) da escalação `escalated`: a ticket.priority_raised depois do ticket.escalated
+  # anterior do caso. `audits` em ordem de id. Também usada pela fila humana.
+  def self.priority_raised(audits, escalated)
+    return unless escalated
+
+    previous = audits.select { _1.event_type == "ticket.escalated" && _1.id < escalated.id }.map(&:id).max || 0
+    audits.reverse.find { _1.event_type == "ticket.priority_raised" && _1.id > previous }
+  end
+
+  def initialize(ticket, deliveries: nil)
     @ticket = ticket
+    @deliveries = deliveries
   end
 
   def view
@@ -53,6 +67,7 @@ class HandoffPhase
     discarded = escalated ? nil : outcome(request, "handoff.discarded", "assignment_version")
     resolved = escalated || discarded
     ConversationView::Handoff.new(
+      **escalation_details(escalated),
       state: escalated ? :escalated : (discarded ? :discarded : :requested),
       reason: data["reason"], source: data["source"], turn: data["turn"], first_pending_seq: data["first_pending_seq"],
       requested_at: request.occurred_at, resolved_at: resolved&.occurred_at,
@@ -64,14 +79,52 @@ class HandoffPhase
     )
   end
 
-  def queue_name(queue_id)
+  def queue_name(queue_id) = queue_version_for(queue_id)&.name
+
+  def queue_version_for(queue_id)
     return if queue_id.nil?
 
     queue = HelpdeskQueue.includes(:current_version).find_by(brand_id: @ticket.brand_id, id: queue_id)
     return unless queue
 
     version = @ticket.queue_id == queue.id && @ticket.queue_version ? queue.versions.find_by(version: @ticket.queue_version) : nil
-    (version || queue.current_version)&.name
+    version || queue.current_version
+  end
+
+  # Bloco 10: o que só existe depois da escalação. Registros do bloco 08 (sem queue_kind) leem o tipo da própria fila.
+  def escalation_details(escalated)
+    return {} unless escalated
+
+    data = escalated.data
+    raised = self.class.priority_raised(audits, escalated)
+    version = queue_version_for(data["queue_id"])
+    { queue_version: version&.version, queue_kind: data["queue_kind"] || queue_kind(version&.queue),
+      priority: @ticket.priority, priority_from: raised&.data&.dig("from"), priority_to: raised&.data&.dig("to"),
+      summary: summary(data["from_assignment_version"]), transfer_notice: transfer_notice(data["transfer_delivery_id"]) }
+  end
+
+  def queue_kind(queue)
+    return unless queue
+    return "escalation" if queue.escalation
+
+    "default" if queue.is_default
+  end
+
+  def summary(from_version)
+    record = HandoffSummary.find_by(brand_id: @ticket.brand_id, ticket_id: @ticket.id, from_assignment_version: from_version)
+    audit = record && audits.reverse.find do
+      _1.event_type == "handoff.summary_#{record.status}" && _1.data["from_assignment_version"] == from_version
+    end
+    ConversationView::HandoffSummary.from(record, audit)
+  end
+
+  def transfer_notice(delivery_id)
+    deliveries = @deliveries ||= DeliveryEvents.new(@ticket)
+    status = deliveries.status_for(delivery_id || deliveries.latest_handoff_notice_id)
+    return unless status
+
+    text = Message.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id, seq: status.seq).pick(:body)
+    ConversationView::TransferNotice.from(status, text:, reconciliations: deliveries.reconciliations)
   end
 
   # RNF-18: da gravação da primeira mensagem pendente do ciclo até a entrada na fila humana.

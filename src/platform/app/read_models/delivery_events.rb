@@ -28,6 +28,15 @@ class DeliveryEvents
     delivery && status_view(delivery)
   end
 
+  # A entrega pelo delivery_id (o aviso de transferência do bloco 10). nil para entrega de outro atendimento.
+  def status_for(delivery_id)
+    delivery = deliveries_by_id[delivery_id]
+    delivery && status_view(delivery)
+  end
+
+  # A entrega kind handoff_notice mais nova do atendimento, para registros sem transfer_delivery_id.
+  def latest_handoff_notice_id = deliveries.reverse.find { _1.kind == "handoff_notice" }&.delivery_id
+
   # A auditoria delivery.requested da saída gravada pelo turno (a primeira, pela ordem do seq).
   def requested_for_turn(turn_number)
     requested.values.select { _1.data["turn"] == turn_number }.min_by { _1.data["seq"].to_i }
@@ -134,7 +143,7 @@ class DeliveryEvents
   def detail(kind, data, delivery)
     head = "Saída seq #{delivery.seq}, delivery_id #{delivery.delivery_id.first(8)}"
     case kind
-    when :delivery_requested then "#{head} (#{data['kind']}) gravada com a resposta aplicada do turno #{data['turn']}"
+    when :delivery_requested then requested_detail(head, data)
     when :delivery_sending then "#{head}: envio ao provedor, tentativa #{data['attempt']}"
     when :delivered
       replayed = data["replayed"] ? ", confirmação repetida pelo provedor (Idempotent-Replayed)" : ""
@@ -147,6 +156,13 @@ class DeliveryEvents
     when :delivery_status
       "#{head}: provedor informou #{data['status']} (#{data['provider_message_id']}, às #{data['provider_timestamp']})"
     end
+  end
+
+  # Bloco 10: o aviso de transferência (RN-42) sai do handoff, sem turno.
+  def requested_detail(head, data)
+    return "#{head}: aviso de transferência (handoff_notice) gravado pelo handoff, sem turno (RN-42)" if data["kind"] == "handoff_notice"
+
+    "#{head} (#{data['kind']}) gravada com a resposta aplicada do turno #{data['turn']}"
   end
 
   def reconciliation_detail(head, data, delivery)

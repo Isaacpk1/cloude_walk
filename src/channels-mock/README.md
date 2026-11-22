@@ -57,6 +57,8 @@ curl -X POST localhost:4000/provider/chat/faults -H 'Content-Type: application/j
 
 **Na tela.** Cada envio do cliente mostra as respostas recebidas pelo provedor, ligadas pelo `reply_to` (= `message_id` do webhook do cliente), com `message_id`, `Idempotency-Key`, `seq`, repetições, `trace_id`, último status e o **tempo total**: chegada da resposta ao provedor − `sent_at` do envio (RNF-05, latência percebida). O `trace_id` do envio e o link para a linha do tempo levam até a mensagem original no painel. `/?atualizar=3` recarrega a página a cada 3 s.
 
+**Pedir humano (bloco 10).** O botão **Pedir humano** do formulário envia, pela mesma rota do chat, a frase de pedido explícito no idioma da marca da conta (`Quero falar com um atendente` na InfinitePay, `I want to talk to a human agent` na JIM; RN-34). O aviso de transferência (RN-42) aparece destacado como mensagem do **Sistema** sob o pedido. O envio do provedor (`chat_send`) não diz quem escreveu: o simulador reconhece o aviso pelo texto padrão da plataforma (`lib/channels_mock/human_request.rb`).
+
 O armazenamento é só em memória: reiniciar o mock apaga as mensagens aceitas e a última `seq` de cada conversa. Por isso uma retentativa depois de reiniciar é aceita como nova.
 
 ## Cenários de rajada (bloco 06)

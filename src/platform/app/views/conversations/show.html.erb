@@ -1,5 +1,10 @@
 <% c = @conversation %>
 <% content_for :title, "Conversa #{c.ticket_id}" %>
+<%# Bloco 10 (RNF-06): o AuditEvent pede a recarga quando o caso escala ou o resumo chega. %>
+<% unless c.source.synthetic? %>
+  <% content_for :head do %><%= turbo_refreshes_with method: :morph, scroll: :preserve %><% end %>
+  <%= turbo_stream_from(*c.stream) %>
+<% end %>
 
 <div class="page-header">
   <div>
@@ -48,6 +53,8 @@
     <% if c.grouping %><%= render "conversations/grouping", grouping: c.grouping %><% end %>
     <% if c.turn_refusal %><%= render "conversations/turn_refusal", refusal: c.turn_refusal %><% end %>
     <% if c.handoff %><%= render "conversations/handoff", handoff: c.handoff %><% end %>
+    <% if c.handoff&.summary %><%= render "conversations/handoff_summary", summary: c.handoff.summary %><% end %>
+    <% if c.handoff&.transfer_notice %><%= render "conversations/transfer_notice", notice: c.handoff.transfer_notice %><% end %>
     <% if c.deadlines %><%= render "conversations/deadlines", deadlines: c.deadlines %><% end %>
     <% c.reconciliations.each do |reconciliation| %><%= render "conversations/reconciliation", reconciliation: %><% end %>
 

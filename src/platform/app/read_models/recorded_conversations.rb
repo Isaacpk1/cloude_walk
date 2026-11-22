@@ -33,6 +33,7 @@ class RecordedConversations
     events += AgentActionEvents.new(ticket).events
     events += DeliveryEvents.new(ticket).events
     events += DeadlineEvents.new(ticket).events
+    events += HandoffEvents.new(ticket).events
     events += OutboxAttempts.new(ticket).events
     events += DeadLetterEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
@@ -50,7 +51,7 @@ class RecordedConversations
 
   def conversation(ticket)
     deliveries = DeliveryEvents.new(ticket)
-    handoff = HandoffPhase.new(ticket)
+    handoff = HandoffPhase.new(ticket, deliveries:)
     ConversationView.new(
       id: ticket.id.to_s, ticket_id: ticket.id.to_s, brand_slug: ticket.brand.slug, brand_name: ticket.brand.name,
       customer_name: ticket.customer.display_name, channel: ticket.channel, state: ticket.state,
