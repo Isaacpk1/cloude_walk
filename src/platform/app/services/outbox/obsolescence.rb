@@ -17,6 +17,8 @@
 #   conciliação (Deliveries::Send decide e acorda a próxima); o aviso da ingestão vale para a triagem.
 # - "handoff.requested", "turn.timeout", "cycle.timeout" e "progress.notice" (blocos 08 e 09): nunca obsoletos
 #   aqui. O worker revalida sob o lock e audita o descarte com o motivo do domínio.
+# - "handoff.summary" (bloco 10): nunca obsoleto. O caso já está com humano por definição; o Handoff::Summarize
+#   decide sob o lock e a inserção é idempotente.
 # - Outros tipos: obsoletos se o caso saiu da IA, se o payload traz `assignment_version` diferente da atual ou
 #   `first_pending_seq` diferente do ciclo pendente atual (ciclo_anterior).
 module Outbox
@@ -25,7 +27,9 @@ module Outbox
     DISPATCH = "turn.dispatch".freeze
     # Os tipos revalidados pelo próprio worker sob o lock (blocos 08 e 09) também: o worker decide e audita o descarte
     # com o motivo do domínio (handoff.discarded, *.timeout_discarded, progress.notice_discarded).
-    NEVER = %w[delivery.requested message.received handoff.requested turn.timeout cycle.timeout progress.notice].freeze
+    # O resumo do handoff (bloco 10) é sempre de um caso que já saiu da IA: a regra genérica o daria por obsoleto.
+    NEVER = %w[delivery.requested message.received handoff.requested turn.timeout cycle.timeout progress.notice
+               handoff.summary].freeze
 
     module_function
 

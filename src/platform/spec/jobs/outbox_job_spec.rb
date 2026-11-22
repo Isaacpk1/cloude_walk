@@ -183,6 +183,24 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
     end
   end
 
+  describe "RN-39, RN-40: handoff.summary (bloco 10)" do
+    it "monta o resumo da plataforma pelo ID e está em HANDLED, para a recuperação reoferecê-lo" do
+      expect(described_class::HANDLED).to include("handoff.summary")
+      turn = opened_turn
+      request_handoff(turn.ticket, reason: "prazo_do_turno", source: "scheduler", turn: turn.turn)
+      Handoff::Escalate.call(handoff_items(turn.ticket).sole.id)
+      item = OutboxEvent.create!(brand_id: turn.brand_id, ticket_id: turn.ticket_id, event_type: "handoff.summary",
+                                 dedup_key: "summary:#{turn.ticket_id}:0", trace_id: "d" * 32, next_attempt_at: Time.current,
+                                 payload: { "ticket_id" => turn.ticket_id, "from_assignment_version" => 0,
+                                            "reason" => "prazo_do_turno", "escalated_at" => Time.current.utc.iso8601(6) })
+
+      described_class.perform_now(item.id)
+
+      expect(HandoffSummary.find_by!(ticket_id: turn.ticket_id)).to have_attributes(source: "platform", status: "available")
+      expect(item.reload.completed_at).to be_present
+    end
+  end
+
   it "repetição: ação encerrada não faz nada" do
     item = due_dispatch(ingest)
     item.update!(completed_at: start)

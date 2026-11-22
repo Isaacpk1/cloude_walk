@@ -12,6 +12,8 @@
 #   Turns::Open e Outbox::Publish também podem pedir o handoff (falha definitiva, RN-46 e RN-49).
 # - "progress.notice": aviso de progresso do scheduler aos 15 s (RN-57). Turns::ProgressNotice revalida e grava a
 #   saída do aviso; o envio é o delivery.requested seguinte. Relógio do banco antes do prazo: volta no prazo.
+# - "handoff.summary": resumo do handoff montado pela plataforma quando o agente não mandou o dele (RN-39, RN-40;
+#   Handoff::Summarize). Grava o resumo ou o "sem resumo" e conclui o item; nunca mexe no handoff.
 # - "message.received": aviso da ingestão. Não abre turno; fica para a triagem (bloco 11). Até lá, o
 #   worker só o encerra, para a recuperação não reoferecê-lo para sempre.
 #
@@ -24,7 +26,7 @@ class OutboxJob < ApplicationJob
   TIMEOUTS = [ Deadlines::TurnTimeout::EVENT_TYPE, Deadlines::CycleTimeout::EVENT_TYPE ].freeze
   HANDLED = [ MESSAGE_RECEIVED, Turns::Open::DISPATCH_TYPE, Turns::Open::EVENT_TYPE, Deliveries::Send::EVENT_TYPE,
               *TIMEOUTS, Handoff::Request::EVENT_TYPE,
-              Deadlines::ProgressDue::EVENT_TYPE ].freeze
+              Deadlines::ProgressDue::EVENT_TYPE, Handoff::Summarize::EVENT_TYPE ].freeze
 
   def perform(outbox_event_id)
     item = OutboxEvent.find_by(id: outbox_event_id)
@@ -51,6 +53,8 @@ class OutboxJob < ApplicationJob
     when Deadlines::ProgressDue::EVENT_TYPE
       result = Turns::ProgressNotice.call(item.id)
       self.class.set(wait_until: result.next_attempt_at).perform_later(item.id) if result.next_attempt_at
+    when Handoff::Summarize::EVENT_TYPE
+      Handoff::Summarize.call(item.id)
     when MESSAGE_RECEIVED
       OutboxEvent.where(id: item.id, completed_at: nil).update_all(completed_at: Time.current, lease_until: nil)
     end
