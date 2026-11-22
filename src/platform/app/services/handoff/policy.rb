@@ -5,11 +5,12 @@
 #   policy.human_request?(text, brand.locale)          # pedido explícito de humano (RN-34)
 #   policy.raise_priority?(reason)                     # RN-41: tempo ou falha de integração sobem um nível
 #   policy.raised_priority(ticket.priority)
+#   policy.exchanges_limit                             # RN-33, item 6: trocas da IA sem resolver antes de escalar
 #
 # Hoje toda marca usa os padrões. No bloco 12, `for` passa a ler a configuração versionada da marca (textos e
 # expressões por marca e idioma, RN-34 e RN-42); quem chama não muda.
 module Handoff
-  Policy = Data.define(:transfer_notice_texts, :human_request_patterns, :priority_raising_reasons) do
+  Policy = Data.define(:transfer_notice_texts, :human_request_patterns, :priority_raising_reasons, :exchanges_limit) do
     # Idioma sem texto é erro, como no aviso de progresso: um padrão esconderia uma marca nova sem o aviso.
     def transfer_notice_text(locale) = transfer_notice_texts.fetch(locale)
 
@@ -58,7 +59,9 @@ module Handoff
       }.freeze,
       human_request_patterns: { "pt-BR" => PT_BR, "en" => EN }.freeze,
       # RN-41: o cliente já esperou mais que o normal.
-      priority_raising_reasons: %w[prazo_do_turno teto_do_ciclo publicacao_falhou falha_de_integracao].freeze
+      priority_raising_reasons: %w[prazo_do_turno teto_do_ciclo publicacao_falhou falha_de_integracao].freeze,
+      # RN-33, item 6: uma troca é um turno com `reply` aplicado na atribuição atual da IA (AgentActions::Apply).
+      exchanges_limit: 10
     )
 
     def self.for(_brand) = DEFAULT
