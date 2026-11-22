@@ -131,6 +131,20 @@ RSpec.describe Routing::Evaluate do
                                                "queue_id" => credito_vip.id, "reason" => "fila_inativa" } ])
     end
 
+    it "várias puladas ficam na ordem do conjunto, com rule_index 0-based" do
+      publish([ "Crédito VIP", credito_vip, [ [ %w[category eq credito] ] ] ],
+              [ "Maquininha", maquininha, [ [ %w[category eq credito] ] ] ],
+              [ "Crédito", credito, [ [ %w[category eq credito] ] ] ])
+      credito_vip.update!(active: false)
+      maquininha.update!(active: false)
+
+      expect(route(category: "credito")).to have_attributes(
+        queue: credito, rule_index: 2,
+        skipped_rules: [ { "rule_index" => 0, "rule_name" => "Crédito VIP", "queue_id" => credito_vip.id, "reason" => "fila_inativa" },
+                         { "rule_index" => 1, "rule_name" => "Maquininha", "queue_id" => maquininha.id, "reason" => "fila_inativa" } ]
+      )
+    end
+
     it "regra que não casaria não entra em skipped_rules" do
       publish([ "Maquininha", maquininha, [ [ %w[category eq maquininha] ] ] ])
       maquininha.update!(active: false)
