@@ -41,15 +41,23 @@ class PublicationEvents
       "(tentativa #{data['attempt']}, #{data['broker_status']})"
   end
 
-  def failure(turn, item, audit)
+  # O erro de uma tentativa de publicação que falhou, foi recusada ou cancelada. Num lugar só: a linha do
+  # tempo e o resumo das tentativas do item (OutboxAttempts) mostram o mesmo motivo.
+  def self.error_for(audit)
     data = audit.data
     discarded = audit.event_type == "agent_event.discarded"
-    error = TimelineView::Error.new(
+    TimelineView::Error.new(
       origin: discarded ? data["reason"] : data["origin"], http_status: data["http_status"],
       message: data["error"] || data["reason"], attempt: data["attempt"],
       retry: audit.event_type == "agent_event.publish_failed" && data["retry"] == true,
       next_attempt_at: data["next_attempt_at"] && Time.zone.parse(data["next_attempt_at"]), outcome: data["outcome"]
     )
+  end
+
+  def failure(turn, item, audit)
+    data = audit.data
+    discarded = audit.event_type == "agent_event.discarded"
+    error = self.class.error_for(audit)
     event(turn, item, discarded ? :publish_discarded : :publish_failed, started_at: audit.occurred_at,
                                                                        finished_at: audit.occurred_at,
                                                                        detail: "Tentativa #{data['attempt']}: #{error.origin_label}", error:)

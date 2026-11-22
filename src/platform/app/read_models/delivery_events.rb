@@ -132,7 +132,11 @@ class DeliveryEvents
     end
   end
 
-  def error(kind, data)
+  def error(kind, data) = self.class.error_for(kind, data)
+
+  # O erro de uma etapa da entrega, pelo tipo do evento (EVENT_KINDS). Num lugar só: a linha do tempo e o
+  # resumo das tentativas do item (OutboxAttempts) mostram o mesmo motivo.
+  def self.error_for(kind, data)
     case kind
     when :delivery_retry_scheduled
       delivery_error(origin: "provedor_transitorio", message: data["error"], attempt: data["attempt"], retry: true,
@@ -148,10 +152,14 @@ class DeliveryEvents
     end
   end
 
-  def delivery_error(origin:, http_status: nil, message: nil, attempt: nil, retry: false, next_attempt_at: nil, outcome: nil)
+  def self.delivery_error(origin:, http_status: nil, message: nil, attempt: nil, retry: false, next_attempt_at: nil, outcome: nil)
     TimelineView::Error.new(origin:, http_status:, message:, attempt:, retry:, next_attempt_at:, outcome:,
                             retry_key: "delivery_id")
   end
 
-  def parse_time(value) = value && Time.zone.parse(value)
+  def self.parse_time(value) = value && Time.zone.parse(value)
+
+  private_class_method :delivery_error
+
+  def parse_time(value) = self.class.parse_time(value)
 end
