@@ -23,6 +23,11 @@ class ConversationView < Data.define(
     )
   end
 
+  # Stream do Turbo da conversa (bloco 10): o AuditEvent pede a recarga quando o caso escala ou o resumo chega.
+  def self.stream_for(brand_slug, ticket_id) = [ :conversation, brand_slug, ticket_id.to_s ]
+
+  def stream = self.class.stream_for(brand_slug, ticket_id)
+
   def messages_in(turn) = messages.select { turn.covered_seqs.include?(_1.seq) }
   def turns_covering(seq) = turns.select { _1.covered_seqs.include?(seq) }
   def superseded_turns = turns.select(&:superseded?)
