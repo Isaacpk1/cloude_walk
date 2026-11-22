@@ -103,7 +103,8 @@ class HumanQueue
       queue_kind: data["queue_kind"] || queue_kind(version), reason: data["reason"], source: data["source"],
       priority: ticket.priority, priority_from: raised&.data&.dig("from"), priority_to: raised&.data&.dig("to"),
       escalated_at: escalated&.occurred_at || ticket.updated_at,
-      summary: summary(summaries[ticket.id], audits, data["from_assignment_version"]), trace_id: escalated&.trace_id
+      summary: summary(summaries[ticket.id], audits, data["from_assignment_version"]), trace_id: escalated&.trace_id,
+      category: ticket.category
     )
   end
 

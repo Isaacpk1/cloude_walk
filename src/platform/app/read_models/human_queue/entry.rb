@@ -1,9 +1,11 @@
 # Uma linha da fila humana (ROADMAP 10; RF-42, RF-45, RN-29, RN-39 a RN-41). `escalated_at`: o ticket.escalated da
 # atribuição atual (início da espera na fila). `priority_from`/`priority_to`: a subida da RN-41 gravada em
-# ticket.priority_raised nesta escalação, ou nil. `summary`: ConversationView::HandoffSummary. Tudo texto comum.
+# ticket.priority_raised nesta escalação, ou nil. `summary`: ConversationView::HandoffSummary. `category`: a categoria
+# da triagem (bloco 11), ou nil. Tudo texto comum.
 class HumanQueue::Entry < Data.define(:ticket_id, :brand_slug, :brand_name, :customer_name, :title, :state, :queue_id,
                                       :queue_name, :queue_version, :queue_kind, :reason, :source, :priority,
-                                      :priority_from, :priority_to, :escalated_at, :summary, :trace_id)
+                                      :priority_from, :priority_to, :escalated_at, :summary, :trace_id,
+                                      :category)
   QUEUE_KINDS = {
     "escalation" => "fila de escalas",
     "default" => "fila padrão: a marca não tem fila de escalas"
@@ -13,6 +15,8 @@ class HumanQueue::Entry < Data.define(:ticket_id, :brand_slug, :brand_name, :cus
   def reason_label = ConversationView::Handoff.reason_label(reason)
   def source_label = ConversationView::Handoff.source_label(source)
   def priority_label = ConversationView::Priority.label(priority)
+  # Bloco 11 (RF-10, RN-11): a categoria da triagem; caso escalado antes da triagem aparece como "sem triagem".
+  def category_label = ConversationView::Category.label(category) || "sem triagem"
   def priority_raise_label = priority_to && ConversationView::Priority.raise_label(priority_from, priority_to)
 
   def queue_label = self.class.queue_label(queue_name, queue_version, queue_kind)

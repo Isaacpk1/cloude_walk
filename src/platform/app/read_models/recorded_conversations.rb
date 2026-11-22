@@ -34,6 +34,7 @@ class RecordedConversations
     events += DeliveryEvents.new(ticket).events
     events += DeadlineEvents.new(ticket).events
     events += HandoffEvents.new(ticket).events
+    events += TriageEvents.new(ticket).events
     events += OutboxAttempts.new(ticket).events
     events += DeadLetterEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
@@ -52,21 +53,29 @@ class RecordedConversations
   def conversation(ticket)
     deliveries = DeliveryEvents.new(ticket)
     handoff = HandoffPhase.new(ticket, deliveries:)
+    triage = TriagePhase.new(ticket).view
     ConversationView.new(
       id: ticket.id.to_s, ticket_id: ticket.id.to_s, brand_slug: ticket.brand.slug, brand_name: ticket.brand.name,
       customer_name: ticket.customer.display_name, channel: ticket.channel, state: ticket.state,
-      title: ticket.messages.first&.body.to_s.truncate(60), assignee: assignee(handoff),
+      title: ticket.messages.first&.body.to_s.truncate(60), assignee: assignee(ticket, handoff, triage),
       assignment_version: ticket.assignment_version, latest_customer_seq: ticket.latest_customer_seq,
       messages: ticket.messages.map { message(ticket, _1, deliveries) }, turns: turns(ticket, deliveries),
       escalations: handoff.escalations, source: DataSource::SYSTEM, deadlines: DeadlinesPhase.new(ticket).view,
-      handoff: handoff.view, reconciliations: deliveries.reconciliations, **phase(ticket)
+      handoff: handoff.view, reconciliations: deliveries.reconciliations, triage:, **phase(ticket)
     )
   end
 
-  # Depois do handoff (bloco 08) o caso espera na fila humana da marca; a atribuição a analista é do bloco 10.
-  def assignee(handoff)
+  # Depois do handoff (bloco 08) o caso espera na fila humana da marca; a atribuição a analista é do bloco 13.
+  # Bloco 11: sem handoff, a atribuição da triagem diz se o caso está com a IA (RF-24) ou na fila humana (RN-28).
+  def assignee(ticket, handoff, triage)
     queue = handoff.current_queue_name
-    queue ? ConversationView::Participant.new(name: queue, kind: "queue") : WAITING
+    return ConversationView::Participant.new(name: queue, kind: "queue") if queue
+
+    assignment = triage&.assignment
+    return WAITING unless assignment
+    return ConversationView::Participant.new(name: ticket.assignee&.name || "Agente de IA", kind: "bot") if assignment.to == "ia"
+
+    ConversationView::Participant.new(name: assignment.queue_name || "fila sem nome", kind: "queue")
   end
 
   # A recusa terminal do turno da última mensagem substitui a fase de agrupamento (RN-49, RN-46).

@@ -257,3 +257,14 @@ a.message__turn { text-decoration: none; }
 .handoff-summary__fields dt { font-weight: 600; }
 .transfer-notice__status { font-weight: 600; }
 .message--system { border-left: 3px solid #8a4b00; }
+
+/* Bloco 11: triagem e roteamento na conversa, na lista e na fila. */
+.triage { border-left: 4px solid #1f6f8b; }
+.triage h3 { margin: .75rem 0 .25rem; font-size: .9rem; }
+.triage__explanation { margin: 0; font-weight: 600; }
+.triage__unclassified, .triage__skipped { margin: .5rem 0 0; color: #8a4b00; }
+.triage__skipped-rules { margin: .25rem 0; padding-left: 1.1rem; font-size: .85rem; color: var(--muted); }
+.triage__tag { font-size: .8rem; }
+.conversation-list__triage { display: flex; gap: .35rem; align-items: center; font-size: .85rem; }
+.bar__fill--triage_classified, .bar__fill--routing_decided, .bar__fill--triage_assigned { background: #1f6f8b; }
+.bar__fill--triage_skipped { background: #888; }
