@@ -39,10 +39,14 @@ module Turns
 
     attr_reader :ticket
 
-    # "Sem resposta": mensagens do cliente depois da última saída visível ao cliente.
+    # "Sem resposta": mensagens do cliente depois da última saída visível ao cliente. O aviso de progresso (RN-57)
+    # não responde: as mensagens do ciclo continuam pendentes depois dele.
     def pending
       @pending ||= begin
-        answered_until = messages.where(direction: "outbound", internal: false).maximum(:seq).to_i
+        answered_until = messages.where(direction: "outbound", internal: false)
+                                 .where.not(id: Delivery.where(ticket_id: ticket.id, brand_id: ticket.brand_id, kind: "progress")
+                                                        .select(:message_id))
+                                 .maximum(:seq).to_i
         messages.where(direction: "inbound", author_type: "customer").where(seq: (answered_until + 1)..).order(:seq).to_a
       end
     end
