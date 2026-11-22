@@ -166,10 +166,17 @@ module AgentActions
     # 1. Turno atual e elegível.
     def turn_reason
       return "turno_superado" if @turn.status == "superseded"
-      return "prazo_vencido" if @turn.status == "expired"
+      return expired_reason if @turn.status == "expired"
       return "turno_nao_elegivel" unless @turn.eligible?
 
       "turno_superado" if @ticket.ai_turns.where(turn: (@turn.turn + 1)..).exists?
+    end
+
+    # Turno expirado pelo pedido de handoff de um gatilho que não é prazo (falha definitiva, DLQ, contexto): o motivo é o
+    # pedido. Expirado pelo timeout, ou por um pedido de prazo: prazo_vencido.
+    def expired_reason
+      reason = Handoff::Request.pending_reason(@ticket)
+      reason && !Handoff::Request::DEADLINE_REASONS.include?(reason) ? "handoff_pedido" : "prazo_vencido"
     end
 
     # 2. Mesma atribuição, que continua com a IA.

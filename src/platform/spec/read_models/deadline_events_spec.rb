@@ -119,6 +119,15 @@ RSpec.describe "RN-46, RN-57, RF-36, RF-56, RNF-18: prazos e handoff na linha do
     expect(event.detail).to eq("Teto do ciclo (primeira pendente seq 1) descartado: outro ciclo começou depois do registro")
   end
 
+  it "RN-57: aviso registrado pelo Deadlines::ProgressDue real aparece na hora do prazo, não na hora da página" do
+    at(t0 + 15.3.seconds) { Deadlines::ProgressDue.call(now: Time.current, limit: 10) }
+
+    event = travel_to(t0 + 40.seconds) { of(:progress_scheduled).sole }
+    expect(event.started_at).to eq(t0 + 15.seconds)
+    expect(event.detail).to include("vencido às", "300 ms depois")
+    expect(event.detail).not_to include("às —")
+  end
+
   it "RN-57: todo motivo de descarte do aviso gravado pelo serviço tem rótulo" do
     %w[fora_da_ia resposta_aplicada ciclo_encerrado ciclo_novo handoff_pedido prazo_vencido].each do |reason|
       expect(ConversationView::ProgressNotice::REASONS).to have_key(reason)

@@ -130,9 +130,10 @@ class DeadlineEvents
 
   def progress_scheduled(audit)
     data = audit.data
-    build(audit, :progress_scheduled, started_at: parse(data["deadline_at"]), seq: data["first_pending_seq"], turn: nil,
+    deadline = data["deadline_at"] || data["progress_due_at"]
+    build(audit, :progress_scheduled, started_at: parse(deadline), seq: data["first_pending_seq"], turn: nil,
                                       detail: "Aviso de progresso do ciclo da seq #{data['first_pending_seq']} vencido às " \
-                                              "#{clock(data['deadline_at'])}: o scheduler registrou progress.notice no " \
+                                              "#{clock(deadline)}: o scheduler registrou progress.notice no " \
                                               "outbox #{data['delay_ms']} ms depois",
                                       cause: TimelineView::Cause.new(origin: "scheduler", reason: "aviso_de_progresso",
                                                                      reason_label: "15 s desde a primeira mensagem pendente (RN-57)"))

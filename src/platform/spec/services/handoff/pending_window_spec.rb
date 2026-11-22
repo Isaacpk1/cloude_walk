@@ -29,9 +29,16 @@ RSpec.describe "RN-46, RN-56: janela entre o pedido de handoff e o Escalate" do
 
     result = apply(agent_action_for(turn))
 
-    expect(result.status).to eq(:rejected)
+    expect(result).to have_attributes(status: :rejected, reason: "handoff_pedido")
     expect(Delivery.where(ticket_id: turn.ticket_id)).to be_empty
     expect(Handoff::Escalate.call(handoff_items(turn.ticket).sole.id).status).to eq(:escalated)
+  end
+
+  it "pedido por prazo (timeout do turno): a resposta atrasada mostra prazo_vencido" do
+    turn = opened_turn
+    request_handoff(turn.ticket, reason: "prazo_do_turno", source: "scheduler", turn: turn.turn)
+
+    expect(apply(agent_action_for(turn))).to have_attributes(status: :rejected, reason: "prazo_vencido")
   end
 
   it "cenário B: timeout pedido e mensagem nova do cliente antes do Escalate: nenhum turno novo abre" do
