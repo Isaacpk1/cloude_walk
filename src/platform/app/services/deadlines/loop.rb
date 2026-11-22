@@ -10,6 +10,12 @@ module Deadlines
   class Loop
     DEFAULT_INTERVAL = 0.25
     DEFAULT_BATCH = 100
+    # Prazos consultados a cada volta, cada um no seu serviço (ADR-016). Uma linha por prazo, no fim da lista.
+    REGISTRATIONS = [
+      "Deadlines::DispatchDue",
+      "Deadlines::TurnTimeout",
+      "Deadlines::CycleTimeout"
+    ].freeze
 
     attr_reader :interval, :batch, :heartbeat
 
@@ -42,7 +48,10 @@ module Deadlines
 
     # Devolve quantos itens a volta emitiu (0 em caso de erro, para dormir antes de tentar de novo).
     def tick
-      emitted = Rails.application.executor.wrap { DispatchDue.call(now: Time.current, limit: batch).size }
+      emitted = Rails.application.executor.wrap do
+        now = Time.current
+        REGISTRATIONS.sum { _1.constantize.call(now:, limit: batch).size }
+      end
       beat
       emitted
     rescue StandardError => e

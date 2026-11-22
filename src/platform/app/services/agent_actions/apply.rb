@@ -153,8 +153,11 @@ module AgentActions
       reason ? reject(reason) : apply
     end
 
+    # A atribuição vem primeiro no motivo: depois de um handoff (bloco 08) o turno também fica `expired`, e a
+    # ação atrasada deve aparecer como `atribuicao_mudou`/`fora_da_ia`, não como prazo vencido. O resultado
+    # (rejeitar) é o mesmo em qualquer ordem.
     def rejection_reason
-      turn_reason || assignment_reason || context_reason || deadline_reason
+      assignment_reason || turn_reason || context_reason || deadline_reason
     end
 
     # 1. Turno atual e elegível.

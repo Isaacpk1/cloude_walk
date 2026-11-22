@@ -1027,6 +1027,13 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: index_ai_turns_eligible_deadline; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_turns_eligible_deadline ON public.ai_turns USING btree (deadline_at) WHERE ((status)::text = 'eligible'::text);
+
+
+--
 -- Name: index_ai_turns_on_brand_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1838,6 +1845,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261122010000'),
 ('20261122000000'),
 ('20261121040000'),
 ('20261121030000'),
