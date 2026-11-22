@@ -61,6 +61,12 @@ module KafkaHelpers
   def messages_in(producer, topic) = producer.client.messages.select { _1[:topic] == topic }
   def outbound(producer) = messages_in(producer, AgentMock::TOPICS.fetch(:outbound))
   def dlq(producer) = messages_in(producer, AgentMock::TOPICS.fetch(:dlq))
+
+  # RN-44, RN-45: a mensagem da DLQ segue o contrato dead_letter (bloco 09).
+  def dead_letter_errors(message)
+    view = HelpdeskContracts::DeadLetter.view(headers: message[:headers], payload: message[:payload], key: message[:key])
+    HelpdeskContracts.errors(:dead_letter, view).map(&:to_s)
+  end
   def action_in(producer) = JSON.parse(outbound(producer).last.fetch(:payload))
 
   def log_lines(io) = io.string.lines.map { JSON.parse(_1) }

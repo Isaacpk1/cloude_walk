@@ -307,6 +307,7 @@ RSpec.describe AgentMock::Responder do
       expect(message[:headers]).to include("dlq_reason" => "contrato", "dlq_source" => "agent-mock",
                                            "event_id" => event["event_id"], "traceparent" => traceparent)
       expect(JSON.parse(message[:headers]["dlq_violations"]).map { _1["pointer"] }).to include("/turn")
+      expect(dead_letter_errors(message)).to eq([])
     end
 
     it "JSON malformado também vai para a DLQ, com a chave do event_id do cabeçalho" do
@@ -316,6 +317,14 @@ RSpec.describe AgentMock::Responder do
 
       expect(result.status).to eq(:dead_lettered)
       expect(sole(dlq(producer))).to include(key: event_id, payload: "{nao e json")
+      expect(dead_letter_errors(sole(dlq(producer)))).to eq([])
+    end
+
+    it "RN-45: sem event_id nem traceparent nos cabeçalhos, a mensagem segue o contrato dead_letter" do
+      responder.call(payload: "{nao e json", headers: {})
+
+      expect(sole(dlq(producer))[:headers]).to include("event_id" => "", "traceparent" => "")
+      expect(dead_letter_errors(sole(dlq(producer)))).to eq([])
     end
   end
 
@@ -334,6 +343,7 @@ RSpec.describe AgentMock::Responder do
       expect(message[:headers]).to include("dlq_reason" => "acao_invalida", "dlq_source" => "agent-mock")
       expect(JSON.parse(message[:payload])).to include("in_reply_to" => event["event_id"], "action" => "reply")
       expect(log_lines(io).map { _1["event"] }).to include("agent.invalid_action")
+      expect(dead_letter_errors(message)).to eq([])
     end
   end
 
