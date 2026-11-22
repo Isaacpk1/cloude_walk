@@ -6,9 +6,15 @@ RSpec.describe InboundConsumer do
   subject(:consumer) { karafka.consumer_for(AgentMock::TOPICS.fetch(:inbound)) }
 
   let(:clock) { KafkaHelpers::FakeClock.new }
+  let(:redis) { KafkaHelpers::FakeControlRedis.new }
+
+  def profiles_for(env)
+    AgentMock::Profiles.new(config: AgentMock::Config.load(env:), source: AgentMock::ProfileSource.new(redis:),
+                            log: AgentMock::Log.new(StringIO.new))
+  end
 
   before do
-    allow(AgentMock).to receive_messages(config: AgentMock::Config.load(env: { "AGENT_LATENCY_MS" => "0" }),
+    allow(AgentMock).to receive_messages(profiles: profiles_for("AGENT_LATENCY_MS" => "0"),
                                          clock:, log: AgentMock::Log.new(StringIO.new))
   end
 
@@ -62,13 +68,27 @@ RSpec.describe InboundConsumer do
 
   describe "RF-38: modo mudo" do
     it "consome e não publica nada" do
-      allow(AgentMock).to receive(:config).and_return(AgentMock::Config.load(env: { "AGENT_PROFILE" => "mudo" }))
+      allow(AgentMock).to receive(:profiles).and_return(profiles_for("AGENT_PROFILE" => "mudo"))
       publish_inbound(inbound(texts: [ "Bom dia" ]))
 
       consumer.consume
 
       expect(produced_to(AgentMock::TOPICS.fetch(:outbound))).to be_empty
       expect(produced_to(AgentMock::TOPICS.fetch(:dlq))).to be_empty
+    end
+  end
+
+  describe "RF-38: perfil escolhido pelo simulador" do
+    it "o mesmo consumidor passa a usar o perfil gravado no lote seguinte, sem reiniciar" do
+      publish_inbound(inbound(texts: [ "Bom dia" ]))
+      consumer.consume
+      expect(produced_to(AgentMock::TOPICS.fetch(:outbound)).size).to eq(1)
+
+      redis.set(AgentMock::ProfileSource.key("global"), "mudo")
+      publish_inbound(inbound(texts: [ "Bom dia" ]))
+      consumer.consume
+
+      expect(produced_to(AgentMock::TOPICS.fetch(:outbound)).size).to eq(1)
     end
   end
 

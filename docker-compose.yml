@@ -221,6 +221,7 @@ services:
   # Agente de IA simulado (ADR-008; RF-32, RF-38): consome agent.inbound, decide por regras de
   # config/scenarios.yml e publica a ação em agent.outbound. Sem banco (invariante 12).
   # Perfil e falhas por variável: AGENT_PROFILE (rapido, lento, mudo), AGENT_LATENCY_MS, AGENT_FAILURE_RATE.
+  # O simulador troca o perfil sem reiniciar pelo Redis de controle (banco 1, separado do Sidekiq; bloco 08).
   agent-mock:
     build:
       context: ./src
@@ -232,9 +233,12 @@ services:
       KAFKA_BROKERS: kafka:29092
       AGENT_PROFILE: ${AGENT_PROFILE:-rapido}
       AGENT_SEED: ${AGENT_SEED:-42}
+      AGENT_CONTROL_REDIS_URL: ${AGENT_CONTROL_REDIS_URL:-redis://redis:6379/1}
     depends_on:
       kafka-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   # Provedores simulados e simulador do cliente (RF-04, ADR-012): http://localhost:4000
   channels-mock:
@@ -246,10 +250,14 @@ services:
       PLATFORM_PUBLIC_URL: http://localhost:3000 # links abertos no navegador
       # Falha simulada do provedor do chat (none, lose_ack, unavailable, reject); a tela também troca.
       CHAT_PROVIDER_FAULT: ${CHAT_PROVIDER_FAULT:-none}
+      # Onde o seletor de perfil do agente grava a escolha; o agent-mock lê o mesmo (RF-38).
+      AGENT_CONTROL_REDIS_URL: ${AGENT_CONTROL_REDIS_URL:-redis://redis:6379/1}
     ports:
       - "4000:4000"
     depends_on:
       web:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "ruby", "-rnet/http", "-e", "exit Net::HTTP.get_response(URI('http://localhost:4000/')).is_a?(Net::HTTPSuccess)"]

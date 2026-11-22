@@ -5,7 +5,8 @@ require_relative "lib/agent_mock"
 require_relative "app/consumers/inbound_consumer"
 
 # Falha na subida se a configuração for inválida (perfil desconhecido, taxa fora de 0..1, regra inválida).
-AgentMock.config
+# Monta todos os perfis (rapido, lento, mudo): o simulador pode escolher qualquer um sem reiniciar (RF-38).
+AgentMock.profiles
 
 class KarafkaApp < Karafka::App
   setup do |config|

@@ -6,7 +6,7 @@ Faz o papel do agente de IA da CloudWalk ([ADR-008](../../docs/08-decisoes-de-ar
 | --- | --- |
 | Fora do contrato `agent_inbound` (ou JSON malformado) | Publica o corpo original em `helpdesk.agent.dlq.v1` com `dlq_reason`, `dlq_source=agent-mock`, `dlq_violations`, `event_id` e `traceparent`. Sem retentativa (invariante 10) |
 | `deadline_at` já chegou no relógio do agente (no limite exato inclusive) | Descarta e loga `agent.expired` (07, seção 6, "Agente lento ou fora do ar") |
-| Perfil mudo | Consome e não responde (`agent.muted`) |
+| Perfil mudo (do ambiente ou escolhido pelo simulador) | Consome e não responde (`agent.muted`) |
 | Falha sorteada (`AGENT_FAILURE_RATE`) | A ação não sai (`agent.failed`). Não levanta erro: com a mesma semente o evento falharia de novo para sempre |
 | `ticket.ai_turns >= 10` | `escalate` com `limite_de_trocas` (RN-33) |
 | Caso normal | Primeira regra de `config/scenarios.yml` que casar no texto de **todas** as `pending_messages`; sem regra, `reply` padrão |
@@ -19,12 +19,33 @@ Toda ação é validada contra `agent_outbound` antes de sair. Se não passar, �
 
 - chave `conversation_id`; cabeçalhos `event_id` (da ação), `traceparent` (o mesmo recebido, RF-56) e `schema`;
 - `in_reply_to`, `conversation_id`, `brand`, `turn`, `context_until_seq` e `assignment_version` iguais aos do evento;
-- `agent`: `model: mock-deterministico`, `version` (`lib/agent_mock/version.rb`) e `config_hash` (`sha256:` do JSON canônico da configuração efetiva, RN-37);
+- `agent`: `model: mock-deterministico`, `version` (`lib/agent_mock/version.rb`) e `config_hash` (`sha256:` do JSON canônico da configuração efetiva **do perfil daquele evento**, RN-37);
 - `timing`: `received_at`, `responded_at` e `agent_ms` = `responded_at - received_at`, a execução simulada inteira: latência sorteada mais a soma dos `duration_ms` das consultas, que também ocupam a thread (RNF-03). Determinístico para a mesma entrada e semente.
 
 A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Kafka não confirmar, o erro sobe, o Karafka não confirma o offset daquele evento e ele volta (07, seção 6). O offset é marcado evento a evento.
 
 **Idempotência.** O agente não guarda estado: o mesmo evento entregue de novo gera outra ação, igual no conteúdo, com outro `event_id`. Quem garante o efeito único é a plataforma (`processed_events` e uma ação final por turno; RN-47, RN-56). É o caso mais difícil para a plataforma, e é o que um agente real com LLM faria.
+
+## Perfil em tempo de execução (bloco 08)
+
+O simulador (`channels-mock`) troca o perfil sem reiniciar o agente (RF-38). Ele grava o nome do perfil num Redis de controle e o agente lê a cada evento, com um `MGET` (`lib/agent_mock/profile_source.rb`):
+
+| Chave | Vale para |
+| --- | --- |
+| `helpdesk:agent-mock:profile:brand:<marca>` | Eventos daquela marca (`brand` do evento: `infinitepay`, `jim`) |
+| `helpdesk:agent-mock:profile:global` | Todas as marcas sem perfil próprio |
+
+Ordem: marca → global → `AGENT_PROFILE`. O valor é só o nome do perfil (`rapido`, `lento`, `mudo`). O escopo mais fino é a marca: o evento traz o `cus_<id>` da plataforma, não o `account_id` nem o `customer_ref` do simulador, e o agente não consulta o Postgres para traduzir (invariante 12).
+
+| Perfil | Latência | O que demonstra na plataforma |
+| --- | --- | --- |
+| `rapido` | 50–150 ms | Caminho feliz: resposta antes de qualquer aviso |
+| `lento` | 16–18 s (sorteada com a semente e o `event_id`) | O turno abre ~1,5 s depois da primeira mensagem (RN-55). A resposta chega a ~17,5–19,5 s do ciclo: depois do aviso de progresso dos 15 s (RN-57) e antes do prazo de 20 s do turno (RN-46) |
+| `mudo` | não responde | Timeout do turno aos 20 s e handoff para a fila humana (RN-46, RN-33) |
+
+Todos os perfis são montados na subida (perfil inválido no YAML derruba a subida). As sobreposições `AGENT_*` do ambiente valem em qualquer perfil escolhido: com `AGENT_LATENCY_MS=200`, o `lento` do simulador também responde em 200 ms. O `config_hash` da ação é o do perfil efetivo, igual ao que o mesmo perfil teria pelo `AGENT_PROFILE`.
+
+**Falhas da fonte.** Redis fora do ar, lento (timeout de 200 ms, sem reconexão) ou com um perfil desconhecido gravado: o agente usa o `AGENT_PROFILE`, loga `agent.profile_source_failed` ou `agent.profile_unknown` (warn, com `trace_id` e `fallback`) e segue consumindo. Sem `AGENT_CONTROL_REDIS_URL`, não há fonte e vale só o `AGENT_PROFILE`, como antes. Os logs `agent.published`, `agent.muted` e `agent.failed` trazem `profile` e `profile_source` (`brand`, `global` ou `env`).
 
 ## Configuração
 
@@ -35,7 +56,8 @@ A publicação é síncrona (`produce_sync`, `acks=all`, idempotência). Se o Ka
 | `KAFKA_BROKERS` | `localhost:9092` | Kafka (no Compose, `kafka:29092`) |
 | `KAFKA_MESSAGE_TIMEOUT_MS` | `5000` | Quanto o produtor espera a confirmação antes de falhar |
 | `AGENT_CONSUMER_GROUP` | `agent-mock` | Grupo do consumidor, separado do `consumer` da plataforma |
-| `AGENT_PROFILE` | `rapido` | `rapido` (50–150 ms), `lento` (2–6 s) ou `mudo` (não responde) |
+| `AGENT_PROFILE` | `rapido` | Perfil padrão: `rapido` (50–150 ms), `lento` (16–18 s) ou `mudo` (não responde) |
+| `AGENT_CONTROL_REDIS_URL` | vazio | Redis de controle onde o simulador grava o perfil (no Compose, `redis://redis:6379/1`, banco separado do Sidekiq). Vazio: só o `AGENT_PROFILE`. Não entra no `config_hash`; o perfil escolhido entra |
 | `AGENT_SEED` | `42` | Semente da latência, da falha e das consultas (RNF-30) |
 | `AGENT_LATENCY_MS` | do perfil | Fixa (`2000`) ou faixa (`1000-3000`) |
 | `AGENT_FAILURE_RATE` | do perfil | De `0` a `1`: fração de eventos sem resposta |
