@@ -91,6 +91,62 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
     end
   end
 
+  describe "RN-46, RF-36: timeouts e handoff (bloco 08)" do
+    before { allow(DatabaseClock).to receive(:now) { Time.current } }
+
+    it "os tipos novos estão em HANDLED, para a recuperação reoferecê-los" do
+      expect(described_class::HANDLED).to include("turn.timeout", "cycle.timeout", "handoff.requested")
+    end
+
+    it "turn.timeout expira o turno e acorda o handoff pelo ID" do
+      turn = opened_turn
+      turn.update_columns(deadline_at: start - 1.second)
+      item = Deadlines::TurnTimeout.call(now: start, limit: 10).sole
+      clear_enqueued_jobs
+
+      described_class.perform_now(item)
+
+      handoff = handoff_items(turn.ticket).sole
+      expect(turn.reload.status).to eq("expired")
+      expect(described_class).to have_been_enqueued.with(handoff.id).on_queue("critical")
+    end
+
+    it "timeout ainda não vencido pelo relógio do banco: despertador no prazo gravado" do
+      turn = opened_turn
+      turn.update_columns(deadline_at: start - 1.second)
+      item = Deadlines::TurnTimeout.call(now: start, limit: 10).sole
+      allow(DatabaseClock).to receive(:now).and_return(start - 2.seconds)
+      clear_enqueued_jobs
+
+      described_class.perform_now(item)
+
+      expect(Time.zone.at(enqueued_jobs.sole[:at])).to be_within(0.001).of(start - 1.second)
+    end
+
+    it "cycle.timeout pede o handoff e o handoff.requested escala o caso" do
+      ticket = ingest.ticket
+      ticket.update_columns(ai_deadline_at: start)
+      item = Deadlines::CycleTimeout.call(now: start, limit: 10).sole
+
+      perform_enqueued_jobs { described_class.perform_now(item) }
+
+      expect(ticket.reload.state).to eq("aguardando_humano")
+      expect(AuditEvent.where(ticket_id: ticket.id, event_type: "ticket.escalated").count).to eq(1)
+    end
+
+    it "RN-46: publicação esgotada acorda o handoff pedido pelo outbox" do
+      stub_broker({ status: 401 })
+      described_class.perform_now(due_dispatch(ingest).id)
+      clear_enqueued_jobs
+
+      described_class.perform_now(AiTurn.sole.event_id)
+
+      handoff = handoff_items.sole
+      expect(handoff.payload).to include("reason" => "publicacao_falhou", "source" => "outbox")
+      expect(described_class).to have_been_enqueued.with(handoff.id)
+    end
+  end
+
   it "repetição: ação encerrada não faz nada" do
     item = due_dispatch(ingest)
     item.update!(completed_at: start)
