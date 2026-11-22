@@ -42,12 +42,10 @@ RSpec.describe "RN-38, RN-42: cliente pede humano com uma resposta do bot ainda 
     expect(reply.status).to eq("pending") # o worker ainda não pegou a resposta
 
     clear_enqueued_jobs
-    post_chat("quero falar com um atendente")
-    handoff_id = ActiveRecord::Base.transaction do
-      locked = Ticket.lock.find(ticket.id)
-      Handoff::Request.call(ticket: locked, reason: "pedido_do_cliente", source: "ingestion", trace_id: "c" * 32)
-    end
-    clear_enqueued_jobs # a janela da 2ª mensagem não é o foco (com o E1, o pedido não abre ciclo da IA)
+    post_chat("quero falar com um atendente") # RN-34: a ingestão detecta o pedido e grava o handoff
+    handoff_id = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "handoff.requested").id
+    expect(OutboxEvent.find(handoff_id).payload).to include("reason" => "pedido_do_cliente", "source" => "ingestion")
+    clear_enqueued_jobs
 
     perform_enqueued_jobs(only: OutboxJob) { OutboxJob.perform_now(handoff_id) }
     # O job da resposta chega atrasado: ela já foi cancelada e não sai.

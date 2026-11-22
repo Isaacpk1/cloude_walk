@@ -167,7 +167,7 @@ RSpec.describe Ingestion::Receive do
       expect(result.ticket.reload).to have_attributes(state: "aguardando_humano", assignment_version: 1)
       expect(handoff_items(result.ticket).count).to eq(1)
       expect(human_audits(result.ticket).last.data)
-        .to eq("seq" => 2, "state" => "aguardando_humano", "outcome" => "registrado")
+        .to eq("seq" => 3, "state" => "aguardando_humano", "outcome" => "registrado") # seq 2 é o aviso de transferência
       expect(result.handoff_event_id).to be_nil
       expect(OutboxJob).to have_been_enqueued.exactly(:once).with(result.outbox_event_id)
     end

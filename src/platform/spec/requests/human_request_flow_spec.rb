@@ -32,6 +32,7 @@ RSpec.describe "RN-34, RF-39: pedido de humano durante a consulta, de ponta a po
 
   it "o turno publicado expira, o caso vai a aguardando_humano e a resposta atrasada não sai ao cliente" do
     stub_broker
+    stub_channels({ status: 200, message_id: "chat_out_notice" })
     perform_enqueued_jobs { post_chat("meu repasse não caiu") }
     travel 2.seconds
     scheduler_tick
@@ -62,10 +63,13 @@ RSpec.describe "RN-34, RF-39: pedido de humano durante a consulta, de ponta a po
     expect(Delivery.where(ticket_id: ticket.id, kind: %w[reply resolution progress])).to be_empty
     expect(broker_requests.size).to eq(1)
     expect(ticket.reload.ai_turns.count).to eq(1)
+    # RN-42: o cliente recebe só o aviso de transferência.
+    expect(channel_requests.map { JSON.parse(_1.body)["text"] }).to eq([ Handoff::Policy::DEFAULT.transfer_notice_text("pt-BR") ])
   end
 
   it "RF-39 a RF-42 (aceite): repetir o pedido na fila humana não duplica o handoff" do
     stub_broker
+    stub_channels({ status: 200, message_id: "chat_out_notice" })
     perform_enqueued_jobs { post_chat("quero falar com um atendente") }
     perform_enqueued_jobs { post_chat("preciso falar com uma pessoa, por favor") }
 
