@@ -13,6 +13,7 @@ require_relative "lib/channels_mock/conversation_view"
 require_relative "lib/channels_mock/scenarios"
 require_relative "lib/channels_mock/scenario_view"
 require_relative "lib/channels_mock/agent_profile"
+require_relative "lib/channels_mock/human_request"
 
 module ChannelsMock
   # Provedores simulados e simulador do cliente (RF-04, ADR-012). Bloco 02: só o chat do app, na entrada.
@@ -130,7 +131,9 @@ module ChannelsMock
           account = r.params["account"].to_s
           r.halt(422, "conta desconhecida: #{account}") unless Providers::Chat::ACCOUNTS.include?(account)
 
-          send_chat(account, r.params)
+          # Bloco 10 (RN-34): "Pedir humano" troca o texto pela frase do idioma da marca da conta.
+          fields = r.params["pedir_humano"] == "1" ? r.params.merge("text" => HumanRequest.text_for(account)) : r.params
+          send_chat(account, fields)
           r.redirect "/"
         end
 
