@@ -107,7 +107,7 @@ RSpec.describe DeadLetters::Record, "RF-34, RN-45: DLQ da plataforma (07, seçõ
       expect(item).to have_attributes(dedup_key: "handoff:#{ticket.id}:#{ticket.assignment_version}", brand_id: infinitepay.id,
                                       ticket_id: ticket.id, trace_id: AgentActionHelpers::TRACE_ID, payload:, completed_at: nil)
       expect(item.next_attempt_at).to be_within(5.seconds).of(Time.current)
-      expect(audits("handoff.requested").sole).to have_attributes(data: payload.merge("outbox_event_id" => item.id), trace_id: AgentActionHelpers::TRACE_ID,
+      expect(audits("handoff.requested").sole).to have_attributes(data: payload.merge("outbox_event_id" => item.id, "summary_from_agent" => false), trace_id: AgentActionHelpers::TRACE_ID,
                                                                   brand_id: infinitepay.id)
       expect(audits("dead_letter.recorded").sole.data).to include(
         "dead_letter_id" => dead_letter.id, "source" => "broker", "reason" => "contrato", "outcome" => "escalated"

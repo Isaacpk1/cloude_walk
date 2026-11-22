@@ -24,6 +24,17 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
     expect(HelpdeskQueue.all).to all(have_attributes(current_version: be_present))
   end
 
+  it "RF-42, bloco 10: cada marca tem uma fila humana de escalas (Escalas N1), sem IA primeiro, na mesma equipe" do
+    Seeds::Synthetic.call(seed: 42)
+
+    Brand.find_each do |brand|
+      queue = HelpdeskQueue.find_by!(brand:, escalation: true, active: true)
+      expect(queue).to have_attributes(is_default: false)
+      expect(queue.current_version).to have_attributes(name: "Escalas N1", ai_first: false)
+      expect(queue.team).to eq(HelpdeskQueue.find_by!(brand:, is_default: true).team)
+    end
+  end
+
   it "ADR-019: cria uma conta de provedor por marca e canal, com o segredo local do simulador" do
     Seeds::Synthetic.call(seed: 42)
 

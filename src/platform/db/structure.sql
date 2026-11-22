@@ -413,6 +413,46 @@ CREATE TABLE public.eval_runs (
 
 
 --
+-- Name: handoff_summaries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.handoff_summaries (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint NOT NULL,
+    from_assignment_version integer NOT NULL,
+    source character varying NOT NULL,
+    status character varying NOT NULL,
+    fields jsonb,
+    missing_reason character varying,
+    trace_id character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT handoff_summaries_source_check CHECK (((source)::text = ANY ((ARRAY['agent'::character varying, 'platform'::character varying])::text[]))),
+    CONSTRAINT handoff_summaries_status_check CHECK (((status)::text = ANY ((ARRAY['available'::character varying, 'missing'::character varying])::text[]))),
+    CONSTRAINT handoff_summaries_status_fields_check CHECK (((((status)::text = 'available'::text) AND (fields IS NOT NULL)) OR (((status)::text = 'missing'::text) AND (missing_reason IS NOT NULL))))
+);
+
+
+--
+-- Name: handoff_summaries_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.handoff_summaries_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: handoff_summaries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.handoff_summaries_id_seq OWNED BY public.handoff_summaries.id;
+
+
+--
 -- Name: messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -580,7 +620,8 @@ CREATE TABLE public.queues (
     is_default boolean DEFAULT false NOT NULL,
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    escalation boolean DEFAULT false NOT NULL
 );
 
 
@@ -706,6 +747,8 @@ CREATE TABLE public.tickets (
     context_version integer DEFAULT 0 NOT NULL,
     evaluation boolean DEFAULT false NOT NULL,
     progress_due_at timestamp(6) without time zone,
+    ai_turns_count integer DEFAULT 0 NOT NULL,
+    CONSTRAINT tickets_ai_turns_count_check CHECK ((ai_turns_count >= 0)),
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
     CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
@@ -823,6 +866,13 @@ ALTER TABLE ONLY public.dead_letters ALTER COLUMN id SET DEFAULT nextval('public
 --
 
 ALTER TABLE ONLY public.deliveries ALTER COLUMN id SET DEFAULT nextval('public.deliveries_id_seq'::regclass);
+
+
+--
+-- Name: handoff_summaries id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries ALTER COLUMN id SET DEFAULT nextval('public.handoff_summaries_id_seq'::regclass);
 
 
 --
@@ -954,6 +1004,14 @@ ALTER TABLE ONLY public.eval_runs
 
 
 --
+-- Name: handoff_summaries handoff_summaries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries
+    ADD CONSTRAINT handoff_summaries_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: messages messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1039,6 +1097,13 @@ ALTER TABLE ONLY public.tickets
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_on_ticket_id_from_assignment_version_5e5bf8094e; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_on_ticket_id_from_assignment_version_5e5bf8094e ON public.handoff_summaries USING btree (ticket_id, from_assignment_version);
 
 
 --
@@ -1252,6 +1317,13 @@ CREATE INDEX index_eval_runs_on_ticket_id ON public.eval_runs USING btree (ticke
 
 
 --
+-- Name: index_handoff_summaries_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_handoff_summaries_on_brand_id ON public.handoff_summaries USING btree (brand_id);
+
+
+--
 -- Name: index_messages_dedup_per_provider; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1375,6 +1447,13 @@ CREATE INDEX index_queues_on_team_id ON public.queues USING btree (team_id);
 --
 
 CREATE UNIQUE INDEX index_queues_one_default_per_brand ON public.queues USING btree (brand_id) WHERE is_default;
+
+
+--
+-- Name: index_queues_one_escalation_per_brand; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_queues_one_escalation_per_brand ON public.queues USING btree (brand_id) WHERE (escalation AND active);
 
 
 --
@@ -1580,6 +1659,14 @@ ALTER TABLE ONLY public.eval_runs
 
 
 --
+-- Name: handoff_summaries fk_handoff_summaries_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries
+    ADD CONSTRAINT fk_handoff_summaries_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
 -- Name: messages fk_messages_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1780,6 +1867,14 @@ ALTER TABLE ONLY public.deliveries
 
 
 --
+-- Name: handoff_summaries fk_rails_93ff00cebd; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries
+    ADD CONSTRAINT fk_rails_93ff00cebd FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
 -- Name: ai_turns fk_rails_ad9c9534a9; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1874,6 +1969,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261123000000'),
 ('20261122030000'),
 ('20261122015000'),
 ('20261122010000'),
