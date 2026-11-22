@@ -13,7 +13,7 @@ class AgentActionView < Data.define(
   REJECTION_REASONS = {
     "turno_superado" => "Turno superado por mensagem nova do cliente (RN-56)",
     "in_reply_to_divergente" => "in_reply_to diferente do event_id enviado no turno (RN-56)",
-    "atribuicao_mudou" => "O atendimento mudou de responsável desde o turno (RN-57)",
+    "atribuicao_mudou" => "O atendimento mudou de responsável desde o turno (RN-56)",
     "fora_da_ia" => "O atendimento não está mais com a IA",
     "prazo_vencido" => "Prazo da IA vencido (RN-46)",
     "turno_nao_elegivel" => "Turno já encerrado: não aceita outra ação final",

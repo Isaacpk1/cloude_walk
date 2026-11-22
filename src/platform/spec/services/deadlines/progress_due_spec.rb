@@ -46,7 +46,7 @@ RSpec.describe Deadlines::ProgressDue, "RN-57: aviso de progresso registrado pel
       expect(audit).to have_attributes(brand_id: infinitepay.id, ticket_id: ticket.id, actor_type: "system", trace_id: "b" * 32)
       expect(audit.data).to include("outbox_event_id" => ids.sole, "dedup_key" => "progress:#{ticket.id}:1",
                                     "first_pending_seq" => 1, "progress_due_at" => (t0 + 15.seconds).iso8601(3),
-                                    "delay_ms" => 300)
+                                    "deadline_at" => (t0 + 15.seconds).utc.iso8601(3), "delay_ms" => 300)
       expect(ticket.reload.progress_due_at).to eq(t0 + 15.seconds)
     end
 

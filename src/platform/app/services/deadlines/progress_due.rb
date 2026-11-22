@@ -116,7 +116,9 @@ module Deadlines
       AuditEvent.create!(
         brand_id: ticket.brand_id, ticket_id: ticket.id, actor_type: "system", event_type:, trace_id:,
         data: { dedup_key: key(ticket), first_pending_seq: ticket.first_pending_seq,
-                assignment_version: ticket.assignment_version, progress_due_at: ticket.progress_due_at&.iso8601(3) }.merge(data)
+                assignment_version: ticket.assignment_version, progress_due_at: ticket.progress_due_at&.iso8601(3),
+                # Mesmo campo dos *.timeout_scheduled (interface do bloco 08, item 5): o painel lê deadline_at.
+                deadline_at: ticket.progress_due_at&.utc&.iso8601(3) }.merge(data)
       )
     end
 
