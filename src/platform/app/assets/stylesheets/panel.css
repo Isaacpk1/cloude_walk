@@ -213,3 +213,11 @@ a.message__turn { text-decoration: none; }
 .eval-checks tr.check--failed td { background: #fdecea; font-weight: 600; }
 .eval-data { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
 .eval-data pre, .eval-error { white-space: pre-wrap; word-break: break-word; font-size: .8rem; margin: 0; }
+
+/* Bloco 08: prazos do atendimento, aviso de progresso e handoff */
+.deadlines { border-left: 4px solid #1e6fc9; }
+.deadline { margin-left: 0.25rem; }
+.deadline--overdue { color: #b3261e; }
+.handoff { border-left: 4px solid #6b3fa0; }
+.handoff--discarded { border-left-color: #888; }
+.badge--progress-cancelled, .badge--progress-discarded { background: #eee; color: #555; }

@@ -1,7 +1,8 @@
 # Lê a recusa terminal do turno da última mensagem (RN-49, RN-46; 07, seção 3.4) da auditoria
 # ai_turn.not_opened gravada pelo Turns::Open. Há recusa quando o caso está com a IA, a última recusa terminal
 # cobre latest_customer_seq (cover_until_seq) e nenhum turno elegível a cobre. Uma mensagem nova do cliente
-# sobe latest_customer_seq e a recusa deixa de valer: volta a fase de agrupamento.
+# sobe latest_customer_seq e a recusa deixa de valer: volta a fase de agrupamento. Bloco 08: o handoff.requested
+# gravado depois da recusa (id maior; item 3 da interface: na mesma transação) troca o "handoff pendente" pelo motivo pedido.
 # Isolamento por marca (invariante 6): auditoria, turnos e mensagens filtrados pelo brand_id do atendimento.
 class TurnRefusalPhase
   def initialize(ticket)
@@ -16,7 +17,7 @@ class TurnRefusalPhase
     ConversationView::TurnRefusal.new(
       reason: data["reason"], pending_seqs: data["pending_seqs"] || pending_seqs, pending_chars: data["pending_chars"],
       limit: data["limit"], violations: data["violations"], deadline_at: data["deadline_at"]&.then { Time.zone.parse(_1) },
-      occurred_at: audit.occurred_at, trace_id: audit.trace_id
+      occurred_at: audit.occurred_at, trace_id: audit.trace_id, handoff_reason: handoff_after(audit)&.data&.dig("reason")
     )
   end
 
@@ -27,6 +28,11 @@ class TurnRefusalPhase
                       .where("data->>'reason' IN (?)", Turns::Open::TERMINAL_REASONS)
                       .order(:occurred_at, :id).last
     audit if audit && audit.data["cover_until_seq"].to_i >= @ticket.latest_customer_seq
+  end
+
+  def handoff_after(audit)
+    AuditEvent.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id, event_type: "handoff.requested")
+              .where("id > ?", audit.id).order(:id).last
   end
 
   def covered?

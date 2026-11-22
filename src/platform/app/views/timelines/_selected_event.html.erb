@@ -8,6 +8,13 @@
     <div><dt>trace_id</dt><dd><code><%= event.trace_id || "—" %></code></dd></div>
     <% if event.detail %><div><dt>Detalhe</dt><dd><%= event.detail %></dd></div><% end %>
   </dl>
+  <% if (cause = event.cause) %>
+    <dl class="selected-event__fields selected-event__fields--cause">
+      <div><dt>Gatilho</dt><dd><strong><%= cause.origin_label %></strong></dd></div>
+      <div><dt>Motivo</dt><dd><%= cause.reason_label %></dd></div>
+      <% if cause.outcome %><div><dt>Desfecho</dt><dd><%= cause.outcome %></dd></div><% end %>
+    </dl>
+  <% end %>
   <% if event.agent_action %>
     <%= render "shared/agent_action", action: event.agent_action %>
   <% end %>
@@ -27,7 +34,7 @@
         <% end %>
       </dd></div>
     </dl>
-  <% else %>
+  <% elsif !event.cause %>
     <p class="muted">Sem erro registrado nesta etapa.</p>
   <% end %>
 </section>
