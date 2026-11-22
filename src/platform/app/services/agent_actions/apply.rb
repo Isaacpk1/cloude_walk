@@ -197,7 +197,8 @@ module AgentActions
       return reject("turno_nao_elegivel") unless applied
 
       # "Marca o turno applied, registra a ação final, limpa os prazos" (07, seção 3.4).
-      @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+      @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil,
+                             progress_due_at: nil)
       audit("agent_action.applied")
       request_delivery
       outcome(:applied, nil)
