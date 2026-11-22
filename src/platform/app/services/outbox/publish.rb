@@ -1,6 +1,6 @@
 # Publicação de um evento do outbox no broker (07, seções 3.1 e 6; ADR-006, ADR-007).
 #
-#   Outbox::Publish.call(outbox_event_id) # => Result(status:, next_attempt_at:)
+#   Outbox::Publish.call(outbox_event_id) # => Result(status:, next_attempt_at:, handoff_event_id:)
 #
 # 1. Reserva o item (lease) com uma atualização condicional: dois workers não chamam o broker juntos.
 # 2. Atendimento de eval (ADR-023, item 5) não sai: o item encerra como descarte `eval`.
@@ -12,10 +12,17 @@
 #
 # Retentativas (RN-43, RNF-16): 5xx, 429, timeout e conexão recusada esperam 1, 2, 4, 8 e 16 s, mais
 # um jitter de até 25%, enquanto o prazo do turno permitir (07, seção 6). 4xx é permanente (RN-44).
-# A DLQ da plataforma e a escalação pela RN-45 entram no bloco 09; o timeout do ciclo, no bloco 08.
+# Falha definitiva (recusa do broker, contrato inválido, retentativas esgotadas ou sem tempo no prazo do turno)
+# escala na hora (RN-46, ADR-020 item 3): com o atendimento travado, se o turno ainda é `eligible`, da atribuição
+# atual e o caso está com a IA, grava `handoff.requested` (`publicacao_falhou`, origem `outbox`) na mesma
+# transação do desfecho. O OutboxJob acorda o handoff pelo `handoff_event_id`, depois do commit.
+# A DLQ da plataforma e a escalação pela RN-45 entram no bloco 09.
 module Outbox
   class Publish
-    Result = Data.define(:status, :next_attempt_at)
+    Result = Data.define(:status, :next_attempt_at, :handoff_event_id) do
+      def initialize(handoff_event_id: nil, **) = super
+    end
+    HANDOFF_REASON = "publicacao_falhou".freeze
 
     LEASE = 30.seconds
     MAX_RETRIES = 5
@@ -137,15 +144,19 @@ module Outbox
     # falha definitiva de publicação a registrar e o item encerra como descarte; senão, publish_failed terminal.
     def terminal(outcome, data)
       stale = nil
-      finish(lock_ticket: true, completed_at: Time.current, last_error: data[:error]) do
+      finish(lock_ticket: true, completed_at: Time.current, last_error: data[:error]) do |ticket|
         stale = turn && !turn.reload.eligible? && "turno_#{turn.status}"
-        stale ? audit("agent_event.discarded", reason: stale) : audit("agent_event.publish_failed", **data, outcome:)
+        next audit("agent_event.discarded", reason: stale) if stale
+
+        audit("agent_event.publish_failed", **data, outcome:)
+        request_handoff(ticket)
       end
       return discarded(stale) if stale
 
       JsonLog.warn("outbox.publish_failed", trace_id: item.trace_id, event_id: item.id, attempt: item.attempts,
                                             origin: data[:origin], http_status: data[:http_status], outcome:)
-      Result.new(status: outcome == "retentativas_esgotadas" ? :exhausted : :expired, next_attempt_at: nil)
+      Result.new(status: outcome == "retentativas_esgotadas" ? :exhausted : :expired, next_attempt_at: nil,
+                 handoff_event_id: @handoff_event_id)
     end
 
     # 1, 2, 4, 8, 16 s pela tentativa que falhou, mais até 25% de jitter (só para cima).
@@ -156,11 +167,12 @@ module Outbox
 
     def reject(origin:, http_status:, reason:, violations: nil)
       error = "#{origin}: #{reason}"
-      finish(completed_at: Time.current, last_error: error) do
+      finish(lock_ticket: true, completed_at: Time.current, last_error: error) do |ticket|
         audit("agent_event.rejected", **{ origin:, http_status:, reason:, violations: }.compact)
+        request_handoff(ticket)
       end
       JsonLog.warn("outbox.rejected", trace_id: item.trace_id, event_id: item.id, origin:, http_status:, reason:)
-      Result.new(status: :rejected, next_attempt_at: nil)
+      Result.new(status: :rejected, next_attempt_at: nil, handoff_event_id: @handoff_event_id)
     end
 
     def discard(reason)
@@ -177,10 +189,19 @@ module Outbox
     # `lock_ticket`, trava antes a linha do atendimento (da marca do item), na ordem atendimento → item.
     def finish(lock_ticket: false, **attrs)
       ActiveRecord::Base.transaction do
-        Ticket.lock.find_by(id: item.ticket_id, brand_id: item.brand_id) if lock_ticket
+        ticket = Ticket.lock.find_by(id: item.ticket_id, brand_id: item.brand_id) if lock_ticket
         updated = OutboxEvent.where(id: item.id, completed_at: nil).update_all(attrs.merge(lease_until: nil))
-        yield if updated == 1
+        yield ticket if updated == 1
       end
+    end
+
+    # RN-46: só com o atendimento travado (por `finish(lock_ticket: true)`) e para o turno que ainda vale.
+    def request_handoff(ticket)
+      return unless ticket && turn
+      return unless turn.reload.eligible? && turn.assignment_version == ticket.assignment_version && ticket.with_ai?
+
+      @handoff_event_id = Handoff::Request.call(ticket:, reason: HANDOFF_REASON, source: "outbox", turn: turn.turn,
+                                                trace_id: item.trace_id)
     end
 
     def audit(event_type, **data)
