@@ -65,7 +65,7 @@ src/platform/
 │   │   ├── deadlines/          # consulta de prazos e laço do scheduler (ADR-016)
 │   │   └── rate_limit/         # limite por marca e canal (RNF-33)
 │   ├── jobs/                   # Sidekiq: recebem só o ID e chamam um service
-│   ├── consumers/              # Karafka: helpdesk.agent.outbound.v1
+│   ├── consumers/              # Karafka: helpdesk.agent.outbound.v1 e helpdesk.agent.dlq.v1 (grupo platform-dlq)
 │   ├── controllers/            # ingestão dos canais, painel, configuração
 │   │   └── webhooks/           # entrada dos provedores
 │   ├── read_models/            # formato de leitura das telas (ConversationView, TimelineView) e suas fontes
@@ -248,6 +248,7 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Rate limit por marca e canal | `src/platform/app/services/rate_limit/` |
 | Criar um tópico Kafka ou mudar as partições | `infra/kafka/topics.yml` |
 | Consumir um tópico na plataforma | `src/platform/karafka.rb` e `app/consumers/` |
+| Mensagens da DLQ | Contrato `dead_letter` em `src/contracts/v1` (vista `{ key, headers, payload }`, sem envelope novo no Kafka). A plataforma consome no grupo `platform-dlq` (`app/consumers/dead_letters_consumer.rb`) e grava `dead_letters` por `DeadLetters::Record`; o painel fica em `/dlq` |
 | Publicar no Kafka | O broker (`src/broker/lib/broker/publisher.rb`) publica em `inbound` e o agente mock em `outbound`. A plataforma envia ao broker por webhook e só publica direto na DLQ, pelo próprio Karafka |
 | Prazos (janela, aviso, timeout, SLA) | Colunas na migration de `tickets`; consulta e laço em `app/services/deadlines/` (`Deadlines::DispatchDue`, `Deadlines::Loop`); processo em `bin/scheduler` (intervalo e lote em `SCHEDULER_INTERVAL` e `SCHEDULER_BATCH`) |
 | Esquema de um evento | `src/contracts/v1/schemas/` |
