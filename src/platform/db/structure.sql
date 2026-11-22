@@ -269,6 +269,55 @@ ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
 
 
 --
+-- Name: dead_letters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.dead_letters (
+    id bigint NOT NULL,
+    brand_id bigint,
+    ticket_id bigint,
+    topic character varying NOT NULL,
+    partition integer NOT NULL,
+    "offset" bigint NOT NULL,
+    source character varying NOT NULL,
+    reason character varying NOT NULL,
+    event_id character varying,
+    trace_id character varying,
+    turn integer,
+    violations jsonb DEFAULT '[]'::jsonb NOT NULL,
+    headers jsonb DEFAULT '{}'::jsonb NOT NULL,
+    payload text NOT NULL,
+    error text,
+    attempts integer DEFAULT 0 NOT NULL,
+    outcome character varying,
+    reprocessed_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT dead_letters_outcome_check CHECK (((outcome IS NULL) OR ((outcome)::text = ANY ((ARRAY['escalated'::character varying, 'audited'::character varying, 'uncorrelated'::character varying])::text[])))),
+    CONSTRAINT dead_letters_source_check CHECK (((source)::text = ANY ((ARRAY['broker'::character varying, 'agent-mock'::character varying, 'platform'::character varying])::text[]))),
+    CONSTRAINT dead_letters_ticket_brand_check CHECK (((ticket_id IS NULL) OR (brand_id IS NOT NULL)))
+);
+
+
+--
+-- Name: dead_letters_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.dead_letters_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: dead_letters_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.dead_letters_id_seq OWNED BY public.dead_letters.id;
+
+
+--
 -- Name: deliveries; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -344,7 +393,7 @@ CREATE TABLE public.eval_runs (
     finished_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT eval_runs_checks_check CHECK ((jsonb_typeof(checks) = 'array'::text)),
-    CONSTRAINT eval_runs_status_check CHECK (((status)::text = ANY ((ARRAY['passed'::character varying, 'failed'::character varying, 'error'::character varying])::text[])))
+    CONSTRAINT eval_runs_status_check CHECK (((status)::text = ANY (ARRAY[('passed'::character varying)::text, ('failed'::character varying)::text, ('error'::character varying)::text])))
 );
 
 
@@ -641,11 +690,13 @@ CREATE TABLE public.tickets (
     ai_deadline_at timestamp(6) without time zone,
     context_version integer DEFAULT 0 NOT NULL,
     evaluation boolean DEFAULT false NOT NULL,
+    progress_due_at timestamp(6) without time zone,
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
     CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
     CONSTRAINT tickets_first_pending_pair_check CHECK (((first_pending_seq IS NULL) = (first_pending_at IS NULL))),
     CONSTRAINT tickets_first_pending_seq_check CHECK (((first_pending_seq IS NULL) OR (first_pending_seq >= 1))),
+    CONSTRAINT tickets_progress_requires_cycle_check CHECK (((progress_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
     CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text])))
 );
 
@@ -743,6 +794,13 @@ ALTER TABLE ONLY public.customer_identities ALTER COLUMN id SET DEFAULT nextval(
 --
 
 ALTER TABLE ONLY public.customers ALTER COLUMN id SET DEFAULT nextval('public.customers_id_seq'::regclass);
+
+
+--
+-- Name: dead_letters id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters ALTER COLUMN id SET DEFAULT nextval('public.dead_letters_id_seq'::regclass);
 
 
 --
@@ -854,6 +912,14 @@ ALTER TABLE ONLY public.customer_identities
 
 ALTER TABLE ONLY public.customers
     ADD CONSTRAINT customers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dead_letters dead_letters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT dead_letters_pkey PRIMARY KEY (id);
 
 
 --
@@ -1049,6 +1115,41 @@ CREATE INDEX index_customers_on_brand_id ON public.customers USING btree (brand_
 --
 
 CREATE UNIQUE INDEX index_customers_on_id_and_brand_id ON public.customers USING btree (id, brand_id);
+
+
+--
+-- Name: index_dead_letters_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_brand_id ON public.dead_letters USING btree (brand_id);
+
+
+--
+-- Name: index_dead_letters_on_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_created_at ON public.dead_letters USING btree (created_at);
+
+
+--
+-- Name: index_dead_letters_on_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_event_id ON public.dead_letters USING btree (event_id);
+
+
+--
+-- Name: index_dead_letters_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_ticket_id ON public.dead_letters USING btree (ticket_id);
+
+
+--
+-- Name: index_dead_letters_on_topic_and_partition_and_offset; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_dead_letters_on_topic_and_partition_and_offset ON public.dead_letters USING btree (topic, partition, "offset");
 
 
 --
@@ -1297,6 +1398,13 @@ CREATE INDEX index_tickets_dispatch_due ON public.tickets USING btree (dispatch_
 
 
 --
+-- Name: index_tickets_on_ai_deadline_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_ai_deadline_at ON public.tickets USING btree (ai_deadline_at) WHERE (ai_deadline_at IS NOT NULL);
+
+
+--
 -- Name: index_tickets_on_assignee_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1329,6 +1437,13 @@ CREATE UNIQUE INDEX index_tickets_on_id_and_brand_id ON public.tickets USING btr
 --
 
 CREATE INDEX index_tickets_on_linked_ticket_id ON public.tickets USING btree (linked_ticket_id);
+
+
+--
+-- Name: index_tickets_on_progress_due_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_progress_due_at ON public.tickets USING btree (progress_due_at) WHERE (progress_due_at IS NOT NULL);
 
 
 --
@@ -1405,6 +1520,14 @@ ALTER TABLE ONLY public.customer_identities
 
 
 --
+-- Name: dead_letters fk_dead_letters_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT fk_dead_letters_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
 -- Name: deliveries fk_deliveries_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1466,6 +1589,14 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.messages
     ADD CONSTRAINT fk_rails_1a0b99fe7e FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
+
+
+--
+-- Name: dead_letters fk_rails_1a56f359d6; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT fk_rails_1a56f359d6 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
 
 
 --
@@ -1578,6 +1709,14 @@ ALTER TABLE ONLY public.outbox_events
 
 ALTER TABLE ONLY public.customer_identities
     ADD CONSTRAINT fk_rails_79d4b2c664 FOREIGN KEY (customer_id) REFERENCES public.customers(id);
+
+
+--
+-- Name: dead_letters fk_rails_7ee7c1307c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT fk_rails_7ee7c1307c FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
 
 
 --
@@ -1699,6 +1838,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261122000000'),
 ('20261121040000'),
 ('20261121030000'),
 ('20261121020000'),
