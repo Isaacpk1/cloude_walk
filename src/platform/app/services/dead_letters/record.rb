@@ -121,8 +121,16 @@ module DeadLetters
       @dead_letter_id = insert_dead_letter
       return duplicate unless @dead_letter_id
 
-      @correlation = @envelope_violations.any? ? Correlation::Missing.new(reason: "cabecalhos_fora_do_contrato") : Correlation.call(@view)
+      @correlation = @envelope_violations.any? ? Correlation::Missing.new(reason: "cabecalhos_fora_do_contrato") : correlate
       @correlation.is_a?(Correlation::Found) ? judge : uncorrelated
+    end
+
+    # RNF-14: um valor que o driver recusa (ArgumentError, antes de ir ao banco) é conteúdo, não falha transitória.
+    # Subir faria a partição reentregar a mesma mensagem sem fim; vira sem correlação, com a nota do erro.
+    def correlate
+      Correlation.call(@view)
+    rescue ArgumentError => e
+      Correlation::Missing.new(reason: "correlacao_falhou (#{e.message})")
     end
 
     def insert_dead_letter

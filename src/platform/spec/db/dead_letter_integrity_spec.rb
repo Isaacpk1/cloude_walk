@@ -17,6 +17,13 @@ RSpec.describe "Invariante 8: integridade de dead_letters garantida pelo banco" 
       expect { DeadLetter.where(id:).delete_all }.to raise_error(ActiveRecord::StatementInvalid, /7 dias/)
     end
 
+    it "a retenção compara em UTC, qualquer que seja o fuso da sessão (psql ou job de limpeza fora do Rails)" do
+      id = insert(created_at: now - 7.days + 2.hours)
+      ActiveRecord::Base.connection.execute("SET LOCAL TIME ZONE 'Asia/Tokyo'")
+
+      expect { DeadLetter.where(id:).delete_all }.to raise_error(ActiveRecord::StatementInvalid, /7 dias/)
+    end
+
     it "o banco aceita apagar depois de 7 dias (limpeza futura)" do
       id = insert(created_at: now - 7.days - 1.minute)
 

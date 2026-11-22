@@ -52,7 +52,15 @@ class DeadLetterView < Data.define(:id, :created_at, :source, :reason, :event_id
 
   def payload_text = self.class.printable(payload)
   def headers_text = self.class.printable(JSON.pretty_generate(headers))
-  def violations_text = violations.empty? ? "nenhuma" : violations.join(", ")
+  def violations_text = violations.empty? ? "nenhuma" : violations.map { violation_text(_1) }.join(", ")
+
+  # DeadLetters::Record grava { pointer, type, message } (contrato dead_letter); registros antigos, texto.
+  def violation_text(violation)
+    return violation.to_s unless violation.is_a?(Hash)
+
+    pointer, type, message = violation.values_at("pointer", "type", "message")
+    message ? "#{pointer}: #{message} (#{type})" : "#{pointer}: #{type}"
+  end
 
   def self.printable(text)
     utf8 = text.to_s.dup.force_encoding(Encoding::UTF_8).scrub("�")

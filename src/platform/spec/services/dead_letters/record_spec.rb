@@ -169,6 +169,19 @@ RSpec.describe DeadLetters::Record, "RF-34, RN-45: DLQ da plataforma (07, seçõ
       expect(result.outcome).to eq("escalated")
     end
 
+    it "RN-45: a mensagem 3, gravada depois do pedido pela DLQ e antes do Escalate, não abre turno para a IA" do
+      broker_dead_letter(turn)
+      expect(turn.reload.status).to eq("expired")
+
+      travel 1.second
+      received = ingest("e agora?")
+      opened = Turns::Open.call(due_dispatch(received).id)
+
+      expect(opened.turn).to be_nil
+      expect(AuditEvent.where(ticket_id: turn.ticket_id, event_type: "ai_turn.not_opened").last.data["reason"]).to eq("handoff_pedido")
+      expect(OutboxEvent.where(ticket_id: turn.ticket_id, event_type: "agent.event").count).to eq(1)
+    end
+
     it "dois DLQ do mesmo turno: um só handoff.requested; o pedido expirou o turno e o segundo só audita" do
       first = broker_dead_letter(turn)
       second = action_dead_letter(turn, action: "refund")
@@ -252,6 +265,30 @@ RSpec.describe DeadLetters::Record, "RF-34, RN-45: DLQ da plataforma (07, seçõ
       expect(DeadLetter.find(result.dead_letter_id)).to have_attributes(brand_id: nil, ticket_id: nil, turn: nil)
       expect(handoff_items).to be_empty
       expect(AuditEvent.where(event_type: %w[dead_letter.recorded dead_letter.audited handoff.requested])).to be_empty
+    end
+
+    it "RNF-14: NUL num campo de correlação (marca) não trava a partição: grava uncorrelated" do
+      result = nil
+      expect { result = action_dead_letter(turn, brand: "infinitepay\u0000") }.not_to raise_error
+
+      expect_untouched(result)
+      expect(DeadLetter.find(result.dead_letter_id).error).to include("marca_invalida")
+    end
+
+    it "RNF-14: erro de conteúdo na correlação (driver recusa o valor) vira uncorrelated, não reentrega sem fim" do
+      allow(DeadLetters::Correlation).to receive(:call).and_raise(ArgumentError, "string contains null byte")
+
+      result = action_dead_letter(turn)
+
+      expect_untouched(result)
+      expect(DeadLetter.find(result.dead_letter_id).error).to include("correlacao_falhou", "null byte")
+    end
+
+    it "RNF-14: NUL nos demais campos de correlação também não trava" do
+      %w[conversation_id in_reply_to].each do |field|
+        expect(action_dead_letter(turn, field => "#{turn.event_id}\u0000").outcome).to eq("uncorrelated")
+      end
+      expect(action_dead_letter(turn, turn: "1\u0000").outcome).to eq("uncorrelated")
     end
 
     it "marca_divergente e turno_inexistente da plataforma nunca escalam (07, seção 5.3)" do

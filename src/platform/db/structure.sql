@@ -30,7 +30,7 @@ CREATE FUNCTION public.dead_letters_retention() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  IF OLD.created_at > now() - interval '7 days' THEN
+  IF OLD.created_at > (now() AT TIME ZONE 'UTC') - interval '7 days' THEN
     RAISE EXCEPTION 'dead_letters: retenção mínima de 7 dias (RN-48), registro %', OLD.id;
   END IF;
   RETURN OLD;

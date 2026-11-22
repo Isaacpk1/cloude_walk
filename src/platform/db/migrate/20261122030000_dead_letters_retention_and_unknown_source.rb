@@ -1,7 +1,8 @@
 # Bloco 09 (B1): regras da DLQ da plataforma no banco (invariante 8; 07, seção 4, dead_letters).
 #
 # - RN-48, RNF-16: nada apaga um registro com menos de 7 dias. A limpeza dos antigos é pendência; quando
-#   vier, o banco já garante o mínimo.
+#   vier, o banco já garante o mínimo. created_at é UTC sem fuso: a comparação é em UTC, para não depender do
+#   fuso da sessão (psql, job de limpeza). O gatilho não cobre TRUNCATE.
 # - RF-34: mensagem com dlq_source ausente ou fora do contrato dead_letter é gravada como `unknown`, em vez de
 #   sumir do espelho ou travar a partição (o check antigo recusaria a linha para sempre).
 class DeadLettersRetentionAndUnknownSource < ActiveRecord::Migration[8.1]
@@ -12,7 +13,7 @@ class DeadLettersRetentionAndUnknownSource < ActiveRecord::Migration[8.1]
     execute <<~SQL
       CREATE FUNCTION dead_letters_retention() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN
-        IF OLD.created_at > now() - interval '7 days' THEN
+        IF OLD.created_at > (now() AT TIME ZONE 'UTC') - interval '7 days' THEN
           RAISE EXCEPTION 'dead_letters: retenção mínima de 7 dias (RN-48), registro %', OLD.id;
         END IF;
         RETURN OLD;

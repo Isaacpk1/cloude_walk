@@ -30,6 +30,7 @@ module DeadLetters
     }.freeze
     SCHEMAS = { event: "helpdesk.agent_event.v1", action: "helpdesk.agent_action.v1" }.freeze
     UUID = /\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/
+    BRAND_SLUG = /\A[a-z0-9][a-z0-9_-]{0,63}\z/
     CONVERSATION_ID = AgentActions::Apply::CONVERSATION_ID
 
     def self.call(...) = new(...).call
@@ -52,7 +53,11 @@ module DeadLetters
     private
 
     def find_turn
-      brand_id = Brand.where(slug: string("brand")).pick(:id) or return missing("marca_desconhecida")
+      slug = string("brand")
+      # RNF-14: um NUL (ou outro controle) chega ao driver do Postgres como erro e travaria a partição da DLQ.
+      return missing("marca_invalida") unless slug.nil? || slug.match?(BRAND_SLUG)
+
+      brand_id = Brand.where(slug:).pick(:id) or return missing("marca_desconhecida")
       ticket_id = CONVERSATION_ID.match(string("conversation_id").to_s)&.[](:id) or return missing("conversa_invalida")
       key = string(@kind == :event ? "event_id" : "in_reply_to")
       return missing("chave_invalida") unless UUID.match?(key.to_s)

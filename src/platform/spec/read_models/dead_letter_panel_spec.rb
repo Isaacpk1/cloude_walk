@@ -15,6 +15,15 @@ RSpec.describe DeadLetterPanel, "RF-37: DLQ no painel" do
     [ turn.ticket, turn ]
   end
 
+  it "RF-37: violações no formato do DeadLetters::Record (pointer, type, message) aparecem legíveis" do
+    record = seed_dead_letter(violations: [ { "pointer" => "/action", "type" => "enum", "message" => "fora da lista" },
+                                            { "pointer" => "/turn", "type" => "required" } ])
+
+    text = DeadLetterView.from(record).violations_text
+    expect(text).to eq("/action: fora da lista (enum), /turn: required")
+    expect(text).not_to include("=>")
+  end
+
   describe "lista" do
     it "mostra quando, origem, motivo, event_id, atendimento, turno e desfecho, da mais nova para a mais antiga" do
       ticket, turn = ticket_with_turn
