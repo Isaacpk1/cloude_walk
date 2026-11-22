@@ -292,8 +292,8 @@ CREATE TABLE public.dead_letters (
     outcome character varying,
     reprocessed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT dead_letters_outcome_check CHECK (((outcome IS NULL) OR ((outcome)::text = ANY ((ARRAY['escalated'::character varying, 'audited'::character varying, 'uncorrelated'::character varying])::text[])))),
-    CONSTRAINT dead_letters_source_check CHECK (((source)::text = ANY ((ARRAY['broker'::character varying, 'agent-mock'::character varying, 'platform'::character varying])::text[]))),
+    CONSTRAINT dead_letters_outcome_check CHECK (((outcome IS NULL) OR ((outcome)::text = ANY (ARRAY[('escalated'::character varying)::text, ('audited'::character varying)::text, ('uncorrelated'::character varying)::text])))),
+    CONSTRAINT dead_letters_source_check CHECK (((source)::text = ANY (ARRAY[('broker'::character varying)::text, ('agent-mock'::character varying)::text, ('platform'::character varying)::text]))),
     CONSTRAINT dead_letters_ticket_brand_check CHECK (((ticket_id IS NULL) OR (brand_id IS NOT NULL)))
 );
 

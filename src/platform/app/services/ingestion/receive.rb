@@ -132,6 +132,7 @@ module Ingestion
                                         first_pending_seq: ticket.first_pending_seq,
                                         dispatch_due_at: ticket.dispatch_due_at&.iso8601(3),
                                         ai_deadline_at: ticket.ai_deadline_at&.iso8601(3),
+                                        progress_due_at: ticket.progress_due_at&.iso8601(3),
                                         window_ms: window&.in_milliseconds&.round,
                                         ceiling_at: ceiling_at(ticket), context_version:)
       notice = OutboxEvent.create!(
@@ -148,8 +149,8 @@ module Ingestion
       Turns::Policy.for(ticket.brand).window_for(ticket.channel) if ticket.with_ai?
     end
 
-    # RN-55, RN-46 (07, seção 3.4; ADR-016, ADR-020): com a linha travada, a mensagem abre o ciclo pendente, se
-    # não houver um, e empurra o fim da janela de agrupamento até o teto de 4 s. O `scheduler` abre o
+    # RN-55, RN-46, RN-57 (07, seção 3.4; ADR-016, ADR-020): com a linha travada, a mensagem abre o ciclo pendente
+    # (com o teto de 60 s e o aviso de progresso aos 15 s), se não houver um, e empurra o fim da janela de agrupamento até o teto de 4 s. O `scheduler` abre o
     # turno quando dispatch_due_at vence. Caso fora da IA não ganha prazos da IA.
     def cycle_deadlines(ticket, seq, window)
       return {} unless window
@@ -159,7 +160,9 @@ module Ingestion
       cycle = if ticket.first_pending_seq
         {}
       else
-        { first_pending_seq: seq, first_pending_at: now, ai_deadline_at: Turns::Window.ai_deadline_at(first_pending_at: now, policy:) }
+        # RN-57: o aviso de progresso tem um prazo por ciclo, gravado só na abertura.
+        { first_pending_seq: seq, first_pending_at: now, ai_deadline_at: Turns::Window.ai_deadline_at(first_pending_at: now, policy:),
+          progress_due_at: now + policy.progress_notice }
       end
       first_pending_at = cycle.fetch(:first_pending_at, ticket.first_pending_at)
       cycle.merge(dispatch_due_at: Turns::Window.dispatch_due_at(channel: ticket.channel, now:, first_pending_at:, policy:))

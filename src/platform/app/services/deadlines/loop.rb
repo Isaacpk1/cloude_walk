@@ -1,4 +1,5 @@
-# Laço do scheduler (bin/scheduler; ADR-016; 07, seção 2). Consulta os prazos vencidos a cada 250 ms.
+# Laço do scheduler (bin/scheduler; ADR-016; 07, seção 2). Consulta os prazos vencidos a cada 250 ms: abertura
+# de turno (DispatchDue) e aviso de progresso (ProgressDue, RN-57).
 # Lote cheio: volta sem dormir, para escoar o atraso. Erro numa volta (Postgres ou Redis fora) é
 # registrado e o laço segue. stop! só levanta uma flag, então pode ser chamado de um trap de sinal: o
 # laço termina a volta em curso e sai (desligamento gracioso).
@@ -14,7 +15,8 @@ module Deadlines
     REGISTRATIONS = [
       "Deadlines::DispatchDue",
       "Deadlines::TurnTimeout",
-      "Deadlines::CycleTimeout"
+      "Deadlines::CycleTimeout",
+      "Deadlines::ProgressDue" # RN-57
     ].freeze
 
     attr_reader :interval, :batch, :heartbeat

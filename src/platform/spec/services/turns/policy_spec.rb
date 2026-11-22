@@ -22,6 +22,19 @@ RSpec.describe Turns::Policy, "ADR-020: os tempos do atendimento pela IA ficam n
     expect(described_class.for(jim)).to eq(described_class.for(infinitepay))
   end
 
+  describe "RN-57: texto do aviso de progresso por idioma da marca, num lugar só" do
+    it "pt-BR para a InfinitePay e inglês para a JIM" do
+      policy = described_class.for(infinitepay)
+
+      expect(policy.progress_notice_text("pt-BR")).to eq("Ainda estou verificando as informações para te responder. Só mais um instante.")
+      expect(policy.progress_notice_text("en")).to eq("I'm still checking the details to answer you. Just a moment more.")
+    end
+
+    it "idioma sem texto é erro, não texto padrão" do
+      expect { described_class.for(infinitepay).progress_notice_text("es") }.to raise_error(KeyError)
+    end
+  end
+
   it "canal desconhecido é erro, não janela padrão" do
     expect { described_class.for(infinitepay).window_for("telegram") }.to raise_error(KeyError)
   end

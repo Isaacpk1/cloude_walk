@@ -147,6 +147,42 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
     end
   end
 
+  describe "RN-57: progress.notice" do
+    before { allow(DatabaseClock).to receive(:now) { Time.current } }
+
+    it "grava o aviso e acorda o envio pelo item delivery.requested" do
+      ticket = ingest.ticket
+      travel 15.seconds
+      item_id = Deadlines::ProgressDue.call(now: Time.current, limit: 10).sole
+      clear_enqueued_jobs
+
+      described_class.perform_now(item_id)
+
+      requested = OutboxEvent.find_by!(event_type: "delivery.requested", ticket_id: ticket.id)
+      expect(Delivery.find_by!(ticket_id: ticket.id).kind).to eq("progress")
+      expect(described_class).to have_been_enqueued.with(requested.id).on_queue("critical")
+    end
+
+    it "relógio do banco antes do prazo: agenda o despertador para o progress_due_at" do
+      ingest
+      travel 15.seconds
+      item_id = Deadlines::ProgressDue.call(now: Time.current, limit: 10).sole
+      due = Ticket.sole.progress_due_at
+      allow(DatabaseClock).to receive(:now).and_return(due - 0.1.seconds)
+      clear_enqueued_jobs
+
+      described_class.perform_now(item_id)
+
+      job = enqueued_jobs.sole
+      expect(job).to include(job: described_class, args: [ item_id ])
+      expect(job[:at]).to be_within(0.01).of(due.to_f)
+    end
+
+    it "a recuperação do outbox reoferece o tipo (OutboxJob::HANDLED)" do
+      expect(described_class::HANDLED).to include("progress.notice")
+    end
+  end
+
   it "repetição: ação encerrada não faz nada" do
     item = due_dispatch(ingest)
     item.update!(completed_at: start)

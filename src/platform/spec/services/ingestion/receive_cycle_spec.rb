@@ -96,7 +96,7 @@ RSpec.describe Ingestion::Receive do
     it "com analista humano, a mensagem não abre ciclo" do
       first = ingest_at(t0)
       first.ticket.update_columns(state: "com_analista", assignee_id: create(:user).id, first_pending_seq: nil,
-                                  first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+                                  first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil, progress_due_at: nil)
 
       ticket = ingest_at(t0 + 1.second).ticket.reload
 
@@ -216,7 +216,7 @@ RSpec.describe Ingestion::Receive do
     it "07, seção 3.3: caso fora da IA não usa janela; a versão continua registrada" do
       first = ingest_at(t0)
       first.ticket.update_columns(state: "com_analista", assignee_id: create(:user).id, first_pending_seq: nil,
-                                  first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+                                  first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil, progress_due_at: nil)
 
       data = received_audit(ingest_at(t0 + 1.second))
 
