@@ -169,11 +169,12 @@ RSpec.describe DeadLetters::Record, "RF-34, RN-45: DLQ da plataforma (07, seçõ
       expect(result.outcome).to eq("escalated")
     end
 
-    it "dois DLQ do mesmo turno: um só handoff.requested (a chave da atribuição colide)" do
+    it "dois DLQ do mesmo turno: um só handoff.requested; o pedido expirou o turno e o segundo só audita" do
       first = broker_dead_letter(turn)
       second = action_dead_letter(turn, action: "refund")
 
-      expect([ first.outcome, second.outcome ]).to eq(%w[escalated escalated])
+      expect([ first.outcome, second.outcome ]).to eq(%w[escalated audited])
+      expect(audits("dead_letter.audited").sole.data["reason"]).to eq("turno_expired")
       expect(handoff_items.count).to eq(1)
       expect(audits("handoff.requested").count).to eq(1)
       expect(audits("dead_letter.recorded").count).to eq(2)

@@ -180,11 +180,10 @@ module AgentActions
       "fora_da_ia" unless @ticket.with_ai?
     end
 
-    # 5. RN-45, RN-46: pedido o handoff nesta atribuição (DLQ, falha definitiva), a IA já não responde. Fica por
-    # último: um turno expirado ou vencido mostra o motivo do prazo. O Handoff::Escalate expira o turno ao escalar;
-    # até lá, a chave do pedido no outbox decide sob o mesmo lock.
+    # 5. RN-45, RN-46: pedido o handoff nesta atribuição, a IA já não responde. Fica por último: um turno expirado
+    # ou vencido mostra o motivo do prazo. O pedido já expira os turnos eligible; isto é a defesa sob o mesmo lock.
     def handoff_reason
-      "handoff_pedido" if OutboxEvent.exists?(brand_id: @ticket.brand_id, dedup_key: Handoff::Request.dedup_key(@ticket))
+      "handoff_pedido" if Handoff::Request.pending?(@ticket)
     end
 
     # 3. Contexto devolvido igual ao persistido, e o persistido cobre a última mensagem do cliente.

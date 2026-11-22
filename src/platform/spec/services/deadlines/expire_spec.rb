@@ -97,14 +97,15 @@ RSpec.describe Deadlines::Expire, "RN-46: worker dos timeouts do turno e do cicl
       expect(turn.reload.status).to eq("eligible")
     end
 
-    it "outro gatilho já pediu o handoff nesta atribuição: expira o turno e não grava um segundo pedido" do
+    it "outro gatilho já pediu o handoff nesta atribuição: o pedido já expirou o turno e o timeout é descartado" do
       turn = opened_turn
       id = turn_timeout_for(turn)
       request_handoff(turn.ticket, reason: "publicacao_falhou", source: "outbox")
+      expect(turn.reload.status).to eq("expired")
 
       result = described_class.call(id)
 
-      expect(result).to have_attributes(status: :expired, handoff_event_id: nil)
+      expect(result).to have_attributes(status: :discarded, reason: "turno_expired", handoff_event_id: nil)
       expect(handoff_items(turn.ticket).sole.payload["reason"]).to eq("publicacao_falhou")
     end
   end

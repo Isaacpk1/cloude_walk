@@ -1217,6 +1217,13 @@ CREATE UNIQUE INDEX index_deliveries_on_ticket_id_and_seq ON public.deliveries U
 
 
 --
+-- Name: index_deliveries_one_progress_per_cycle; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_deliveries_one_progress_per_cycle ON public.deliveries USING btree (ticket_id, ai_first_pending_seq) WHERE ((kind)::text = 'progress'::text);
+
+
+--
 -- Name: index_deliveries_open; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1868,6 +1875,7 @@ SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
 ('20261122030000'),
+('20261122015000'),
 ('20261122010000'),
 ('20261122000000'),
 ('20261121040000'),

@@ -182,15 +182,17 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
 
     it "RN-45, RN-46: com o handoff pedido na atribuição atual, a resposta não é aplicada (uma ação final por turno)" do
       request_handoff(ticket.reload, reason: "falha_de_integracao", source: "dlq", turn: turn.turn)
+      expect(turn.reload.status).to eq("expired") # o pedido expira os turnos eligible
+      turn.update_columns(status: "eligible") # defesa: mesmo com um turno ainda eligible, o pedido decide
 
       expect_rejected(agent_action_for(turn), "handoff_pedido")
-      expect(turn.status).to eq("eligible") # o Handoff::Escalate expira o turno ao escalar
       expect(ticket.messages.where(direction: "outbound")).to be_empty
     end
 
     it "handoff pedido numa atribuição anterior não bloqueia a resposta da atribuição atual" do
       request_handoff(ticket.reload, reason: "falha_de_integracao", source: "dlq", turn: turn.turn)
       OutboxEvent.where(event_type: "handoff.requested").update_all(dedup_key: "handoff:#{ticket.id}:99")
+      turn.update_columns(status: "eligible")
 
       expect(apply(agent_action_for(turn))).to have_attributes(status: :applied)
     end

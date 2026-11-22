@@ -33,7 +33,9 @@ RSpec.describe "DLQ da plataforma com processos concorrentes", :concurrency do
         i.zero? ? broker_dead_letter(turn, offset: 100) : action_dead_letter(turn, action: "refund")
       end)
 
-      expect(results.map { [ _1.status, _1.outcome ] }).to all(eq([ :recorded, "escalated" ]))
+      # O primeiro a travar o atendimento pede o handoff e expira o turno; o segundo só audita (turno_expired).
+      expect(results.map { [ _1.status, _1.outcome ] }).to contain_exactly([ :recorded, "escalated" ], [ :recorded, "audited" ])
+      expect(AuditEvent.where(event_type: "dead_letter.audited").sole.data["reason"]).to eq("turno_expired")
       expect(DeadLetter.count).to eq(2)
       expect(handoff_items.count).to eq(1)
       expect(AuditEvent.where(event_type: "handoff.requested").count).to eq(1)
