@@ -64,6 +64,9 @@ module Turns
                                              current_version: ticket.assignment_version)
       end
 
+      # RN-46: com o handoff pedido nesta atribuição, o caso não volta para a IA enquanto o Escalate não roda.
+      return settled(:handoff_requested, reason: "handoff_pedido") if Handoff::Request.pending?(ticket)
+
       covering = ticket.ai_turns.eligible.where(context_until_seq: ticket.latest_customer_seq...).order(:turn).last
       return settled(:covered, reason: "coberto", covered_by_turn: covering.turn) if covering
 

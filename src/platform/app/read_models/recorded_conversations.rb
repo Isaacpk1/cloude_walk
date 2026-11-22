@@ -92,11 +92,31 @@ class RecordedConversations
     first_received = ticket.messages.to_h { [ _1.seq, _1.received_at ] }
     records = ticket.ai_turns.where(brand_id: ticket.brand_id).order(:turn).to_a
     publications = OutboxEvent.where(brand_id: ticket.brand_id, id: records.map(&:event_id)).index_by(&:id)
+    expirations = expiration_reasons(ticket)
     records.map do |record|
       agent_action = actions.for_turn(record)
-      note = record.status == "eligible" ? publication_note(publications[record.event_id]) : TURN_NOTES[record.status]
+      note = case record.status
+      when "eligible" then publication_note(publications[record.event_id])
+      when "expired" then expired_note(expirations[record.turn], publications[record.event_id])
+      else TURN_NOTES[record.status]
+      end
       turn(record, agent_action, stages(record, agent_action, actions, deliveries, first_received), note,
            superseded.for_turn(record.turn))
+    end
+  end
+
+  # Bloco 08: o turno expira no pedido de handoff ou no timeout. A nota mostra a causa gravada em ai_turn.expired.
+  def expiration_reasons(ticket)
+    AuditEvent.where(brand_id: ticket.brand_id, ticket_id: ticket.id, event_type: "ai_turn.expired")
+              .order(:id).to_h { [ _1.data["turn"], _1.data["reason"] ] }
+  end
+
+  def expired_note(reason, publication)
+    case reason
+    when "publicacao_falhou"
+      "Turno expirado: a publicação para o agente falhou sem nova tentativa (#{publication&.last_error || 'recusa'}) e o caso vai para um humano (RN-46)."
+    when "falha_de_integracao" then "Turno expirado: a integração com o agente falhou e o caso vai para um humano (RN-45)."
+    else TURN_NOTES.fetch("expired")
     end
   end
 

@@ -160,7 +160,7 @@ module AgentActions
     # ação atrasada deve aparecer como `atribuicao_mudou`/`fora_da_ia`, não como prazo vencido. O resultado
     # (rejeitar) é o mesmo em qualquer ordem.
     def rejection_reason
-      assignment_reason || turn_reason || context_reason || deadline_reason
+      assignment_reason || turn_reason || context_reason || deadline_reason || handoff_reason
     end
 
     # 1. Turno atual e elegível.
@@ -178,6 +178,12 @@ module AgentActions
       return "atribuicao_mudou" if returned != @turn.assignment_version || @turn.assignment_version != @ticket.assignment_version
 
       "fora_da_ia" unless @ticket.with_ai?
+    end
+
+    # 5. RN-45, RN-46: pedido o handoff nesta atribuição, a IA já não responde. Fica por último: um turno expirado
+    # ou vencido mostra o motivo do prazo. O pedido já expira os turnos eligible; isto é a defesa sob o mesmo lock.
+    def handoff_reason
+      "handoff_pedido" if Handoff::Request.pending?(@ticket)
     end
 
     # 3. Contexto devolvido igual ao persistido, e o persistido cobre a última mensagem do cliente.

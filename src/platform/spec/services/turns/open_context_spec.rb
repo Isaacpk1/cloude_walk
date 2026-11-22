@@ -183,7 +183,7 @@ RSpec.describe Turns::Open, "RN-49, RF-33, RF-53: contexto do turno completo e v
       expect(Deadlines::DispatchDue.call(now: Time.current + 30.seconds, limit: 10)).to be_empty
     end
 
-    it "mensagem nova do cliente volta a gravar dispatch_due_at e um turno novo é tentado (ainda acima: recusa de novo)" do
+    it "mensagem nova do cliente com o handoff já pedido pela recusa: nenhum turno é tentado (handoff_pedido)" do
       ingest("a" * 8_000)
       first_refusal = described_class.call(due_dispatch(ingest("b" * 8_001)).id)
       expect(first_refusal.status).to eq(:context_too_large)
@@ -194,10 +194,11 @@ RSpec.describe Turns::Open, "RN-49, RF-33, RF-53: contexto do turno completo e v
 
       ids = Deadlines::DispatchDue.call(now: Time.current, limit: 10)
       expect(ids.size).to eq(1)
-      expect(described_class.call(ids.sole).status).to eq(:context_too_large)
+      expect(described_class.call(ids.sole).status).to eq(:handoff_requested)
       expect(received.ticket.reload.dispatch_due_at).to be_nil
-      expect(received.ticket.audit_events.where(event_type: "ai_turn.not_opened").pluck(Arel.sql("data->>'cover_until_seq'")))
-        .to eq(%w[2 3])
+      expect(received.ticket.audit_events.where(event_type: "ai_turn.not_opened").order(:id).pluck(Arel.sql("data->>'reason'")))
+        .to eq(%w[contexto_excede_limite handoff_pedido])
+      expect(received.ticket.ai_turns).to be_empty
     end
   end
 

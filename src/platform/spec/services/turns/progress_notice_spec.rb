@@ -264,6 +264,17 @@ RSpec.describe Turns::ProgressNotice, "RN-57: worker do aviso de progresso" do
     end
   end
 
+  it "invariante 6: atendimento inexistente na marca do item é descartado (atendimento_inexistente), sem laço" do
+    ticket = ingest_at(t0)
+    item = OutboxEvent.create!(brand_id: jim.id, ticket_id: nil, event_type: Deadlines::ProgressDue::EVENT_TYPE,
+                               dedup_key: "progress:#{ticket.id}:1", trace_id: "d" * 32, next_attempt_at: t0,
+                               payload: { "ticket_id" => ticket.id, "first_pending_seq" => 1, "assignment_version" => 0 })
+
+    expect(run_at(item)).to have_attributes(status: :discarded)
+    expect(item.reload).to have_attributes(completed_at: be_present, last_error: "atendimento_inexistente")
+    expect(Delivery.where(ticket_id: ticket.id)).to be_empty
+  end
+
   it "item inexistente ou já concluído não faz nada" do
     expect(described_class.call(SecureRandom.uuid).status).to eq(:already_done)
   end

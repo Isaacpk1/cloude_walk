@@ -20,7 +20,8 @@ class AgentActionView < Data.define(
     "marca_divergente" => "Marca da ação diferente da marca do atendimento (ADR-014)",
     "turno_inexistente" => "Turno não encontrado para o atendimento",
     "contexto_divergente" => "context_until_seq diferente do enviado no turno (RN-56)",
-    "ciclo_encerrado" => "Ciclo da IA já encerrado: não há mensagem pendente (RN-46)"
+    "ciclo_encerrado" => "Ciclo da IA já encerrado: não há mensagem pendente (RN-46)",
+    "handoff_pedido" => "Handoff já pedido para o atendimento: a IA não responde mais (RN-45, RN-46)"
   }.freeze
   SUMMARY_FIELDS = %w[problema dados_cliente acoes_tomadas motivo pendente].freeze
 

@@ -55,13 +55,21 @@ module Turns
       return Result.new(status: :already_done) unless item && item.completed_at.nil?
 
       # Invariante 6: o atendimento pela marca do item. Ordem das travas: atendimento, depois o item.
-      @ticket = Ticket.lock.find_by!(id: item.ticket_id, brand_id: item.brand_id)
+      @ticket = Ticket.lock.find_by(id: item.ticket_id, brand_id: item.brand_id)
       item.lock!
       return Result.new(status: :already_done) if item.completed_at
+      return missing_ticket(item) unless @ticket
 
       @item = item
       @now = DatabaseClock.now # depois do lock
       decide
+    end
+
+    # Sem o atendimento na marca do item, nada a fazer: encerra o item, senão a recuperação o reoferece sem fim.
+    def missing_ticket(item)
+      item.update!(completed_at: Time.current, lease_until: nil, last_error: "atendimento_inexistente")
+      JsonLog.info("progress.notice_discarded", trace_id: item.trace_id, outbox_event_id: item.id, reason: "atendimento_inexistente")
+      Result.new(status: :discarded)
     end
 
     def cycle_seq = item.payload.fetch("first_pending_seq")
@@ -85,9 +93,7 @@ module Turns
     end
 
     # Interface do bloco 08, item 1: um pedido de handoff por atribuição, pela chave.
-    def handoff_requested?
-      OutboxEvent.exists?(brand_id: ticket.brand_id, dedup_key: "handoff:#{ticket.id}:#{ticket.assignment_version}")
-    end
+    def handoff_requested? = Handoff::Request.pending?(ticket)
 
     # O relógio do banco ainda não chegou ao prazo (relógio do scheduler adiantado): volta no prazo.
     def not_due

@@ -62,8 +62,14 @@ module Handoff
         return discard("atribuicao_mudou", expected_version: expected, current_version: ticket.assignment_version)
       end
       return discard(ticket.state == "aguardando_humano" ? "ja_escalado" : "fora_da_ia", state: ticket.state) unless ticket.with_ai?
+      # 07, seção 6: caso já respondido não escala (defesa; o pedido já expira os turnos eligible).
+      return discard("turno_applied", turn: payload["turn"]) if requested_turn_applied?
 
       escalate
+    end
+
+    def requested_turn_applied?
+      payload["turn"] && ticket.ai_turns.where(brand_id: ticket.brand_id, turn: payload["turn"], status: "applied").exists?
     end
 
     def escalate

@@ -161,10 +161,11 @@ RSpec.describe "RN-46: timeout, resposta, handoff e ingestão concorrendo pelo a
       expect(emitted).to eq(0)
     end
 
-    it "a mensagem comita primeiro (supera o turno); o handoff encerra o ciclo que ela abriu" do
+    it "a mensagem comita primeiro; o handoff encerra o ciclo que ela abriu" do
       ticket, turn = run(%i[ingest escalate])
 
-      expect(turn.status).to eq("superseded")
+      # O pedido de handoff (gravado antes da corrida) já expirou o turno: a mensagem não tem o que superar.
+      expect(turn.status).to eq("expired")
       expect_human_without_cycle(ticket)
     end
 

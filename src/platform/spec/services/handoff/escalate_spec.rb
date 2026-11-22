@@ -27,7 +27,7 @@ RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
       )
       expect(ticket.with_ai?).to be(false)
       expect(turn.reload.status).to eq("expired")
-      expect(audits(ticket, "ai_turn.expired").sole.data).to include("turn" => turn.turn, "reason" => "handoff")
+      expect(audits(ticket, "ai_turn.expired").sole.data).to include("turn" => turn.turn, "reason" => "prazo_do_turno") # expirou no pedido
       escalated = audits(ticket, "ticket.escalated").sole
       expect(escalated).to have_attributes(brand_id: infinitepay.id, actor_type: "system", trace_id: "c" * 32)
       expect(escalated.data).to include("reason" => "prazo_do_turno", "source" => "scheduler", "from_assignment_version" => 0,
