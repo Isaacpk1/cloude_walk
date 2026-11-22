@@ -4,7 +4,8 @@
 # (TurnWindowEvents), a abertura e a recusa do turno com o contexto (TurnContextEvents, bloco 06) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03).
 # A ação recebida do agente (AgentActionEvents) vem de ai_turns.response e da auditoria (bloco 04).
 # As mensagens de saída e a entrega ao canal (DeliveryEvents) vêm de deliveries e da auditoria
-# delivery.* (bloco 05). Escalações entram aqui quando suas tabelas existirem (bloco 10).
+# delivery.* (bloco 05). As tentativas e o desfecho de cada item do outbox (OutboxAttempts) e o evento da DLQ
+# (DeadLetterEvents) vêm do bloco 09. Escalações entram aqui quando suas tabelas existirem (bloco 10).
 class RecordedConversations
   LIMIT = 50
   WAITING = ConversationView::Participant.new(name: "Aguardando triagem", kind: "queue")
@@ -28,6 +29,8 @@ class RecordedConversations
     events += TurnSupersededEvents.new(ticket).events
     events += AgentActionEvents.new(ticket).events
     events += DeliveryEvents.new(ticket).events
+    events += OutboxAttempts.new(ticket).events
+    events += DeadLetterEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
   end
 

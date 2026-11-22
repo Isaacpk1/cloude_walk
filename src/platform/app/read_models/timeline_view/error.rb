@@ -19,7 +19,7 @@ class TimelineView::Error < Data.define(:origin, :http_status, :message, :attemp
     "provedor_transitorio" => "Provedor: falha transitória (5xx, timeout ou conexão)",
     "entrega_plataforma" => "Recusada pela plataforma antes do envio ao provedor",
     "conciliacao" => "Confirmação do provedor incerta: a entrega precisa de conciliação (07, seção 6)"
-  }.freeze
+  }.merge(DeadLetterView::SOURCES.to_h { |key, label| [ "dlq_#{key}", "DLQ: desviado por #{label}" ] }).freeze
   # Motivos da entrega (delivery.failed.reason). "assinatura" e "contrato" existem nas duas etapas com textos
   # diferentes: no erro da entrega (retry_key delivery_id) vale o da entrega; nas demais, o da publicação.
   DELIVERY_ORIGINS = ConversationView::DeliveryStatus::FAILURE_REASONS
@@ -27,7 +27,8 @@ class TimelineView::Error < Data.define(:origin, :http_status, :message, :attemp
   OUTCOMES = { "retentativas_esgotadas" => "Retentativas esgotadas (RN-43)",
                "prazo_vencido" => "Sem nova tentativa: passaria do prazo do turno (RN-46)",
                "conciliacao_pendente" => "Conciliação pendente: conferir no provedor antes de reenviar (07, seção 6)",
-               "obsoleto" => "Encerrado pela política de recuperação: não volta a ser tentado (RF-34, RF-35)" }.freeze
+               "obsoleto" => "Encerrado pela política de recuperação: não volta a ser tentado (RF-34, RF-35)" }
+             .merge(DeadLetterView::OUTCOMES.transform_keys { "dlq_#{_1}" }, "dlq_pendente" => DeadLetterView::NO_OUTCOME).freeze
 
   def initialize(retry_key: "event_id", **rest) = super
 
