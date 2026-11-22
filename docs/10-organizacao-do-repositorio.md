@@ -242,9 +242,11 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Dados iniciais (marca, fila, cliente, bot) | `src/platform/db/seeds/synthetic.rb`, chamado por `db/seeds.rb`. Rode com `make seed`; a semente vem de `SEED` no `.env` |
 | Versão do Ruby | No `.ruby-version` de cada serviço em `src/` (hoje Ruby 4.0.10, ADR-001). O CI e o `Makefile` leem esse arquivo; o `ARG RUBY_VERSION` do `Dockerfile` e o `TargetRubyVersion` do `.rubocop.yml` dos serviços repetem o mesmo valor. Ao trocar de versão, mude todos juntos e confira se o `ruby/setup-ruby` já publica a versão para o `ubuntu-latest` |
 | Conexão com o Redis | `src/platform/config/initializers/redis.rb`, com a URL em `REDIS_URL` |
+| Política do handoff (aviso de transferência, expressões de pedido de humano, prioridade da RN-41, limite de trocas) | `src/platform/app/services/handoff/policy.rb` (`Handoff::Policy`) |
+| Fila humana no painel | `/fila` (`HumanQueueController`, `HumanQueue`), com Turbo Streams por marca |
 | Perfil do agente mock escolhido no simulador (`rapido`, `lento`, `mudo`) | Redis de controle em `AGENT_CONTROL_REDIS_URL` (no Compose, `redis://redis:6379/1`), chaves `helpdesk:agent-mock:profile:brand:<marca>` e `helpdesk:agent-mock:profile:global`. O `channels-mock` grava (`POST /simulador/agente/perfil`); o `agent-mock` lê a cada evento (`lib/agent_mock/profile_source.rb`), com `AGENT_PROFILE` como padrão se o Redis faltar |
 | Filas e pesos do Sidekiq | `src/platform/config/sidekiq.yml` |
-| ActionCable no Redis | `src/platform/config/cable.yml` |
+| ActionCable | `src/platform/config/cable.yml`: em desenvolvimento, adaptador `postgresql` (LISTEN/NOTIFY), porque o aviso da fila humana sai do worker e do consumer, não do web, e o `async` não cruza processos. Em produção, `redis` (07), que pede a gem `redis` no Gemfile. O broadcast sai do `after_create_commit` de `AuditEvent` e só pede a recarga da página |
 | Rate limit por marca e canal | `src/platform/app/services/rate_limit/` |
 | Criar um tópico Kafka ou mudar as partições | `infra/kafka/topics.yml` |
 | Consumir um tópico na plataforma | `src/platform/karafka.rb` e `app/consumers/` |

@@ -160,7 +160,10 @@ Todos são configuráveis. Os de origem *proposta* são escolhas deste projeto, 
 | Capacidade por analista | 5 atendimentos simultâneos | Proposta | RN-30 |
 | Capacidade do agente de IA (bot) | 1.000 atendimentos simultâneos, configurável pelo supervisor | Proposta | RN-30 |
 | Offline antes de devolver casos à fila | 10 min | Proposta | RN-31 |
-| Trocas da IA sem resolução antes de escalar | 10 mensagens | Proposta. Ainda não decidida pela plataforma: o motivo `limite_de_trocas` já é aceito pelo pedido de handoff, e a contagem entra com a triagem (blocos 10 e 11) | RN-33 |
+| Trocas da IA sem resolução antes de escalar | 10 trocas. Uma troca é um turno com `reply` aplicado na atribuição atual da IA; `escalate`, `resolve` e ações rejeitadas não contam, e a `resolve` e o handoff zeram a contagem. Parâmetro em `Handoff::Policy#exchanges_limit` | Proposta, implementada no bloco 10 | RN-33 |
+| Aviso de transferência ao cliente | pt-BR: "Estou te transferindo para um especialista. Ele já recebeu o histórico da nossa conversa." Inglês: "I'm transferring you to a specialist. They already have the history of our conversation." Em `Handoff::Policy`, configurável por marca no bloco 12 | Proposta, implementada no bloco 10 | RN-42 |
+| Expressões de pedido de humano | Por idioma em `Handoff::Policy` ("quero falar com um atendente", "atendimento humano", "talk to a human"...), sem acento nem maiúsculas. Configuráveis por marca no bloco 12 | Proposta, implementada no bloco 10 | RN-34 |
+| Prioridade sem triagem na escalação | Vale a média da RN-13; a escalação por tempo ou falha de integração a leva a alta | Proposta, implementada no bloco 10 | RN-41 |
 | Tempo limite do agente por turno | 20 s desde a abertura do turno, limitado ao teto do ciclo. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)); calibrar com o p95 do agente real | RN-46 |
 | Teto do ciclo com a IA | 60 s desde a primeira mensagem pendente, sem reiniciar. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) | RN-46 |
 | Retentativas | 5, com backoff 1, 2, 4, 8, 16 s e jitter | RNF-16 | RN-43 |
