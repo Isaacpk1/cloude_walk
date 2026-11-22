@@ -25,6 +25,8 @@ RSpec.describe Handoff::Summarize, "RN-39, RN-40: resumo do handoff pela platafo
   def summary_item(ticket, from: 0, reason: "prazo_do_turno", escalated_at: db_now, brand_id: ticket.brand_id)
     # O banco já recusa item com atendimento de outra marca na coluna (fk_outbox_events_ticket_same_brand): o caso de
     # marca errada que sobra é o payload apontar para o atendimento de outra marca.
+    # O Escalate (bloco 10) já grava este item; o teste o regrava com o payload que controla.
+    OutboxEvent.where(dedup_key: "summary:#{ticket.id}:#{from}").delete_all
     OutboxEvent.create!(brand_id:, ticket_id: (ticket.id if brand_id == ticket.brand_id), event_type: described_class::EVENT_TYPE,
                         dedup_key: "summary:#{ticket.id}:#{from}", trace_id: "d" * 32, next_attempt_at: Time.current,
                         payload: { "ticket_id" => ticket.id, "from_assignment_version" => from, "reason" => reason,

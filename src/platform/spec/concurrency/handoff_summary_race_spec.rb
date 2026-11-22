@@ -15,6 +15,8 @@ RSpec.describe "RN-39, RN-40: resumo do handoff com workers concorrentes", :conc
   end
 
   def summary_item(ticket)
+    # O Escalate (bloco 10) já grava este item; o teste o regrava com o payload que controla.
+    OutboxEvent.where(dedup_key: "summary:#{ticket.id}:0").delete_all
     OutboxEvent.create!(brand_id: ticket.brand_id, ticket_id: ticket.id, event_type: Handoff::Summarize::EVENT_TYPE,
                         dedup_key: "summary:#{ticket.id}:0", trace_id: "d" * 32, next_attempt_at: Time.current,
                         payload: { "ticket_id" => ticket.id, "from_assignment_version" => 0, "reason" => "prazo_do_turno",

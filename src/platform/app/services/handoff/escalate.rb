@@ -86,7 +86,11 @@ module Handoff
       escalate
     end
 
+    # O pedido de origem `agent` (escalate e limite de trocas, RN-33 itens 1 e 6) nasce de um turno applied: a ação
+    # final é o próprio gatilho, então não vale como "caso já respondido".
     def requested_turn_applied?
+      return false if payload["source"] == "agent"
+
       payload["turn"] && ticket.ai_turns.where(brand_id: ticket.brand_id, turn: payload["turn"], status: "applied").exists?
     end
 
@@ -195,8 +199,12 @@ module Handoff
       turns.each { audit("ai_turn.expired", turn: _1.turn, deadline_at: _1.deadline_at.utc.iso8601(3), reason: REASON) }
     end
 
+    # RN-38: as saídas da IA que ainda não começaram são canceladas. No limite de trocas (RN-33, item 6), as respostas
+    # aplicadas saem antes do aviso (a 10ª é a última troca, não uma resposta superada); só o aviso de progresso cai.
+    def cancelled_kinds = payload["reason"] == "limite_de_trocas" ? AI_KINDS - %w[reply] : AI_KINDS
+
     def cancel_deliveries
-      deliveries = Delivery.where(brand_id: ticket.brand_id, ticket_id: ticket.id, status: "pending", kind: AI_KINDS)
+      deliveries = Delivery.where(brand_id: ticket.brand_id, ticket_id: ticket.id, status: "pending", kind: cancelled_kinds)
                            .where.not(ai_assignment_version: nil).order(:seq).to_a
       deliveries.each do |delivery|
         delivery.update!(status: "cancelled", lease_until: nil, last_error: REASON)

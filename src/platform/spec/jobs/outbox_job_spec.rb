@@ -213,6 +213,8 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
       turn = opened_turn
       request_handoff(turn.ticket, reason: "prazo_do_turno", source: "scheduler", turn: turn.turn)
       Handoff::Escalate.call(handoff_items(turn.ticket).sole.id)
+      # O Escalate (bloco 10) já grava este item; o teste o regrava com o payload que controla.
+      OutboxEvent.where(dedup_key: "summary:#{turn.ticket_id}:0").delete_all
       item = OutboxEvent.create!(brand_id: turn.brand_id, ticket_id: turn.ticket_id, event_type: "handoff.summary",
                                  dedup_key: "summary:#{turn.ticket_id}:0", trace_id: "d" * 32, next_attempt_at: Time.current,
                                  payload: { "ticket_id" => turn.ticket_id, "from_assignment_version" => 0,
