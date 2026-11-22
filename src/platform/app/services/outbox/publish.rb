@@ -10,17 +10,18 @@
 #    em todas as tentativas (invariante 3).
 # 5. Grava o resultado e a auditoria numa transação curta.
 #
-# Retentativas (RN-43, RNF-16): 5xx, 429, timeout e conexão recusada esperam 1, 2, 4, 8 e 16 s, mais
-# um jitter de até 25%, enquanto o prazo do turno permitir (07, seção 6). 4xx é permanente (RN-44).
+# Retentativas (RN-43, RNF-16; Outbox::RetryPolicy): 5xx, 429, timeout e conexão recusada esperam 1, 2, 4,
+# 8 e 16 s, mais um jitter de até 25%, enquanto o prazo do turno permitir (07, seção 6). 4xx é permanente
+# (RN-44). Uma tentativa abandonada (worker caiu depois da reserva) conta: a reserva além do limite não
+# chama o broker e encerra como retentativas_esgotadas (origem recuperacao).
 # A DLQ da plataforma e a escalação pela RN-45 entram no bloco 09; o timeout do ciclo, no bloco 08.
 module Outbox
   class Publish
     Result = Data.define(:status, :next_attempt_at)
 
     LEASE = 30.seconds
-    MAX_RETRIES = 5
-    MAX_JITTER = 0.25
-    DEFAULT_JITTER = -> { rand }
+    MAX_RETRIES = RetryPolicy::MAX_RETRIES
+    DEFAULT_JITTER = RetryPolicy::DEFAULT_JITTER
     EVAL_REASON = "eval".freeze
 
     def self.call(...) = new(...).call
@@ -41,6 +42,7 @@ module Outbox
 
       stale = stale_reason
       return discard(stale) if stale
+      return abandoned_exhausted if RetryPolicy.exceeded?(item.attempts)
 
       violations = HelpdeskContracts.errors(:agent_inbound, @item.payload)
       return reject(origin: "plataforma", http_status: nil, reason: "contrato", violations: violations.map(&:pointer)) if violations.any?
@@ -72,7 +74,16 @@ module Outbox
       return "turno_#{turn.status}" unless turn.eligible?
       return "prazo_vencido" if Time.current >= turn.deadline_at
 
-      "atribuicao_mudou" if Ticket.where(id: turn.ticket_id).pick(:assignment_version) != turn.assignment_version
+      ticket = Ticket.find_by(id: turn.ticket_id, brand_id: item.brand_id)
+      return "atribuicao_mudou" if ticket&.assignment_version != turn.assignment_version
+
+      "fora_da_ia" unless ticket.with_ai?
+    end
+
+    # As tentativas anteriores foram abandonadas (sem resultado gravado) até passar do limite da RN-43.
+    def abandoned_exhausted
+      terminal("retentativas_esgotadas", { origin: "recuperacao", http_status: nil, error: "tentativas abandonadas",
+                                           retry: false })
     end
 
     def deliver
@@ -149,10 +160,7 @@ module Outbox
     end
 
     # 1, 2, 4, 8, 16 s pela tentativa que falhou, mais até 25% de jitter (só para cima).
-    def backoff
-      base = 2**(item.attempts - 1)
-      (base * (1 + (MAX_JITTER * @jitter.call))).seconds
-    end
+    def backoff = RetryPolicy.backoff(item.attempts, jitter: @jitter)
 
     def reject(origin:, http_status:, reason:, violations: nil)
       error = "#{origin}: #{reason}"
