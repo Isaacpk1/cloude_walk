@@ -9,6 +9,8 @@ module AgentMock
   #   contrato agent_inbound inválido → DLQ, sem retentativa (invariante 10)
   #   deadline_at já passou           → descarta e loga (07, seção 6, "Agente lento ou fora do ar")
   #   modo mudo / falha sorteada      → nada sai (RF-38)
+  #
+  # O perfil (rapido, lento, mudo) é resolvido a cada evento (Profiles): o simulador troca sem reiniciar.
   #   senão                           → decide, valida contra agent_outbound e publica
   #
   # Não há deduplicação aqui: o mesmo evento entregue de novo gera outra ação, com outro
@@ -17,14 +19,13 @@ module AgentMock
   class Responder
     Result = Data.define(:status, :action)
 
-    def initialize(producer:, config: Config.load, log: Log.new, clock: SystemClock, id_generator: -> { SecureRandom.uuid })
+    # config: perfil fixo (sem fonte de perfil). profiles: perfil por evento, escolhido pelo simulador.
+    def initialize(producer:, config: nil, profiles: nil, log: Log.new, clock: SystemClock, id_generator: -> { SecureRandom.uuid })
       @publisher = Publisher.new(producer:)
-      @config = config
       @log = log
+      @profiles = profiles || Profiles.new(config: config || Config.load, log:)
       @clock = clock
       @ids = id_generator
-      @failures = FailureModes.new(config)
-      @engine = Scenarios::Engine.new(config)
     end
 
     def call(payload:, headers:)
@@ -34,19 +35,20 @@ module AgentMock
       return reject_inbound(payload, headers, traceparent, violations) if violations.any?
 
       event = JSON.parse(payload)
-      context = log_context(event, traceparent)
-      skipped = skip_reason(event, received_at)
+      runtime = @profiles.resolve(event["brand"], trace_id: Log.trace_id(traceparent))
+      context = log_context(event, traceparent, runtime)
+      skipped = skip_reason(event, received_at, runtime)
       return skip(skipped, context, received_at) if skipped
 
-      respond(event, context, traceparent, received_at)
+      respond(event, runtime, context, traceparent, received_at)
     end
 
     private
 
-    def skip_reason(event, received_at)
+    def skip_reason(event, received_at, runtime)
       return :expired if received_at >= Time.iso8601(event.fetch("deadline_at"))
 
-      :muted if @failures.mute?
+      :muted if runtime.failures.mute?
     end
 
     def skip(status, context, received_at)
@@ -55,24 +57,24 @@ module AgentMock
       Result.new(status:, action: nil)
     end
 
-    def respond(event, context, traceparent, received_at)
-      latency_ms = @failures.latency_ms(event.fetch("event_id"))
+    def respond(event, runtime, context, traceparent, received_at)
+      latency_ms = runtime.failures.latency_ms(event.fetch("event_id"))
       @clock.sleep(latency_ms / 1000.0) if latency_ms.positive?
-      if @failures.fail?(event.fetch("event_id"))
+      if runtime.failures.fail?(event.fetch("event_id"))
         @log.warn("agent.failed", **context, reason: "falha_simulada", latency_ms:)
         return Result.new(status: :failed, action: nil)
       end
 
-      decision = @engine.decide(event)
+      decision = runtime.engine.decide(event)
       simulate_tools(decision)
-      action = build_action(event, decision, received_at, @clock.call)
+      action = build_action(event, decision, runtime.config, received_at, @clock.call)
       violations = HelpdeskContracts.errors(:agent_outbound, action)
       return reject_action(action, context, traceparent, violations) if violations.any?
 
       @publisher.publish(action, traceparent:)
       @log.info("agent.published", **context, action: decision.action, rule: decision.rule, action_event_id: action["event_id"],
                                    tools: decision.tool_calls.map { _1["tool"] }, latency_ms:,
-                                   agent_ms: action.dig("timing", "agent_ms"))
+                                   agent_ms: action.dig("timing", "agent_ms"), config_hash: action.dig("agent", "config_hash"))
       Result.new(status: :published, action:)
     end
 
@@ -85,7 +87,7 @@ module AgentMock
     end
 
     # 07, seção 5.3: correlação igual à do evento, agent (RN-37) e timing (RNF-03).
-    def build_action(event, decision, received_at, responded_at)
+    def build_action(event, decision, config, received_at, responded_at)
       action = {
         "schema" => "helpdesk.agent_action.v1",
         "event_id" => @ids.call,
@@ -95,7 +97,7 @@ module AgentMock
         **decision.content,
         "tool_calls" => decision.tool_calls,
         "classification" => decision.classification,
-        "agent" => { "model" => MODEL, "version" => VERSION, "config_hash" => @config.config_hash },
+        "agent" => { "model" => MODEL, "version" => VERSION, "config_hash" => config.config_hash },
         "timing" => { "received_at" => received_at.utc.iso8601(3), "responded_at" => responded_at.utc.iso8601(3),
                       "agent_ms" => ((responded_at - received_at) * 1000).round }
       }
@@ -127,9 +129,9 @@ module AgentMock
     end
 
     # Sem texto do cliente nem display_name no log (RN-51).
-    def log_context(event, traceparent)
+    def log_context(event, traceparent, runtime)
       { trace_id: Log.trace_id(traceparent), event_id: event["event_id"], conversation_id: event["conversation_id"],
-        brand: event["brand"], turn: event["turn"] }
+        brand: event["brand"], turn: event["turn"], profile: runtime.config.profile, profile_source: runtime.source }
     end
 
     # Cabeçalho do Kafka pode vir como String ou, se repetido, como Array (rdkafka).

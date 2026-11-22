@@ -23,6 +23,8 @@ require_relative "agent_mock/tools"
 require_relative "agent_mock/scenarios/decision"
 require_relative "agent_mock/scenarios/rule"
 require_relative "agent_mock/scenarios/engine"
+require_relative "agent_mock/profile_source"
+require_relative "agent_mock/profiles"
 require_relative "agent_mock/publisher"
 require_relative "agent_mock/kafka"
 require_relative "agent_mock/responder"
@@ -32,6 +34,8 @@ module AgentMock
     # Configuração carregada uma vez por processo (config/scenarios.yml + ENV).
     def config = @config ||= Config.load
     def log = @log ||= Log.new
+    # Perfil por evento: o escolhido pelo simulador no Redis de controle, ou o AGENT_PROFILE (RF-38).
+    def profiles = @profiles ||= Profiles.new(config:, source: ProfileSource.build, log:)
     def clock = SystemClock
   end
 end

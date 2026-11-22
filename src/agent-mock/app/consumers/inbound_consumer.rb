@@ -15,6 +15,6 @@ class InboundConsumer < Karafka::BaseConsumer
   private
 
   def responder
-    @responder ||= AgentMock::Responder.new(producer:, config: AgentMock.config, log: AgentMock.log, clock: AgentMock.clock)
+    @responder ||= AgentMock::Responder.new(producer:, profiles: AgentMock.profiles, log: AgentMock.log, clock: AgentMock.clock)
   end
 end

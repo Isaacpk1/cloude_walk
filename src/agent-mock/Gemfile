@@ -11,6 +11,10 @@ gem "waterdrop", "~> 2.8"
 # Mesmo validador da plataforma e do broker: contrato na entrada e na saída (invariante 10).
 gem "helpdesk_contracts", path: "../contracts"
 
+# Perfil escolhido pelo simulador em tempo de execução (RF-38): lido do Redis a cada evento.
+# Opcional: sem AGENT_CONTROL_REDIS_URL vale só o AGENT_PROFILE.
+gem "redis", "~> 5.4"
+
 group :development, :test do
   gem "rspec", "~> 3.13"
   gem "karafka-testing", "~> 2.5"

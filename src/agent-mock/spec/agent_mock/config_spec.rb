@@ -8,8 +8,10 @@ RSpec.describe AgentMock::Config do
       expect(config.latency).to eq(described_class::Latency.new(min: 50, max: 150))
     end
 
-    it "lento tem latência maior e mudo não responde" do
-      expect(described_class.load(env: { "AGENT_PROFILE" => "lento" }).latency.min).to be >= 1000
+    it "lento passa do aviso de progresso (15 s, RN-57) e fica abaixo do prazo do turno (20 s, RN-46); mudo não responde" do
+      latency = described_class.load(env: { "AGENT_PROFILE" => "lento" }).latency
+      expect(latency.min).to be > 15_000
+      expect(latency.max).to be < 20_000
       expect(described_class.load(env: { "AGENT_PROFILE" => "mudo" }).mute).to be(true)
     end
 
