@@ -14,7 +14,7 @@ RSpec.describe "ROADMAP 10: fila humana no painel" do
   def row_for(ticket) = doc.at_css("#queue-ticket-#{ticket.id}")
 
   def escalated(time, identity:, brand: "infinitepay", priority: nil, reason: "pedido_do_cliente", source: "ingestion",
-                text: "quero falar com um atendente", **)
+                text: "meu repasse não caiu", **)
     at(time) do
       ticket = ingest(text, brand:, identity:).ticket
       ticket.update_columns(priority:)
@@ -61,7 +61,7 @@ RSpec.describe "ROADMAP 10: fila humana no painel" do
       visit_queue(t0 + 75.seconds)
 
       text = row_for(ticket).text.squish
-      expect(text).to include("##{ticket.id}", "quero falar com um atendente", "InfinitePay", "Escalas N1 · versão 1 (fila de escalas)",
+      expect(text).to include("##{ticket.id}", "meu repasse não caiu", "InfinitePay", "Escalas N1 · versão 1 (fila de escalas)",
                               "Pedido explícito do cliente (RN-34)", "Ingestão: mensagem do cliente",
                               "média (sem triagem, RN-13)", "1 min 15 s", "Resumo pendente")
       links = row_for(ticket).css("a").map { _1["href"] }
@@ -90,7 +90,7 @@ RSpec.describe "ROADMAP 10: fila humana no painel" do
     end
 
     it "conteúdo de fora é escapado" do
-      ticket = escalated(t0, identity: "acc_1", text: "<script>alert(1)</script> quero falar com um atendente")
+      ticket = escalated(t0, identity: "acc_1", text: "<script>alert(1)</script> meu repasse não caiu")
 
       visit_queue
 
@@ -138,7 +138,7 @@ RSpec.describe "ROADMAP 10: fila humana no painel" do
 
   describe "marca errada (invariante 6)" do
     let!(:ip_ticket) { escalated(t0, identity: "acc_ip") }
-    let!(:jim_ticket) { escalated(t0, identity: "acc_jim", brand: "jim", text: "I want to talk to a human") }
+    let!(:jim_ticket) { escalated(t0, identity: "acc_jim", brand: "jim", text: "my payout did not arrive") }
 
     it "?marca= mostra só a marca e nunca um caso de outra" do
       visit_queue(marca: "infinitepay")

@@ -12,7 +12,7 @@ RSpec.describe HumanQueue do
   # Um caso escalado em `time`, com a prioridade que tinha antes (nil: sem triagem) e o motivo.
   def escalated(time, identity:, brand: "infinitepay", priority: nil, reason: "pedido_do_cliente", source: "ingestion", **)
     at(time) do
-      ticket = ingest("quero falar com um atendente", brand:, identity:).ticket
+      ticket = ingest("meu repasse não caiu", brand:, identity:).ticket
       ticket.update_columns(priority:)
       request = record_handoff_requested(ticket, reason:, source:)
       record_full_escalation(ticket, request, **)

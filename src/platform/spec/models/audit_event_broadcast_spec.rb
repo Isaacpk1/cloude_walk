@@ -7,7 +7,7 @@ require "rails_helper"
 RSpec.describe AuditEvent, "RNF-06, invariante 2: broadcast do painel depois do commit", :concurrency do
   let!(:infinitepay) { create(:brand, :infinitepay) }
   let!(:jim) { create(:brand, :jim, locale: "en") }
-  let!(:ticket) { ingest("quero falar com um atendente").ticket }
+  let!(:ticket) { ingest("meu repasse não caiu").ticket }
   let(:pubsub) { ActionCable.server.pubsub }
 
   before { pubsub.clear }
