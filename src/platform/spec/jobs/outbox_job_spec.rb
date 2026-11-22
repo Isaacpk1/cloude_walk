@@ -134,6 +134,30 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
       expect(AuditEvent.where(ticket_id: ticket.id, event_type: "ticket.escalated").count).to eq(1)
     end
 
+    it "RN-42, RN-39: handoff.requested acorda, depois do commit, o aviso de transferência e o pedido de resumo" do
+      ticket = ingest.ticket
+      id = request_handoff(ticket)
+      clear_enqueued_jobs
+
+      described_class.perform_now(id)
+
+      notice = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "delivery.requested")
+      summary = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "handoff.summary")
+      expect(described_class).to have_been_enqueued.with(notice.id).on_queue("critical")
+      expect(described_class).to have_been_enqueued.with(summary.id).on_queue("critical")
+    end
+
+    it "RN-42: Redis fora ao acordar o aviso: o handoff já está gravado e a recuperação reoferece o item" do
+      ticket = ingest.ticket
+      id = request_handoff(ticket)
+      allow(described_class).to receive(:perform_later).and_raise(RedisClient::CannotConnectError)
+
+      expect { described_class.perform_now(id) }.not_to raise_error
+
+      expect(ticket.reload.state).to eq("aguardando_humano")
+      expect(OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "delivery.requested").completed_at).to be_nil
+    end
+
     it "RN-46: publicação esgotada acorda o handoff pedido pelo outbox" do
       stub_broker({ status: 401 })
       described_class.perform_now(due_dispatch(ingest).id)
