@@ -1,0 +1,25 @@
+<%# ROADMAP 09 (RF-34, RNF-16): tentativas e desfecho de um item do outbox (OutboxView). O erro de cada tentativa é o mesmo TimelineView::Error das etapas. %>
+<div class="outbox-attempts outbox-attempts--<%= item.outcome %>">
+  <p class="outbox-attempts__summary"><strong><%= item.type_label %></strong> <code class="muted"><%= item.event_type %></code>
+    <span class="badge badge--outbox-<%= item.outcome %>"><%= item.summary %></span>
+    <% if item.recovered_count.positive? %><span class="muted">reoferecido pela recuperação <%= item.recovered_count %>×</span><% end %>
+    <% if item.open? && item.next_attempt_at && item.attempts_count.positive? %><span class="muted">despertador às <%= panel_time(item.next_attempt_at) %></span><% end %>
+  </p>
+  <% if item.attempts.any? %>
+    <ol class="outbox-attempts__list">
+      <% item.attempts.each do |entry| %>
+        <li>
+          <% if entry.number %><strong>Tentativa <%= entry.number %></strong> · <% end %>
+          <time><%= panel_time(entry.at, precise: true) %></time>
+          <% if entry.duration_ms %> · <span class="mono"><%= entry.duration_ms %> ms</span><% end %>
+          · <%= entry.result_label %>
+          <% if (error = entry.error) %>
+            · <span class="outbox-attempts__error"><%= error.origin_label %><%= " · HTTP #{error.http_status}" if error.http_status %></span>
+            <% if error.message %><span class="muted">(<%= error.message %>)</span><% end %>
+          <% end %>
+          <% if entry.next_attempt_at %> · próxima às <%= panel_time(entry.next_attempt_at) %><% end %>
+        </li>
+      <% end %>
+    </ol>
+  <% end %>
+</div>

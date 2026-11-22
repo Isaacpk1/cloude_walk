@@ -57,11 +57,28 @@ class DeliveryEvents
 
   def events = audits.filter_map { event_for(_1) }
 
+  # Entregas em conciliação (ROADMAP 09; 07, seções 3.2 e 6): ainda em `sending` depois do
+  # delivery.reconciliation_needed. Uma confirmação posterior (callback do provedor) tira do destaque.
+  def reconciliations
+    deliveries.filter_map do |delivery|
+      audit = audits_for(delivery.delivery_id).reverse.find { _1.event_type == "delivery.reconciliation_needed" }
+      next unless audit && delivery.status == "sending"
+
+      ConversationView::Reconciliation.new(
+        delivery_id: delivery.delivery_id, seq: delivery.seq, turn: requested[delivery.delivery_id]&.data&.dig("turn"),
+        attempts: delivery.attempts, last_error: delivery.last_error, since: audit.occurred_at, waiting_seqs: waiting_seqs(delivery)
+      )
+    end
+  end
+
   private
 
   def deliveries
     @deliveries ||= Delivery.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id).order(:seq).to_a
   end
+
+  # Saídas abertas depois desta, que o envio segura enquanto ela não se encerrar (07, seção 3.2).
+  def waiting_seqs(delivery) = deliveries.select { _1.seq > delivery.seq && Delivery::OPEN.include?(_1.status) }.map(&:seq)
 
   def deliveries_by_message = @deliveries_by_message ||= deliveries.index_by(&:message_id)
   def deliveries_by_id = @deliveries_by_id ||= deliveries.index_by(&:delivery_id)
@@ -126,10 +143,17 @@ class DeliveryEvents
     when :delivery_retry_scheduled then "#{head}: tentativa #{data['attempt']} falhou, nova tentativa agendada"
     when :delivery_failed then "#{head}: falha definitiva na tentativa #{data['attempt']}"
     when :delivery_cancelled then "#{head}: cancelada antes do envio ao provedor"
-    when :delivery_reconciliation then "#{head}: resultado incerto após #{data['attempts']} tentativas"
+    when :delivery_reconciliation then reconciliation_detail(head, data, delivery)
     when :delivery_status
       "#{head}: provedor informou #{data['status']} (#{data['provider_message_id']}, às #{data['provider_timestamp']})"
     end
+  end
+
+  def reconciliation_detail(head, data, delivery)
+    waiting = waiting_seqs(delivery)
+    "#{head}: resultado incerto após #{data['attempts']} tentativas" \
+      "#{delivery.last_error ? "; último erro #{delivery.last_error}" : ''}; saídas seguintes aguardam a conciliação" \
+      "#{waiting.any? ? " (seq #{waiting.join(', ')})" : ''}"
   end
 
   def error(kind, data) = self.class.error_for(kind, data)

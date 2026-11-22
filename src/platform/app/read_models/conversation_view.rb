@@ -4,14 +4,15 @@
 # (07, seção 4) e preenche os mesmos campos. `grouping` (ConversationView::Grouping) é a fase de
 # agrupamento enquanto o turno da última mensagem não abriu (bloco 06); nil fora dela. `turn_refusal`
 # (ConversationView::TurnRefusal) é a recusa terminal desse turno, no lugar do agrupamento; nil fora dela.
+# `reconciliations` (ConversationView::Reconciliation) são as entregas em conciliação, em destaque (bloco 09).
 class ConversationView < Data.define(
   :id, :ticket_id, :brand_slug, :brand_name, :customer_name, :channel, :state, :title,
   :assignee, :assignment_version, :latest_customer_seq, :messages, :turns, :escalations, :source, :grouping,
-  :turn_refusal
+  :turn_refusal, :reconciliations
 )
-  def initialize(messages:, turns:, escalations:, grouping: nil, turn_refusal: nil, **rest)
+  def initialize(messages:, turns:, escalations:, grouping: nil, turn_refusal: nil, reconciliations: [], **rest)
     super(
-      grouping:, turn_refusal:,
+      grouping:, turn_refusal:, reconciliations: reconciliations.freeze,
       messages: messages.sort_by(&:seq).freeze,
       turns: turns.sort_by(&:number).freeze,
       escalations: escalations.sort_by(&:occurred_at).freeze,

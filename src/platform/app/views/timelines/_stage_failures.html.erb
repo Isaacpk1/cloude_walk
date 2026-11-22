@@ -1,0 +1,23 @@
+<%# ROADMAP 09 (RF-55): o motivo da falha em cada etapa do fluxo, com o rótulo do mesmo erro da etapa e o link para o evento. %>
+<section class="card stage-failures" aria-labelledby="stage-failures-title">
+  <h2 id="stage-failures-title">Falhas por etapa</h2>
+  <dl class="stage-failures__list">
+    <% timeline.failures_by_stage.each do |stage, failures| %>
+      <div class="<%= class_names("stage-failures__stage", "stage-failures__stage--failed" => failures.any?) %>">
+        <dt><%= TimelineView::Event::STAGES.fetch(stage) %></dt>
+        <dd>
+          <% if failures.empty? %>
+            <span class="muted">Sem falha registrada</span>
+          <% else %>
+            <ul>
+              <% failures.each do |event| %>
+                <li><%= link_to event.label, timeline_path(conversation.id, evento: timeline.events.index { _1.equal?(event) } + 1) %>:
+                  <strong><%= event.failure_label %></strong><% if event.error&.attempt %> <span class="muted">(tentativa <%= event.error.attempt %>)</span><% end %><% if event.error&.outcome_label %> · <%= event.error.outcome_label %><% end %></li>
+              <% end %>
+            </ul>
+          <% end %>
+        </dd>
+      </div>
+    <% end %>
+  </dl>
+</section>
