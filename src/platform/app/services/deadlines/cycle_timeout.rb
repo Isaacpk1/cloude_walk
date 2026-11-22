@@ -23,10 +23,14 @@ module Deadlines
       return [] if tickets.empty?
 
       traces = trace_ids(tickets)
+      # O turno eligible do ciclo, se houver (o painel liga o prazo ao turno); null sem turno publicado.
+      turns = AiTurn.eligible.joins(:ticket).where(ticket_id: tickets.map(&:id)).where("ai_turns.brand_id = tickets.brand_id")
+                    .group(:ticket_id).maximum(:turn)
       tickets.map do |ticket|
         Due.new(ticket:, dedup_key: self.class.dedup_key(ticket), payload: payload(ticket),
                 trace_id: traces[ticket.id] || SecureRandom.hex(16), deadline_at: ticket.ai_deadline_at,
-                audit: { first_pending_seq: ticket.first_pending_seq, assignment_version: ticket.assignment_version })
+                audit: { turn: turns[ticket.id], first_pending_seq: ticket.first_pending_seq,
+                        assignment_version: ticket.assignment_version })
       end
     end
 

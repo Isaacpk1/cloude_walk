@@ -34,7 +34,8 @@ module Deadlines
 
         Due.new(ticket:, dedup_key: self.class.dedup_key(turn), payload: payload(ticket, turn),
                 trace_id: traces[turn.event_id] || SecureRandom.hex(16), deadline_at: turn.deadline_at,
-                audit: { turn: turn.turn, event_id: turn.event_id, assignment_version: turn.assignment_version })
+                audit: { turn: turn.turn, first_pending_seq: ticket.first_pending_seq, event_id: turn.event_id,
+                        assignment_version: turn.assignment_version })
       end
     end
 

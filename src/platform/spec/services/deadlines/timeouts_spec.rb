@@ -37,7 +37,7 @@ RSpec.describe "RN-46: timeouts registrados pelo scheduler" do
                                  "assignment_version" => 0, "first_pending_seq" => 1,
                                  "deadline_at" => (now - 0.4.seconds).utc.iso8601(3))
       audit = AuditEvent.where(event_type: "turn.timeout_scheduled").sole
-      expect(audit.data).to include("outbox_event_id" => item.id, "turn" => turn.turn, "delay_ms" => 400,
+      expect(audit.data).to include("outbox_event_id" => item.id, "turn" => turn.turn, "first_pending_seq" => 1, "delay_ms" => 400,
                                     "deadline_at" => (now - 0.4.seconds).utc.iso8601(3))
       expect(OutboxJob).to have_been_enqueued.with(item.id)
     end
@@ -88,7 +88,8 @@ RSpec.describe "RN-46: timeouts registrados pelo scheduler" do
       expect(item.payload).to eq("ticket_id" => ticket.id, "first_pending_seq" => 1, "assignment_version" => 0,
                                  "ai_deadline_at" => (now - 0.2.seconds).utc.iso8601(3))
       expect(AuditEvent.where(event_type: "cycle.timeout_scheduled").sole.data)
-        .to include("outbox_event_id" => item.id, "delay_ms" => 200, "deadline_at" => (now - 0.2.seconds).utc.iso8601(3))
+        .to include("outbox_event_id" => item.id, "turn" => nil, "first_pending_seq" => 1, "delay_ms" => 200,
+                    "deadline_at" => (now - 0.2.seconds).utc.iso8601(3))
     end
 
     it "tempo no limite: ai_deadline_at igual a agora emite; 1 ms no futuro não" do
@@ -103,6 +104,15 @@ RSpec.describe "RN-46: timeouts registrados pelo scheduler" do
       ingest.ticket.update_columns(ai_deadline_at: now - 1.second, state: "aguardando_humano")
 
       expect(emit).to eq([])
+    end
+
+    it "com turno eligible no ciclo: a auditoria do prazo leva o número do turno" do
+      turn = opened_turn
+      turn.ticket.update_columns(ai_deadline_at: now - 1.second)
+
+      emit
+
+      expect(AuditEvent.where(event_type: "cycle.timeout_scheduled").sole.data).to include("turn" => turn.turn)
     end
 
     it "repetição: uma emissão por ciclo" do

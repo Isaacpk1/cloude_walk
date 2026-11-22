@@ -101,8 +101,11 @@ RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
 
       expect(result).to have_attributes(status: :discarded, reason: "atribuicao_mudou")
       expect(ticket.reload).to have_attributes(state: "novo", assignment_version: 3)
-      expect(audits(ticket, "handoff.discarded").sole.data).to include("reason" => "atribuicao_mudou",
-                                                                       "expected_version" => 0, "current_version" => 3)
+      # Formato combinado com o painel (A3): o data do pedido, o motivo do descarte e o motivo pedido.
+      expect(audits(ticket, "handoff.discarded").sole.data).to include(
+        OutboxEvent.find(id).payload.merge("reason" => "atribuicao_mudou", "handoff_reason" => "prazo_do_turno",
+                                           "expected_version" => 0, "current_version" => 3)
+      )
       expect(audits(ticket, "ticket.escalated")).to be_empty
       expect(OutboxEvent.find(id).completed_at).to be_present
     end
@@ -114,6 +117,16 @@ RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
 
       expect(escalate(id)).to have_attributes(status: :discarded, reason: "fora_da_ia")
       expect(audits(ticket, "ticket.escalated")).to be_empty
+    end
+
+    it "caso já na fila humana na mesma atribuição: ja_escalado" do
+      ticket = opened_turn.ticket
+      id = request_handoff(ticket, reason: "publicacao_falhou", source: "outbox")
+      ticket.update_columns(state: "aguardando_humano")
+
+      expect(escalate(id)).to have_attributes(status: :discarded, reason: "ja_escalado")
+      expect(audits(ticket, "handoff.discarded").sole.data).to include("reason" => "ja_escalado",
+                                                                       "handoff_reason" => "publicacao_falhou")
     end
   end
 

@@ -6,7 +6,9 @@
 # Chamado pelo OutboxJob para o item "handoff.requested", gravado por qualquer gatilho (Handoff::Request).
 # Uma transação, com o atendimento travado antes do item (a ordem do resto do sistema) e escopo pela marca do
 # item (invariante 6). O pedido vale só se a atribuição for a mesma do pedido e o caso ainda estiver com a IA;
-# senão o item encerra como descarte auditado (`handoff.discarded`). Válido:
+# senão o item encerra como descarte auditado (`handoff.discarded`, motivo `atribuicao_mudou`, `ja_escalado` se
+# o caso já está em `aguardando_humano`, ou `fora_da_ia`; `atendimento_inexistente` sem atendimento na marca do
+# item). Válido:
 #
 # - o caso vai a `aguardando_humano`, na fila padrão da marca com a versão atual dela (sem fila padrão, escala
 #   sem fila e registra `queue_missing`: o cliente não pode ficar preso na IA por falta de configuração);
@@ -59,7 +61,7 @@ module Handoff
       if expected != ticket.assignment_version
         return discard("atribuicao_mudou", expected_version: expected, current_version: ticket.assignment_version)
       end
-      return discard("fora_da_ia", state: ticket.state) unless ticket.with_ai?
+      return discard(ticket.state == "aguardando_humano" ? "ja_escalado" : "fora_da_ia", state: ticket.state) unless ticket.with_ai?
 
       escalate
     end
@@ -103,9 +105,13 @@ module Handoff
       end
     end
 
+    # O painel (A3) lê o `data` do pedido mais o motivo do descarte e o motivo pedido.
     def discard(reason, **data)
       complete(last_error: reason)
-      audit("handoff.discarded", reason:, **data)
+      AuditEvent.create!(brand_id: item.brand_id, ticket_id: ticket&.id, actor_type: "system", event_type: "handoff.discarded",
+                         trace_id: item.trace_id,
+                         data: payload.merge(data.transform_keys(&:to_s))
+                                      .merge("outbox_event_id" => item.id, "reason" => reason, "handoff_reason" => payload["reason"]))
       JsonLog.info("handoff.discarded", trace_id: item.trace_id, outbox_event_id: item.id, reason:)
       Result.new(status: :discarded, reason:)
     end
