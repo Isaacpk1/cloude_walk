@@ -13,6 +13,8 @@ RSpec.configure do |config|
     ChannelsMock::Inbox.clear
     ChannelsMock::ChatDeliveries.clear
     ChannelsMock::Faults.clear
+    # Redis de controle do perfil do agente em memória: os testes não dependem de um Redis de verdade.
+    ChannelsMock::AgentProfile.reset!(redis: FakeControlRedis.new, out: StringIO.new)
     ChannelsMock::StatusCallbacks.reset!(mode: :manual)
     # Relógio controlado: nada de sleep nem de Time.now nos testes.
     ChannelsMock::Clock.freeze(Time.utc(2026, 11, 20, 12, 0, 0))
