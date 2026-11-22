@@ -160,14 +160,14 @@ Todos são configuráveis. Os de origem *proposta* são escolhas deste projeto, 
 | Capacidade por analista | 5 atendimentos simultâneos | Proposta | RN-30 |
 | Capacidade do agente de IA (bot) | 1.000 atendimentos simultâneos, configurável pelo supervisor | Proposta | RN-30 |
 | Offline antes de devolver casos à fila | 10 min | Proposta | RN-31 |
-| Trocas da IA sem resolução antes de escalar | 10 mensagens | Proposta | RN-33 |
+| Trocas da IA sem resolução antes de escalar | 10 mensagens | Proposta. Ainda não decidida pela plataforma: o motivo `limite_de_trocas` já é aceito pelo pedido de handoff, e a contagem entra com a triagem (blocos 10 e 11) | RN-33 |
 | Tempo limite do agente por turno | 20 s desde a abertura do turno, limitado ao teto do ciclo. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)); calibrar com o p95 do agente real | RN-46 |
 | Teto do ciclo com a IA | 60 s desde a primeira mensagem pendente, sem reiniciar. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) | RN-46 |
 | Retentativas | 5, com backoff 1, 2, 4, 8, 16 s e jitter | RNF-16 | RN-43 |
 | Retenção mínima da DLQ | 7 dias | RNF-16 (prazo de reentrega do WhatsApp) | RN-48 |
 | Contexto do atendente | Todas as mensagens pendentes + 20 de histórico + 3 atendimentos em 90 dias. Limite de 16 000 caracteres nas pendentes e 32 000 no contexto inteiro (os resumos de atendimentos anteriores contam no limite) | Proposta | RN-49 |
 | Janela de agrupamento de mensagens | 1,5 s (chat e WhatsApp), 0 (e-mail), no máximo 4 s após a primeira mensagem pendente. Com janela 0, `dispatch_due_at` é o horário da gravação e o turno sai na volta seguinte do `scheduler` (até 250 ms). Canal sem janela definida na política da marca é erro na ingestão: nada é gravado | Proposta | RN-55 |
-| Aviso de progresso ao cliente | 15 s após a primeira mensagem pendente | Proposta | RN-57 |
+| Aviso de progresso ao cliente | 15 s após a primeira mensagem pendente, um por ciclo. Texto padrão por idioma em `Turns::Policy` (pt-BR: "Ainda estou verificando as informações para te responder. Só mais um instante."), configurável por marca no bloco 12 | Proposta, implementada no bloco 08 | RN-57 |
 | Horário de contagem do SLA | 24/7 | Suporte 24 h da InfinitePay | RN-24 |
 
 ### SLA padrão por prioridade (proposta)
