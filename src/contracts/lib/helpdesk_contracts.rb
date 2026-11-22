@@ -3,6 +3,7 @@ require "pathname"
 require "json_schemer"
 require_relative "helpdesk_contracts/version"
 require_relative "helpdesk_contracts/signature"
+require_relative "helpdesk_contracts/dead_letter"
 
 # Validador único dos contratos do help desk (07, seção 5; RNF-28; invariante 10).
 #
@@ -24,6 +25,8 @@ module HelpdeskContracts
     normalized_message: { file: "normalized_message.json", schema_name: "normalized_message" },
     agent_inbound: { file: "agent_inbound.json", schema_name: "agent_event" },
     agent_outbound: { file: "agent_outbound.json", schema_name: "agent_action" },
+    # Mensagem na DLQ (bloco 09): vista { key, headers, payload } da mensagem do Kafka, sem campo `schema`.
+    dead_letter: { file: "dead_letter.json", schema_name: nil },
     # Entrada dos canais (07, seção 5.0; ADR-018).
     chat_webhook: { file: "channels/chat.json", schema_name: nil },
     chat_status: { file: "channels/chat_status.json", schema_name: nil },
