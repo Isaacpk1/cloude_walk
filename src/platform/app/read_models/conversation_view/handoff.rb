@@ -3,11 +3,15 @@
 # :escalated (ticket.escalated: fila padrão da marca, assignment_version + 1, ciclo da IA encerrado) ou :discarded
 # (handoff.discarded, com `discard_reason`). `reason` e `source` são os do pedido. `waited_ms`: da gravação da primeira
 # mensagem pendente até a entrada na fila humana (RNF-18: até T + 2 s). `cancelled_deliveries`: as saídas pending da
-# atribuição antiga à IA canceladas pelo handoff (CancelledDelivery). Aviso de transferência e resumo: bloco 10.
+# atribuição antiga à IA canceladas pelo handoff (CancelledDelivery).
+# Bloco 10: `queue_version` e `queue_kind` (escalation | default | missing; RF-42), `priority` (a do caso agora) e
+# `priority_from`/`priority_to` (a subida da RN-41 nesta escalação, ou nil), `summary` (ConversationView::HandoffSummary;
+# RN-39, RN-40) e `transfer_notice` (ConversationView::TransferNotice; RN-42), nil antes da escalação.
 class ConversationView::Handoff < Data.define(:state, :reason, :source, :turn, :first_pending_seq, :requested_at,
                                               :resolved_at, :discard_reason, :from_assignment_version,
                                               :to_assignment_version, :queue_id, :queue_name, :waited_ms,
-                                              :cancelled_deliveries, :trace_id)
+                                              :cancelled_deliveries, :trace_id, :queue_version, :queue_kind,
+                                              :priority, :priority_from, :priority_to, :summary, :transfer_notice)
   CancelledDelivery = Data.define(:delivery_id, :seq, :kind)
 
   REASONS = {
@@ -38,11 +42,17 @@ class ConversationView::Handoff < Data.define(:state, :reason, :source, :turn, :
 
   STATES = %i[requested escalated discarded].freeze
 
-  def initialize(state:, cancelled_deliveries: [], **rest)
+  def initialize(state:, cancelled_deliveries: [], queue_version: nil, queue_kind: nil, priority: nil, priority_from: nil,
+                 priority_to: nil, summary: nil, transfer_notice: nil, **rest)
     raise ArgumentError, "estado do handoff desconhecido: #{state}" unless STATES.include?(state)
 
-    super(state:, cancelled_deliveries: cancelled_deliveries.freeze, **rest)
+    super(state:, cancelled_deliveries: cancelled_deliveries.freeze, queue_version:, queue_kind:, priority:, priority_from:,
+          priority_to:, summary:, transfer_notice:, **rest)
   end
+
+  def queue_label = HumanQueue::Entry.queue_label(queue_name, queue_version, queue_kind)
+  def priority_label = ConversationView::Priority.label(priority)
+  def priority_raise_label = priority_to && ConversationView::Priority.raise_label(priority_from, priority_to)
 
   def self.reason_label(reason) = reason && REASONS.fetch(reason, reason)
   def self.source_label(source) = source && SOURCES.fetch(source, source)

@@ -34,7 +34,7 @@ module HumanQueueRecordHelpers
     ticket.reload
     brand = ticket.brand
     queue = { "escalation" => -> { escalation_queue_for(brand) }, "default" => -> { default_queue_for(brand) } }
-            .fetch(queue_kind, -> {}).call
+            .fetch(queue_kind, -> { }).call
     from = ticket.assignment_version
     reason = request.data["reason"]
     policy = Handoff::Policy.for(brand)

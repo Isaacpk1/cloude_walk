@@ -38,6 +38,10 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     progress_scheduled: "Aviso de progresso agendado",
     progress_sent: "Aviso de progresso enviado",
     progress_discarded: "Aviso de progresso descartado",
+    human_requested: "Pedido de humano pelo cliente",
+    priority_raised: "Prioridade subiu",
+    summary_available: "Resumo disponível",
+    summary_missing: "Sem resumo",
     outbox_item: "Tentativas e desfecho",
     dead_letter: "DLQ"
   }.freeze
@@ -50,6 +54,7 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     intentional_wait: :publicacao, turn_opened: :publicacao, turn_not_opened: :publicacao, turn_superseded: :publicacao,
     published: :publicacao, publish_failed: :publicacao, publish_discarded: :publicacao,
     agent_run: :agente, applied: :aplicacao, discarded: :aplicacao, escalated: :aplicacao, assigned: :aplicacao,
+    human_requested: :ingestao, priority_raised: :aplicacao, summary_available: :aplicacao, summary_missing: :aplicacao,
     delivery_requested: :entrega, delivery_sending: :entrega, delivery_retry_scheduled: :entrega, delivered: :entrega,
     delivery_failed: :entrega, delivery_cancelled: :entrega, delivery_reconciliation: :entrega, delivery_status: :entrega
   }.freeze

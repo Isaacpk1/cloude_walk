@@ -15,11 +15,13 @@ class HumanQueue::Entry < Data.define(:ticket_id, :brand_slug, :brand_name, :cus
   def priority_label = ConversationView::Priority.label(priority)
   def priority_raise_label = priority_to && ConversationView::Priority.raise_label(priority_from, priority_to)
 
-  def queue_label
-    return NO_QUEUE if queue_name.nil?
+  def queue_label = self.class.queue_label(queue_name, queue_version, queue_kind)
 
-    kind = QUEUE_KINDS[queue_kind]
-    "#{queue_name} · versão #{queue_version}#{" (#{kind})" if kind}"
+  def self.queue_label(name, version, kind)
+    return NO_QUEUE if name.nil?
+
+    kind_label = QUEUE_KINDS[kind]
+    "#{name}#{" · versão #{version}" if version}#{" (#{kind_label})" if kind_label}"
   end
 
   def waiting_ms(now = Time.current) = TimelineView::Event.ms_between(escalated_at, now)

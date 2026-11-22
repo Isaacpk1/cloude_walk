@@ -1,0 +1,17 @@
+<%# Bloco 10, RN-39 e RN-40: resumo do handoff (ConversationView::HandoffSummary). Campos com o escape padrão do ERB. %>
+<section class="card handoff-summary handoff-summary--<%= summary.status %>" aria-label="Resumo do handoff">
+  <h2><%= summary.label %></h2>
+  <% if summary.available? %>
+    <dl class="handoff-summary__fields">
+      <% summary.field_rows.each do |label, value| %>
+        <dt><%= label %></dt><dd><%= value.presence || "—" %></dd>
+      <% end %>
+    </dl>
+    <% if summary.ms_since_escalated %><p class="muted"><%= summary.ms_since_escalated %> ms depois da escalação (RNF-06: p95 ≤ 5 s)</p><% end %>
+  <% elsif summary.missing? %>
+    <p>O histórico completo está nesta conversa: o caso escalou sem esperar o resumo (RN-40).</p>
+    <% if summary.ms_since_escalated %><p class="muted">Marcado <%= summary.ms_since_escalated %> ms depois da escalação.</p><% end %>
+  <% else %>
+    <p class="muted">A plataforma monta o resumo a partir do histórico; o caso já está na fila (RN-40).</p>
+  <% end %>
+</section>

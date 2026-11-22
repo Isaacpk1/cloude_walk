@@ -1,0 +1,11 @@
+<%# Bloco 10, RN-42, RN-38 e RF-43: aviso de transferência e o estado da entrega (ConversationView::TransferNotice). %>
+<section class="card transfer-notice transfer-notice--<%= notice.status %>" aria-label="Aviso de transferência">
+  <h2>Aviso de transferência</h2>
+  <p>“<%= notice.text %>”</p>
+  <dl class="turn__facts">
+    <dt>saída</dt><dd><a href="#seq-<%= notice.seq %>">seq <%= notice.seq %></a> · handoff_notice · <code><%= notice.delivery_id.first(8) %></code></dd>
+    <dt>entrega</dt><dd><span class="transfer-notice__status"><%= notice.label %></span><% if notice.attempts.to_i.positive? %> <span class="muted">(<%= notice.attempts %> tentativa(s))</span><% end %></dd>
+    <% if notice.delivered_at %><dt>entregue às</dt><dd><%= panel_time(notice.delivered_at, precise: true) %></dd><% end %>
+  </dl>
+  <p class="muted">O aviso vem antes das respostas do analista e espera a conciliação de uma saída anterior incerta (RN-42, RN-38).</p>
+</section>

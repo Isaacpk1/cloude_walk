@@ -94,7 +94,7 @@ class HumanQueue
   def entry(ticket, audits, summaries, versions)
     escalated = audits.find { _1.id == ticket.escalation_audit_id }
     data = escalated&.data || {}
-    raised = priority_raised(audits, escalated)
+    raised = HandoffPhase.priority_raised(audits, escalated)
     version = versions[[ ticket.brand_id, ticket.queue_id, ticket.queue_version ]]
     HumanQueue::Entry.new(
       ticket_id: ticket.id, brand_slug: ticket.brand.slug, brand_name: ticket.brand.name,
@@ -105,14 +105,6 @@ class HumanQueue
       escalated_at: escalated&.occurred_at || ticket.updated_at,
       summary: summary(summaries[ticket.id], audits, data["from_assignment_version"]), trace_id: escalated&.trace_id
     )
-  end
-
-  # A subida de prioridade desta escalação: a ticket.priority_raised depois do ticket.escalated anterior.
-  def priority_raised(audits, escalated)
-    return unless escalated
-
-    previous = audits.select { _1.event_type == "ticket.escalated" && _1.id < escalated.id }.map(&:id).max || 0
-    audits.reverse.find { _1.event_type == "ticket.priority_raised" && _1.id > previous }
   end
 
   def summary(record, audits, from_version)
