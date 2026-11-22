@@ -91,6 +91,14 @@ module HandoffRecordHelpers
                                                           "first_pending_seq" => ticket.first_pending_seq)
   end
 
+  # Formato do Deadlines::Expire#discard: o payload do item (turn, first_pending_seq, assignment_version, prazo) e o motivo.
+  def record_timeout_discarded(ticket, scope:, reason:, turn: nil, trace_id: SecureRandom.hex(16))
+    ticket.reload
+    audit(ticket, "#{scope}.timeout_discarded", trace_id, "timeout" => "#{scope}.timeout", "reason" => reason,
+                                                          "turn" => turn&.turn, "first_pending_seq" => ticket.first_pending_seq,
+                                                          "assignment_version" => ticket.assignment_version)
+  end
+
   def record_turn_expired(turn, trace_id: SecureRandom.hex(16))
     turn.update_columns(status: "expired")
     audit(turn.ticket, "ai_turn.expired", trace_id, "turn" => turn.turn, "deadline_at" => turn.deadline_at.utc.iso8601(3),

@@ -33,6 +33,7 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     turn_expired: "Turno expirado",
     handoff_requested: "Pedido de handoff",
     handoff_discarded: "Pedido de handoff descartado",
+    timeout_discarded: "Prazo descartado pelo worker",
     progress_scheduled: "Aviso de progresso agendado",
     progress_sent: "Aviso de progresso enviado",
     progress_discarded: "Aviso de progresso descartado"

@@ -10,7 +10,19 @@
 # Isolamento por marca (invariante 6): auditoria, turnos, mensagens e fila filtrados pelo brand_id do atendimento.
 class DeadlineEvents
   AUDITS = %w[turn.timeout_scheduled cycle.timeout_scheduled ai_turn.expired handoff.requested handoff.discarded
-              ticket.escalated progress.notice_scheduled progress.notice_sent progress.notice_discarded].freeze
+              ticket.escalated progress.notice_scheduled progress.notice_sent progress.notice_discarded
+              turn.timeout_discarded cycle.timeout_discarded].freeze
+
+  # Motivos do Deadlines::Expire#discard (07, seção 6): o timeout ficou obsoleto antes do worker.
+  TIMEOUT_DISCARDS = {
+    "turno_applied" => "a resposta da IA já tinha sido aplicada",
+    "turno_superseded" => "o turno foi superado por uma mensagem nova do cliente",
+    "turno_expired" => "o turno já estava expirado",
+    "atribuicao_mudou" => "o atendimento mudou de responsável desde o registro",
+    "fora_da_ia" => "o caso já não estava com a IA",
+    "ciclo_encerrado" => "o ciclo já tinha sido encerrado",
+    "ciclo_mudou" => "outro ciclo começou depois do registro"
+  }.freeze
 
   def initialize(ticket)
     @ticket = ticket
@@ -30,6 +42,7 @@ class DeadlineEvents
   def event_for(audit)
     case audit.event_type
     when "turn.timeout_scheduled", "cycle.timeout_scheduled" then timeout_scheduled(audit)
+    when "turn.timeout_discarded", "cycle.timeout_discarded" then timeout_discarded(audit)
     when "ai_turn.expired" then turn_expired(audit)
     when "handoff.requested" then handoff_requested(audit)
     when "handoff.discarded" then handoff_discarded(audit)
@@ -54,6 +67,19 @@ class DeadlineEvents
                                      detail: "#{what} vencido às #{clock(data['deadline_at'])}: o scheduler registrou " \
                                              "#{audit.event_type.delete_suffix('_scheduled')} no outbox #{data['delay_ms']} ms depois",
                                      cause: cause("scheduler", reason, "O worker revalida sob o lock e pede o handoff (RF-36)"))
+  end
+
+  def timeout_discarded(audit)
+    data = audit.data
+    turn = audit.event_type == "turn.timeout_discarded" ? data["turn"] : nil
+    scheduled = audits.find { _1.event_type == audit.event_type.sub("_discarded", "_scheduled") && _1.id < audit.id && _1.data["turn"] == turn &&
+                              _1.data["first_pending_seq"] == data["first_pending_seq"] }
+    what = turn ? "Prazo do turno #{turn}" : "Teto do ciclo (primeira pendente seq #{data['first_pending_seq']})"
+    label = TIMEOUT_DISCARDS.fetch(data["reason"], data["reason"])
+    build(audit, :timeout_discarded, started_at: scheduled&.occurred_at, seq: seq_for(turn, data), turn:,
+                                     detail: "#{what} descartado: #{label}",
+                                     cause: TimelineView::Cause.new(origin: "worker", reason: data["reason"], reason_label: label,
+                                                                    outcome: "Sem handoff: o caso continua como estava"))
   end
 
   def turn_expired(audit)
@@ -126,7 +152,7 @@ class DeadlineEvents
       label = ConversationView::ProgressNotice::REASONS.fetch(data["reason"], data["reason"])
       build(audit, :progress_discarded, started_at: scheduled&.occurred_at, seq: data["first_pending_seq"], turn: nil,
                                         detail: "Aviso de progresso descartado: #{label}",
-                                        cause: TimelineView::Cause.new(origin: "worker", reason: data["reason"],
+                                        cause: TimelineView::Cause.new(origin: data["source"] || "worker", reason: data["reason"],
                                                                        reason_label: label, outcome: "Nenhuma saída gravada"))
     end
   end

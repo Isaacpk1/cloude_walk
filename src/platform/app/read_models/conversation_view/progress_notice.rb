@@ -15,7 +15,10 @@ class ConversationView::ProgressNotice < Data.define(:state, :first_pending_seq,
     "ciclo_encerrado" => "o ciclo já tinha sido encerrado quando o aviso venceu",
     "ciclo_mudou" => "o ciclo mudou desde o registro do aviso",
     "fora_da_ia" => "o caso já não estava com a IA",
-    "atribuicao_mudou" => "o atendimento mudou de responsável desde o registro do aviso"
+    "atribuicao_mudou" => "o atendimento mudou de responsável desde o registro do aviso",
+    "ciclo_novo" => "outro ciclo começou depois do registro do aviso",
+    "handoff_pedido" => "já havia um pedido de handoff para a atribuição atual",
+    "prazo_vencido" => "o teto do ciclo já tinha vencido (RN-46)"
   }.freeze
 
   def initialize(state:, scheduled_at: nil, delay_ms: nil, occurred_at: nil, delivery_id: nil, seq: nil,

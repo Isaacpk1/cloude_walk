@@ -99,6 +99,43 @@ RSpec.describe "RN-46, RN-57, RF-36, RF-56, RNF-18: prazos e handoff na linha do
     expect(discarded.cause.origin_label).to eq("Worker: ação do outbox revalidada sob o lock")
   end
 
+  it "RN-46: timeout do turno descartado pelo worker aparece com o turno e o motivo" do
+    turn = at(t0 + 1.5.seconds) { record_turn_06(ticket) }
+    at(t0 + 21.6.seconds) { record_timeout_scheduled(ticket, scope: :turn, turn:) }
+    at(t0 + 21.7.seconds) { record_timeout_discarded(ticket, scope: :turn, turn:, reason: "turno_applied") }
+
+    event = of(:timeout_discarded).sole
+    expect(event).to have_attributes(turn: 1, seq: 1, duration_ms: 100)
+    expect(event.detail).to eq("Prazo do turno 1 descartado: a resposta da IA já tinha sido aplicada")
+    expect(event.cause).to have_attributes(origin: "worker", reason: "turno_applied", outcome: "Sem handoff: o caso continua como estava")
+  end
+
+  it "07, seção 6: teto de um ciclo anterior descartado com ciclo_mudou" do
+    at(t0 + 60.1.seconds) { record_timeout_scheduled(ticket, scope: :cycle) }
+    at(t0 + 60.2.seconds) { record_timeout_discarded(ticket, scope: :cycle, reason: "ciclo_mudou") }
+
+    event = of(:timeout_discarded).sole
+    expect(event).to have_attributes(turn: nil, seq: 1)
+    expect(event.detail).to eq("Teto do ciclo (primeira pendente seq 1) descartado: outro ciclo começou depois do registro")
+  end
+
+  it "RN-57: todo motivo de descarte do aviso gravado pelo serviço tem rótulo" do
+    %w[fora_da_ia resposta_aplicada ciclo_encerrado ciclo_novo handoff_pedido prazo_vencido].each do |reason|
+      expect(ConversationView::ProgressNotice::REASONS).to have_key(reason)
+    end
+  end
+
+  it "RN-57: descarte do aviso pelo scheduler mostra a origem scheduler" do
+    at(t0 + 15.2.seconds) do
+      audit(ticket.reload, "progress.notice_discarded", SecureRandom.hex(16),
+            "reason" => "handoff_pedido", "source" => "scheduler", "first_pending_seq" => 1)
+    end
+
+    event = of(:progress_discarded).sole
+    expect(event.cause).to have_attributes(origin: "scheduler", reason: "handoff_pedido")
+    expect(event.detail).to eq("Aviso de progresso descartado: já havia um pedido de handoff para a atribuição atual")
+  end
+
   it "invariante 6: os registros de um atendimento de outra marca não entram" do
     other = at(t0) { ingest("oi da JIM", brand: "jim", identity: "acc_jim_000021").ticket }
     at(t0 + 60.1.seconds) do

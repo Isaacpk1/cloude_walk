@@ -61,6 +61,7 @@ RSpec.describe Deadlines::Expire, "RN-46: worker dos timeouts do turno e do cicl
     it "resposta aplicada antes do worker: descarte turno_applied, sem handoff" do
       turn = opened_turn
       id = turn_timeout_for(turn)
+      registered = OutboxEvent.find(id).payload.fetch("deadline_at")
       # A resposta chegou antes do prazo e foi aplicada; o item do timeout ficou na fila.
       turn.update_columns(deadline_at: now + 5.seconds)
       AgentActions::Apply.call(agent_action_for(turn.reload), traceparent: AgentActionHelpers::TRACEPARENT)
@@ -69,7 +70,9 @@ RSpec.describe Deadlines::Expire, "RN-46: worker dos timeouts do turno e do cicl
 
       expect(result).to have_attributes(status: :discarded, reason: "turno_applied")
       expect(handoff_items).to be_empty
-      expect(audits(turn.ticket, "turn.timeout_discarded").sole.data).to include("reason" => "turno_applied")
+      expect(audits(turn.ticket, "turn.timeout_discarded").sole.data)
+        .to include("reason" => "turno_applied", "turn" => turn.turn, "first_pending_seq" => 1,
+                    "assignment_version" => turn.assignment_version, "deadline_at" => registered)
       expect(OutboxEvent.find(id).completed_at).to be_present
     end
 
@@ -135,7 +138,8 @@ RSpec.describe Deadlines::Expire, "RN-46: worker dos timeouts do turno e do cicl
 
       expect(described_class.call(id)).to have_attributes(status: :discarded, reason: "ciclo_mudou")
       expect(handoff_items).to be_empty
-      expect(audits(ticket, "cycle.timeout_discarded").sole.data).to include("reason" => "ciclo_mudou")
+      expect(audits(ticket, "cycle.timeout_discarded").sole.data)
+        .to include("reason" => "ciclo_mudou", "first_pending_seq" => 1, "turn" => nil)
     end
 
     it "caso fora da IA: descarte fora_da_ia" do

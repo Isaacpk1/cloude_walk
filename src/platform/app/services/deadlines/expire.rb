@@ -108,9 +108,17 @@ module Deadlines
 
     def discard(reason)
       complete(last_error: reason)
-      audit("#{kind}.timeout_discarded", reason:)
+      audit("#{kind}.timeout_discarded", **discard_facts, reason:)
       JsonLog.info("deadline.discarded", trace_id: item.trace_id, outbox_event_id: item.id, event_type: item.event_type, reason:)
       Result.new(status: :discarded, reason:)
+    end
+
+    # O painel liga o descarte ao turno e ao ciclo do item (bloco 08, item 5).
+    def discard_facts
+      payload = item.payload
+      { turn: payload["turn"], first_pending_seq: payload["first_pending_seq"],
+        assignment_version: payload["assignment_version"],
+        deadline_at: payload["deadline_at"] || payload["ai_deadline_at"] }
     end
 
     def complete(last_error: nil) = item.update!(completed_at: Time.current, lease_until: nil, last_error:)
