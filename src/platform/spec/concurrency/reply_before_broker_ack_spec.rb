@@ -82,7 +82,7 @@ RSpec.describe "RN-56, RNF-14: resposta válida antes do ACK do broker", :concur
     expect_single_applied_reply(turn)
   end
 
-  it "ACK perdido por timeout: a retentativa da recuperação descarta o evento do turno applied e audita, sem reenviar" do
+  it "ACK perdido por timeout: a recuperação encerra o evento do turno applied como obsoleto e audita, sem reenviar" do
     stub_broker_with_early_reply(-> { raise Net::ReadTimeout })
 
     turn, publish = open_and_publish
@@ -92,22 +92,26 @@ RSpec.describe "RN-56, RNF-14: resposta válida antes do ACK do broker", :concur
     expect(turn_item(turn)).to have_attributes(published_at: nil, completed_at: nil)
     expect_single_applied_reply(turn) # a falha da confirmação não reverte a resposta
 
-    # O despertador da retentativa se perdeu: a recuperação reoferece o item depois da carência.
+    # O despertador da retentativa se perdeu: depois da carência, a recuperação revalida o turno sob o lock e
+    # encerra o item obsoleto sem acordar o worker (07, seção 6; RF-34 + RF-35).
     travel_to(turn_item(turn).next_attempt_at + Outbox::Recover::GRACE, with_usec: true) do
       clear_enqueued_jobs
-      expect(Outbox::Recover.call).to include(turn.event_id)
-      OutboxJob.perform_now(turn.event_id)
+      expect(Outbox::Recover.call).not_to include(turn.event_id)
+      expect(enqueued_jobs.map { _1[:args] }).not_to include([ turn.event_id ])
+      OutboxJob.perform_now(turn.event_id) # o despertador perdido que reaparece não muda nada
     end
 
-    expect(@broker_calls.size).to eq(1) # 07, seção 6: o worker revalida o turno e encerra o item obsoleto
-    expect(turn_item(turn)).to have_attributes(published_at: nil, completed_at: be_present, attempts: 2)
-    expect(AuditEvent.where(ticket_id: turn.ticket_id, event_type: "agent_event.discarded").sole.data)
-      .to include("event_id" => turn.event_id, "reason" => "turno_applied", "turn" => 1)
+    expect(@broker_calls.size).to eq(1)
+    expect(turn_item(turn)).to have_attributes(published_at: nil, completed_at: be_present, attempts: 1,
+                                               last_error: "obsoleto: turno_applied")
+    expect(AuditEvent.where(ticket_id: turn.ticket_id, event_type: "outbox.closed_obsolete").sole.data)
+      .to include("outbox_event_id" => turn.event_id, "reason" => "turno_applied", "event_type" => "agent.event")
+    expect(AuditEvent.where(ticket_id: turn.ticket_id, event_type: "agent_event.discarded")).to be_empty
     expect_single_applied_reply(turn)
     travel_to(t0 + 60.seconds, with_usec: true) { expect(Outbox::Recover.call).not_to include(turn.event_id) }
   end
 
-  it "ACK perdido de vez (o worker cai com a reserva): a recuperação só reoferece depois da reserva e o item é descartado" do
+  it "ACK perdido de vez (o worker cai com a reserva): a recuperação só decide depois da reserva e encerra o item obsoleto" do
     stub_broker_with_early_reply(-> { raise worker_killed, "worker morto antes da resposta do broker" })
 
     expect { open_and_publish }.to raise_error(worker_killed)
@@ -118,14 +122,15 @@ RSpec.describe "RN-56, RNF-14: resposta válida antes do ACK do broker", :concur
     expect(item).to have_attributes(published_at: nil, completed_at: nil, attempts: 1, lease_until: be_present)
 
     travel_to(item.lease_until - 1.second, with_usec: true) { expect(Outbox::Recover.call).not_to include(turn.event_id) }
+    expect(turn_item(turn).completed_at).to be_nil
     travel_to(item.lease_until + 1.second, with_usec: true) do
-      expect(Outbox::Recover.call).to include(turn.event_id)
+      expect(Outbox::Recover.call).not_to include(turn.event_id)
       OutboxJob.perform_now(turn.event_id)
     end
 
     expect(@broker_calls.size).to eq(1)
     expect(turn_item(turn)).to have_attributes(published_at: nil, completed_at: be_present)
-    expect(AuditEvent.where(ticket_id: turn.ticket_id, event_type: "agent_event.discarded").sole.data["reason"])
+    expect(AuditEvent.where(ticket_id: turn.ticket_id, event_type: "outbox.closed_obsolete").sole.data["reason"])
       .to eq("turno_applied")
     expect_single_applied_reply(turn)
   end
