@@ -5,7 +5,8 @@
 # Quem decide escalar chama dentro da própria transação, com o atendimento já travado (invariante 2: o
 # efeito fora do banco, o worker, só é acordado depois do commit por quem chamou). Um pedido por atribuição:
 # a chave `handoff:<ticket_id>:<assignment_version>` faz o segundo gatilho na mesma atribuição colidir no
-# índice único do outbox e não gravar nada (nil). A auditoria `handoff.requested` só sai com o item gravado.
+# índice único do outbox e não gravar nada (nil). A auditoria `handoff.requested` só sai com o item gravado, e o
+# aviso de progresso do ciclo deixa de ser devido (progress_due_at nulo; RN-57).
 module Handoff
   class Request
     EVENT_TYPE = "handoff.requested".freeze
@@ -34,7 +35,12 @@ module Handoff
               payload:, trace_id: @trace_id, next_attempt_at: now, created_at: now }
       id = OutboxEvent.insert_all([ row ], unique_by: :index_outbox_events_on_dedup_key, returning: [ :id ],
                                            record_timestamps: false).rows.first&.first
-      audit(id) if id
+      return unless id
+
+      audit(id)
+      # RN-57: com o handoff pedido, o aviso do ciclo não é mais devido (o worker o descartaria por handoff_pedido).
+      # No próprio objeto travado de quem chamou: sem tocar o lock_version, para ele seguir válido no resto da transação.
+      @ticket.update_columns(progress_due_at: nil) if @ticket.progress_due_at
       id
     end
 
