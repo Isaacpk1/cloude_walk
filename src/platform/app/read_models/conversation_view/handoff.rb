@@ -16,14 +16,18 @@ class ConversationView::Handoff < Data.define(:state, :reason, :source, :turn, :
     "publicacao_falhou" => "Publicação do turno falhou de forma definitiva (RN-46)",
     "contexto_excede_limite" => "Contexto excede o limite do turno (RN-49)",
     "falha_de_integracao" => "Falha de integração: evento do turno na DLQ (RN-45)",
-    "limite_de_trocas" => "Limite de trocas com a IA sem resolver (RN-33)"
+    "limite_de_trocas" => "Limite de trocas com a IA sem resolver (RN-33)",
+    "pedido_do_cliente" => "Pedido explícito do cliente (RN-34)",
+    "decisao_do_agente" => "Decisão do agente de IA: ação escalate (RN-33)"
   }.freeze
 
   SOURCES = {
     "scheduler" => "Scheduler: prazo vencido no Postgres (ADR-016)",
     "outbox" => "Outbox: publicação para o agente",
     "turns" => "Abertura do turno",
-    "dlq" => "DLQ da plataforma"
+    "dlq" => "DLQ da plataforma",
+    "ingestion" => "Ingestão: mensagem do cliente",
+    "agent" => "Agente de IA: ação do turno"
   }.freeze
 
   DISCARD_REASONS = {
