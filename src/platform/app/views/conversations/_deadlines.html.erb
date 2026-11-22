@@ -1,0 +1,40 @@
+<%# Bloco 08, RN-46 e RN-57: prazos do atendimento e aviso de progresso do ciclo (ConversationView::Deadlines). Texto gravado só com o escape padrão do ERB. %>
+<section class="card deadlines" aria-label="Prazos do atendimento">
+  <h2>Prazos do atendimento<% unless deadlines.pending %> <span class="muted">· Ciclo encerrado</span><% end %></h2>
+  <% if deadlines.pending %>
+    <dl class="turn__facts">
+      <dt>Teto do ciclo</dt>
+      <dd><time datetime="<%= deadlines.ai_deadline_at&.iso8601(3) %>"><%= deadlines.ai_deadline_at ? panel_time(deadlines.ai_deadline_at, precise: true) : "sem teto gravado" %></time>
+        <% if deadlines.remaining_text %><strong class="<%= class_names("deadline", "deadline--overdue" => deadlines.overdue) %>"><%= deadlines.remaining_text %></strong><% end %>
+        <span class="muted">(60 s desde a primeira pendente, seq <%= deadlines.first_pending_seq %>; RN-46)</span></dd>
+      <% if deadlines.turn %>
+        <dt>Prazo do turno <%= deadlines.turn %></dt>
+        <dd><time datetime="<%= deadlines.turn_deadline_at.iso8601(3) %>"><%= panel_time(deadlines.turn_deadline_at, precise: true) %></time>
+          <strong class="<%= class_names("deadline", "deadline--overdue" => deadlines.turn_overdue) %>"><%= deadlines.turn_remaining_text %></strong>
+          <span class="muted"><%= deadlines.turn_limited_by_cycle ? "(limitado pelo teto do ciclo; ADR-020)" : "(20 s desde a abertura; RN-46)" %></span></dd>
+      <% else %>
+        <dt>Prazo do turno</dt><dd class="muted">sem turno aberto: vale o teto do ciclo</dd>
+      <% end %>
+    </dl>
+  <% end %>
+  <% if (progress = deadlines.progress) %>
+    <h3>Aviso de progresso <span class="badge badge--progress badge--progress-<%= progress.state %>"><%= progress.state_label %></span></h3>
+    <dl class="turn__facts">
+      <% if progress.due_at %>
+        <dt>previsto para</dt><dd><time datetime="<%= progress.due_at.iso8601(3) %>"><%= panel_time(progress.due_at, precise: true) %></time> <span class="muted">(15 s desde a primeira pendente; RN-57)</span></dd>
+      <% end %>
+      <% if progress.scheduled_at %>
+        <dt>registrado pelo scheduler</dt><dd><%= panel_time(progress.scheduled_at, precise: true) %> <span class="muted">(<%= progress.delay_ms %> ms depois)</span></dd>
+      <% elsif progress.overdue %>
+        <dt>situação</dt><dd>horário passou: aguardando o scheduler registrar o aviso</dd>
+      <% end %>
+      <% if progress.delivery_id %>
+        <dt>saída</dt><dd><a href="#seq-<%= progress.seq %>">seq <%= progress.seq %></a> · <code><%= progress.delivery_id.first(8) %></code> · entrega <%= progress.delivery_status_label %></dd>
+      <% end %>
+      <% if progress.occurred_at && progress.state != :scheduled %>
+        <dt><%= progress.state == :discarded ? "descartado às" : "gravado às" %></dt><dd><%= panel_time(progress.occurred_at, precise: true) %></dd>
+      <% end %>
+      <% if progress.reason %><dt>motivo</dt><dd><%= progress.reason_label %></dd><% end %>
+    </dl>
+  <% end %>
+</section>
