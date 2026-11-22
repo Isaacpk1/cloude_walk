@@ -150,6 +150,30 @@ RSpec.describe "Broker de webhooks (RF-30, RNF-23, RNF-28)" do
     end
   end
 
+  describe "RN-44, RN-45: a mensagem na DLQ segue o contrato dead_letter" do
+    def dead_letter_errors(message)
+      view = HelpdeskContracts::DeadLetter.view(headers: message[:headers], payload: message[:payload], key: message[:key])
+      HelpdeskContracts.errors(:dead_letter, view).map(&:to_s)
+    end
+
+    {
+      "fora do contrato" => -> { post_webhook(event.tap { _1.delete("turn") }) },
+      "JSON malformado e sem event_id no cabeçalho" => lambda {
+        post_webhook(nil, body: "{nao e json", headers: { "HTTP_X_HELPDESK_EVENT_ID" => nil })
+      },
+      "event_id divergente" => -> { post_webhook(event, headers: { "HTTP_X_HELPDESK_EVENT_ID" => SecureRandom.uuid }) },
+      "sem traceparent" => -> { post_webhook(event, headers: { "HTTP_TRACEPARENT" => nil }) }
+    }.each do |name, send_webhook|
+      it "#{name}: dlq_source broker e cabeçalhos válidos no esquema" do
+        instance_exec(&send_webhook)
+
+        expect(dlq.size).to eq(1)
+        expect(dlq.first[:headers]["dlq_source"]).to eq("broker")
+        expect(dead_letter_errors(dlq.first)).to eq([])
+      end
+    end
+  end
+
   describe "RNF-15: repetição" do
     it "publica uma vez o mesmo event_id reentregue e confirma de novo com o mesmo resultado" do
       payload = event

@@ -438,6 +438,30 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
     end
   end
 
+  describe "RN-44, RN-45: a mensagem da plataforma na DLQ segue o contrato dead_letter" do
+    def dead_letter_errors(message)
+      view = HelpdeskContracts::DeadLetter.view(headers: message[:headers], payload: message[:payload], key: message[:key])
+      HelpdeskContracts.errors(:dead_letter, view).map(&:to_s)
+    end
+
+    {
+      "contrato" => -> { agent_action_for(turn, action: "refund") },
+      "JSON malformado" => -> { "{nao é json" },
+      "conteudo_invalido" => -> { agent_action_for(turn, reply: { "text" => "oi\u0000" }) },
+      "marca_divergente" => -> { agent_action_for(turn, brand: "jim") },
+      "turno_inexistente" => -> { agent_action_for(turn, conversation_id: "tkt_999999999") },
+      "conversation_id que não é texto" => -> { agent_action_for(turn, conversation_id: 42) },
+      "conversation_id vazio" => -> { agent_action_for(turn, conversation_id: "") }
+    }.each do |name, build|
+      it "#{name}: dlq_source platform e cabeçalhos válidos no esquema" do
+        described_class.call(instance_exec(&build), traceparent: nil)
+
+        expect(dead_letters.sole[:headers]).to include("dlq_source" => "platform")
+        expect(dead_letter_errors(dead_letters.sole)).to eq([])
+      end
+    end
+  end
+
   describe "invariante 13, RN-51: log em JSON sem dados do cliente" do
     it "registra trace_id, event_id, in_reply_to, conversation_id, status e motivo, sem o texto da resposta" do
       lines = []

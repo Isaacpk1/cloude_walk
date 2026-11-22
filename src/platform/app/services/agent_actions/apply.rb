@@ -352,10 +352,13 @@ module AgentActions
     end
 
     # RN-44, invariante 10: o corpo vai como chegou, para o supervisor ver e reprocessar (RF-37, bloco 09).
-    # Sem retentativa da ação; se o Kafka recusar, o erro sobe e o offset não é confirmado.
+    # Sem retentativa da ação; se o Kafka recusar, o erro sobe e o offset não é confirmado. Sem conversation_id
+    # em texto, vai sem chave: o WaterDrop recusa chave vazia ou que não é texto, e o erro travaria a partição.
+    # Formato: contrato dead_letter (src/contracts/v1/schemas/dead_letter.json).
     def dead_letter(outcome)
+      key = field("conversation_id")
       Karafka.producer.produce_sync(
-        topic: TOPICS.fetch(:dlq), key: field("conversation_id"), payload: @raw,
+        topic: TOPICS.fetch(:dlq), key: (key if key.is_a?(String) && !key.empty?), payload: @raw,
         headers: { "dlq_reason" => outcome.reason, "dlq_source" => "platform",
                    "dlq_violations" => JSON.generate(outcome.dead_letter), "event_id" => (field("event_id") || @header_event_id).to_s,
                    "traceparent" => @traceparent.to_s }
