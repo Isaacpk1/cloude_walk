@@ -69,15 +69,11 @@ module Outbox
 
     def evaluation? = Ticket.where(id: item.ticket_id, brand_id: item.brand_id).pick(:evaluation) == true
 
+    # Turno superado, vencido, de outra atribuição ou de caso que saiu da IA (Outbox::Obsolescence).
     def stale_reason
       return unless turn
-      return "turno_#{turn.status}" unless turn.eligible?
-      return "prazo_vencido" if Time.current >= turn.deadline_at
 
-      ticket = Ticket.find_by(id: turn.ticket_id, brand_id: item.brand_id)
-      return "atribuicao_mudou" if ticket&.assignment_version != turn.assignment_version
-
-      "fora_da_ia" unless ticket.with_ai?
+      Obsolescence.turn_reason(turn, Ticket.find_by(id: turn.ticket_id, brand_id: item.brand_id), now: Time.current)
     end
 
     # As tentativas anteriores foram abandonadas (sem resultado gravado) até passar do limite da RN-43.
