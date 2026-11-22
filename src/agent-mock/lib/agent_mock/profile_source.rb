@@ -30,6 +30,8 @@ module AgentMock
                            reconnect_attempts: 0))
     end
 
+    attr_reader :redis
+
     def initialize(redis:) = @redis = redis
 
     # Uma ida ao Redis por evento (MGET). Erros do Redis sobem para o Profiles, que cai no padrão.

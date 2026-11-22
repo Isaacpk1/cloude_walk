@@ -95,6 +95,7 @@ RSpec.describe AgentMock::Profiles do
     it "com o Redis de verdade inalcançável, o cliente falha rápido e cai no padrão" do
       source = AgentMock::ProfileSource.build(env: { "AGENT_CONTROL_REDIS_URL" => "redis://127.0.0.1:1/1" })
       profiles = described_class.new(config:, source:, log: AgentMock::Log.new(io))
+      expect(source.redis._client.config).to have_attributes(connect_timeout: 0.2, read_timeout: 0.2)
 
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       expect(profiles.resolve("jim").config.profile).to eq("rapido")

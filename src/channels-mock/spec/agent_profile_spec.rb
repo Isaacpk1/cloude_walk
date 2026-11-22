@@ -104,6 +104,7 @@ RSpec.describe "RF-38: perfil escolhido pelo simulador" do
 
     it "com o Redis de verdade inalcançável, falha rápido com 503" do
       ChannelsMock::AgentProfile.configure_from({ "AGENT_CONTROL_REDIS_URL" => "redis://127.0.0.1:1/1" }, out:)
+      expect(ChannelsMock::AgentProfile.redis._client.config).to have_attributes(connect_timeout: 0.2, read_timeout: 0.2)
 
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       post_json "profile" => "lento", "scope" => "global"
