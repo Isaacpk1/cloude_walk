@@ -21,9 +21,15 @@ module Handoff
 
     # Há pedido de handoff da atribuição atual, ainda não executado ou já executado: a IA não recebe nem aplica
     # mais nada nesta atribuição (Turns::Open, AgentActions::Apply, Turns::ProgressNotice; RN-46, RN-56).
-    def self.pending?(ticket)
-      OutboxEvent.exists?(brand_id: ticket.brand_id, dedup_key: dedup_key(ticket))
+    def self.pending?(ticket) = !pending_reason(ticket).nil?
+
+    # Motivo do pedido da atribuição atual, ou nil sem pedido.
+    def self.pending_reason(ticket)
+      OutboxEvent.where(brand_id: ticket.brand_id, dedup_key: dedup_key(ticket)).pick(Arel.sql("payload->>'reason'"))
     end
+
+    # Gatilhos de prazo (RN-46): a resposta que chega depois deles mostra prazo_vencido, não handoff_pedido.
+    DEADLINE_REASONS = %w[prazo_do_turno teto_do_ciclo].freeze
 
     def initialize(ticket:, reason:, source:, trace_id:, turn: nil)
       raise ArgumentError, "motivo de handoff desconhecido: #{reason}" unless REASONS.include?(reason)
