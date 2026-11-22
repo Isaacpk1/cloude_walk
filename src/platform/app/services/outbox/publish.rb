@@ -19,7 +19,10 @@ module Outbox
   class Publish
     Result = Data.define(:status, :next_attempt_at)
 
-    LEASE = 30.seconds
+    # Reserva de uma tentativa: cobre a chamada inteira (BrokerClient: 2 s para abrir + 10 s de leitura) com folga
+    # e vence antes do prazo do turno (20 s, ADR-020), para a recuperação ainda retomar a publicação de um worker
+    # que caiu no meio da chamada (RNF-17).
+    LEASE = 15.seconds
     MAX_RETRIES = RetryPolicy::MAX_RETRIES
     DEFAULT_JITTER = RetryPolicy::DEFAULT_JITTER
     EVAL_REASON = "eval".freeze

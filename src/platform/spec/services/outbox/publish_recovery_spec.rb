@@ -48,6 +48,15 @@ RSpec.describe Outbox::Publish, "RF-34, RN-43: limites da publicação quando a 
     end
   end
 
+  describe "RNF-17: a reserva da tentativa" do
+    it "cobre a chamada ao broker inteira e vence antes do prazo do turno, para a recuperação retomar a tempo" do
+      call = (Outbox::BrokerClient::OPEN_TIMEOUT + Outbox::BrokerClient::READ_TIMEOUT).seconds
+
+      expect(described_class::LEASE).to be > call
+      expect(described_class::LEASE).to be < Turns::Policy.for(infinitepay).turn_deadline
+    end
+  end
+
   describe "RN-38, RF-34 + RF-35: caso fora da IA não volta para o agente" do
     it "atendimento passou a humano (estado) sem mudar a atribuição: o evento antigo não é publicado" do
       item = open_event
