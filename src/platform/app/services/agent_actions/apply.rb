@@ -21,7 +21,9 @@
 #    `resolution.text`), grava também a saída (bloco 05; 07, seções 3.1 passo 6 e 3.2): a mensagem `outbound`
 #    com o próximo seq do atendimento travado, pelo canal e pela conta da última mensagem do cliente (RF-06),
 #    a versão do contexto (`Ticket#bump_context_version!`), a entrega `pending` (delivery_id estável, RNF-15), o item `delivery.requested` no outbox e a auditoria
-#    `delivery.requested`. Rejeitada, duplicada ou inválida não grava saída.
+#    `delivery.requested`. Aplicada (com ou sem texto), zera progress_due_at e cancela a entrega do aviso de progresso
+#    do ciclo que ainda estiver `pending` (RN-57; auditoria delivery.cancelled `resposta_aplicada`); a que já estiver
+#    em `sending` fica para a conciliação. Rejeitada, duplicada ou inválida não grava saída.
 # 4. Fora da transação (invariante 2): a DLQ pelo produtor do Karafka, se for o caso, o despertador do envio
 #    (OutboxJob com o item delivery.requested; o envio HTTP é do worker) e depois o log JSON.
 #    Erro de caractere do Postgres dentro da transação (defesa além da checagem do passo 1) também é
@@ -36,6 +38,7 @@ module AgentActions
     TOPICS = { outbound: "helpdesk.agent.outbound.v1", dlq: "helpdesk.agent.dlq.v1" }.freeze
     CONSUMER = "agent_actions".freeze
     DELIVERY_EVENT = "delivery.requested".freeze
+    CANCEL_REASON = "resposta_aplicada".freeze
     CONTENT_FIELDS = %w[reply escalation resolution].freeze
     CONVERSATION_ID = /\Atkt_(?<id>[1-9]\d{0,18})\z/
     TRACEPARENT = /\A00-(?<trace_id>\h{32})-\h{16}-\h{2}\z/
@@ -196,12 +199,32 @@ module AgentActions
       # Sob o lock não há corrida; se outro caminho mudar o turno sem o lock, a regra do banco decide.
       return reject("turno_nao_elegivel") unless applied
 
-      # "Marca o turno applied, registra a ação final, limpa os prazos" (07, seção 3.4).
+      # "Marca o turno applied, registra a ação final, limpa os prazos e cancela o aviso de progresso do ciclo que
+      # ainda estiver pending" (07, seção 3.4; RN-57).
+      cycle_seq = @ticket.first_pending_seq
       @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil,
                              progress_due_at: nil)
       audit("agent_action.applied")
+      cancel_progress_notice(cycle_seq)
       request_delivery
       outcome(:applied, nil)
+    end
+
+    # RN-57: o aviso do ciclo que ainda não saiu (pending) não vale mais. Um aviso em `sending` fica para a
+    # conciliação (07, seção 3.2) e sai antes da resposta, que tem seq maior. O item do envio é concluído aqui,
+    # na mesma transação, como o Deliveries::Send faz no cancelamento do eval.
+    def cancel_progress_notice(cycle_seq)
+      Delivery.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id, kind: "progress", status: "pending",
+                     ai_first_pending_seq: cycle_seq).find_each do |delivery|
+        delivery.update!(status: "cancelled", lease_until: nil, last_error: CANCEL_REASON)
+        OutboxEvent.where(brand_id: @ticket.brand_id, dedup_key: "delivery:#{delivery.delivery_id}", completed_at: nil)
+                   .update_all(completed_at: Time.current, lease_until: nil, last_error: CANCEL_REASON)
+        AuditEvent.create!(
+          brand_id: @ticket.brand_id, ticket: @ticket, actor_type: "system", event_type: "delivery.cancelled", trace_id:,
+          data: { delivery_id: delivery.delivery_id, seq: delivery.seq, kind: delivery.kind, reason: CANCEL_REASON,
+                  first_pending_seq: cycle_seq, turn: @turn.turn }
+        )
+      end
     end
 
     # --- Saída ao cliente (bloco 05; 07, seção 3.1, passo 6, e seção 3.2; RF-06, RNF-14, RNF-15) ---
