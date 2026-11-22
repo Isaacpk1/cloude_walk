@@ -147,3 +147,37 @@ RSpec.describe AgentActions::Apply, "RN-33: handoff pela ação do agente" do
     end
   end
 end
+
+# Ponta a ponta com o Escalate (agente E3 do bloco 10). Na base, o Escalate descarta o pedido cujo turno está
+# `applied` (`turno_applied`) e cancela as entregas `pending` da IA. Os dois gatilhos deste arquivo nascem de um turno
+# applied, e a 10ª resposta precisa sair antes do aviso. `pending`: quando o Escalate do E3 entrar, estes testes passam
+# e o RSpec acusa; aí é só tirar o `pending`.
+RSpec.describe AgentActions::Apply, "RN-33: handoff do agente executado pelo Escalate (integração com o E3)" do
+  let!(:infinitepay) { create(:brand, :infinitepay) }
+
+  it "escalate do agente: o Escalate não descarta o pedido como turno_applied" do
+    pending "Handoff::Escalate precisa aceitar o turno applied quando source = agent (E3)"
+    turn = opened_turn
+    action = agent_action_for(turn, action: "escalate", escalation: {
+      "reason" => "x", "summary" => HandoffSummary::FIELDS.index_with { "campo" }
+    }).except("reply")
+    described_class.call(action, traceparent: AgentActionHelpers::TRACEPARENT)
+
+    expect(Handoff::Escalate.call(handoff_items(turn.ticket).sole.id).status).to eq(:escalated)
+  end
+
+  it "limite de trocas: a 10ª resposta continua pending depois do Escalate e o caso escala" do
+    pending "Handoff::Escalate precisa aceitar o turno applied e manter a entrega do turno do pedido (E3)"
+    turns = Array.new(10) do
+      turn = opened_turn("mais uma")
+      described_class.call(agent_action_for(turn), traceparent: AgentActionHelpers::TRACEPARENT)
+      turn
+    end
+    ticket = turns.last.ticket
+
+    Handoff::Escalate.call(handoff_items(ticket).sole.id)
+
+    expect(ticket.reload.state).to eq("aguardando_humano")
+    expect(Delivery.where(ticket_id: ticket.id, kind: "reply").order(:seq).last.status).to eq("pending")
+  end
+end
