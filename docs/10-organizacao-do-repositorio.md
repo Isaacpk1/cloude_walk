@@ -214,7 +214,7 @@ Testes que só fazem sentido com o Compose de pé. Exemplo: o simulador envia "m
 ```text
 bench/
 ├── k6/                         # um script por experimento (E1, E5)
-├── analysis/                   # pandas + Plotly (ADR-010)
+├── analysis/                   # reconcile.rb (perdas, turnos, latência por etapa); gráficos com pandas + Plotly (ADR-010) ainda não feitos
 └── results/
     └── AAAA-MM-DD-e1-referencia/  # semente, configuração, taxas e saídas
 ```

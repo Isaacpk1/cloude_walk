@@ -4,7 +4,7 @@ PLATFORM := $(COMPOSE) run --rm web
 # Mesma versão do CI (setup-ruby lê o .ruby-version de cada serviço).
 CONTRACTS_RUBY := $(shell sed 's/^ruby-//' src/contracts/.ruby-version)
 
-.PHONY: help up down logs seed reset test lint security check topics eval
+.PHONY: help up down logs seed reset test lint security check topics eval bench
 
 help: ## Lista os comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -56,6 +56,25 @@ topics: ## Lista os tópicos do Kafka e as mensagens de entrada, saída e DLQ do
 		$(COMPOSE) exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:29092 \
 			--topic $$t --from-beginning --timeout-ms 5000 \
 			--property print.key=true --property print.headers=true || true; \
+	done
+
+# Experimento E1/E5 (docs/05, seção 2; bloco 19). O k6 roda num contêiner na rede do Compose, contra o `web`.
+# PROFILE=smoke|reference|capacity, MODE=independent|burst, RUNS=3 execuções por cenário. Veja bench/README.md.
+PROFILE ?= smoke
+MODE ?= independent
+RUNS ?= 3
+SEED ?= 42
+bench: ## Roda o experimento de carga e reconcilia o resultado (PROFILE=smoke|reference|capacity MODE=independent|burst RUNS=3)
+	@mkdir -p bench/results/$(shell date +%F)-$(PROFILE)-$(MODE)
+	@for i in $$(seq 1 $(RUNS)); do \
+	  run=$$(date +%Y%m%d%H%M%S)-$$i; dir=bench/results/$(shell date +%F)-$(PROFILE)-$(MODE); \
+	  echo "== execução $$i de $(RUNS) ($$run) =="; \
+	  docker run --rm --user $$(id -u):$$(id -g) --network $$($(COMPOSE) ps -q web | xargs docker inspect -f '{{range $$k,$$v := .NetworkSettings.Networks}}{{$$k}}{{end}}') \
+	    -v $$(pwd)/bench/k6:/scripts:ro -v $$(pwd)/$$dir:/results \
+	    -e PLATFORM_URL=http://web:3000 -e PROFILE=$(PROFILE) -e MODE=$(MODE) -e SEED=$(SEED) -e RUN_ID=$$run \
+	    grafana/k6:0.54.0 run /scripts/chat_load.js || true; \
+	  $(COMPOSE) run --rm -T -v $$(pwd)/bench:/bench:ro -v $$(pwd)/$$dir:/results web bin/rails runner /bench/analysis/reconcile.rb $$run /results/$$run-k6.json > $$dir/$$run-db.json || true; \
+	  cat $$dir/$$run-db.json; \
 	done
 
 check: test lint security ## Tudo que precisa passar antes do PR
