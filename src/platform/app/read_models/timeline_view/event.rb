@@ -10,6 +10,7 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     intentional_wait: "Espera intencional (janela de agrupamento)",
     turn_opened: "Abertura do turno",
     turn_not_opened: "Turno não aberto",
+    turn_superseded: "Turno superado",
     published: "Publicação no broker",
     publish_failed: "Falha na publicação",
     publish_discarded: "Publicação cancelada",
@@ -23,6 +24,7 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     delivery_retry_scheduled: "Retentativa da entrega agendada",
     delivered: "Entrega ao canal",
     delivery_failed: "Falha na entrega",
+    delivery_cancelled: "Entrega cancelada",
     delivery_reconciliation: "Entrega em conciliação",
     delivery_status: "Status do provedor"
   }.freeze

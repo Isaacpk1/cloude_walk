@@ -23,6 +23,18 @@ $$;
 
 
 --
+-- Name: eval_runs_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.eval_runs_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'eval_runs é só de inserção';
+END $$;
+
+
+--
 -- Name: queue_versions_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -31,6 +43,19 @@ CREATE FUNCTION public.queue_versions_immutable() RETURNS trigger
     AS $$
 BEGIN
   RAISE EXCEPTION 'versão de fila é imutável (RN-20): crie uma versão nova';
+END;
+$$;
+
+
+--
+-- Name: tickets_evaluation_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.tickets_evaluation_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'tickets.evaluation não muda depois da criação';
 END;
 $$;
 
@@ -298,6 +323,32 @@ ALTER SEQUENCE public.deliveries_id_seq OWNED BY public.deliveries.id;
 
 
 --
+-- Name: eval_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    scenario character varying NOT NULL,
+    status character varying NOT NULL,
+    agent_model character varying NOT NULL,
+    agent_version character varying NOT NULL,
+    config_hash character varying,
+    expected jsonb DEFAULT '{}'::jsonb NOT NULL,
+    observed jsonb DEFAULT '{}'::jsonb NOT NULL,
+    checks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint,
+    trace_id character varying,
+    error text,
+    started_at timestamp(6) without time zone NOT NULL,
+    finished_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT eval_runs_checks_check CHECK ((jsonb_typeof(checks) = 'array'::text)),
+    CONSTRAINT eval_runs_status_check CHECK (((status)::text = ANY ((ARRAY['passed'::character varying, 'failed'::character varying, 'error'::character varying])::text[])))
+);
+
+
+--
 -- Name: messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -392,6 +443,7 @@ CREATE TABLE public.provider_accounts (
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    evaluation boolean DEFAULT false NOT NULL,
     CONSTRAINT provider_accounts_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT provider_accounts_whatsapp_phone_check CHECK ((((channel)::text <> 'whatsapp'::text) OR (phone_number_id IS NOT NULL)))
 );
@@ -588,6 +640,7 @@ CREATE TABLE public.tickets (
     dispatch_due_at timestamp(6) without time zone,
     ai_deadline_at timestamp(6) without time zone,
     context_version integer DEFAULT 0 NOT NULL,
+    evaluation boolean DEFAULT false NOT NULL,
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
     CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
@@ -809,6 +862,14 @@ ALTER TABLE ONLY public.customers
 
 ALTER TABLE ONLY public.deliveries
     ADD CONSTRAINT deliveries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: eval_runs eval_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1037,6 +1098,27 @@ CREATE UNIQUE INDEX index_deliveries_on_ticket_id_and_seq ON public.deliveries U
 --
 
 CREATE INDEX index_deliveries_open ON public.deliveries USING btree (ticket_id, seq) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('sending'::character varying)::text]));
+
+
+--
+-- Name: index_eval_runs_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_eval_runs_on_brand_id ON public.eval_runs USING btree (brand_id);
+
+
+--
+-- Name: index_eval_runs_on_scenario_and_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_eval_runs_on_scenario_and_started_at ON public.eval_runs USING btree (scenario, started_at);
+
+
+--
+-- Name: index_eval_runs_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_eval_runs_on_ticket_id ON public.eval_runs USING btree (ticket_id);
 
 
 --
@@ -1278,10 +1360,24 @@ CREATE TRIGGER audit_events_immutable BEFORE DELETE OR UPDATE ON public.audit_ev
 
 
 --
+-- Name: eval_runs eval_runs_no_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_runs_no_update BEFORE DELETE OR UPDATE ON public.eval_runs FOR EACH ROW EXECUTE FUNCTION public.eval_runs_immutable();
+
+
+--
 -- Name: queue_versions queue_versions_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER queue_versions_immutable BEFORE DELETE OR UPDATE ON public.queue_versions FOR EACH ROW EXECUTE FUNCTION public.queue_versions_immutable();
+
+
+--
+-- Name: tickets tickets_evaluation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER tickets_evaluation_immutable BEFORE UPDATE OF evaluation ON public.tickets FOR EACH ROW WHEN ((new.evaluation IS DISTINCT FROM old.evaluation)) EXECUTE FUNCTION public.tickets_evaluation_immutable();
 
 
 --
@@ -1314,6 +1410,14 @@ ALTER TABLE ONLY public.customer_identities
 
 ALTER TABLE ONLY public.deliveries
     ADD CONSTRAINT fk_deliveries_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
+-- Name: eval_runs fk_eval_runs_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT fk_eval_runs_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
 
 
 --
@@ -1386,6 +1490,22 @@ ALTER TABLE ONLY public.queues
 
 ALTER TABLE ONLY public.customer_identities
     ADD CONSTRAINT fk_rails_22532c432d FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: eval_runs fk_rails_358a9c83c1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT fk_rails_358a9c83c1 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: eval_runs fk_rails_3d8538fc74; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT fk_rails_3d8538fc74 FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
 
 
 --
@@ -1579,6 +1699,8 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261121040000'),
+('20261121030000'),
 ('20261121020000'),
 ('20261121010000'),
 ('20261121000000'),

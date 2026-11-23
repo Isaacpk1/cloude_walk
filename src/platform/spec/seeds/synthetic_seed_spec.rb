@@ -27,12 +27,20 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
   it "ADR-019: cria uma conta de provedor por marca e canal, com o segredo local do simulador" do
     Seeds::Synthetic.call(seed: 42)
 
-    expect(ProviderAccount.order(:slug).pluck(:slug)).to eq(%w[
+    expect(ProviderAccount.where(evaluation: false).order(:slug).pluck(:slug)).to eq(%w[
       infinitepay-chat-mock infinitepay-email-mock infinitepay-whatsapp-mock jim-chat-mock jim-email-mock jim-whatsapp-mock
     ])
     expect(ProviderAccount.find_by!(slug: "jim-chat-mock")).to have_attributes(brand: Brand.find_by!(slug: "jim"),
                                                                               secret: "dev-secret-jim-chat-mock")
     expect(ProviderAccount.where(channel: "whatsapp").pluck(:phone_number_id)).to all(be_present)
+  end
+
+  it "ADR-023, item 5: cria a conta de chat de eval de cada marca, inativa e marcada como eval" do
+    Seeds::Synthetic.call(seed: 42)
+
+    evals = ProviderAccount.where(evaluation: true).order(:slug)
+    expect(evals.pluck(:slug, :channel, :active)).to eq([ [ "infinitepay-chat-eval", "chat", false ], [ "jim-chat-eval", "chat", false ] ])
+    expect(evals.map { _1.brand.slug }).to eq(%w[infinitepay jim])
   end
 
   it "a mesma semente produz os mesmos dados" do

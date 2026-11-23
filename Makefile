@@ -4,7 +4,7 @@ PLATFORM := $(COMPOSE) run --rm web
 # Mesma versão do CI (setup-ruby lê o .ruby-version de cada serviço).
 CONTRACTS_RUBY := $(shell sed 's/^ruby-//' src/contracts/.ruby-version)
 
-.PHONY: help up down logs seed reset test lint security check topics
+.PHONY: help up down logs seed reset test lint security check topics eval
 
 help: ## Lista os comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -23,6 +23,11 @@ logs: ## Acompanha os logs
 
 seed: ## Carrega os dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
 	$(PLATFORM) bin/rails db:seed
+
+CENARIO ?= corrida-3s
+BRAND ?= infinitepay
+eval: ## Roda um eval e grava o resultado (CENARIO=corrida-3s BRAND=infinitepay; ADR-023)
+	$(PLATFORM) env BRAND=$(BRAND) bin/rails "evals:run[$(CENARIO)]"
 
 reset: ## Recria o banco, carrega o seed e reinicia o channels-mock (o estado dele fica em memória, ADR-021)
 	$(PLATFORM) bin/rails db:reset

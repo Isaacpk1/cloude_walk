@@ -1,0 +1,39 @@
+<% content_for :title, "Evals" %>
+
+<div class="page-header">
+  <div>
+    <h1>Evals</h1>
+    <p class="page-header__subtitle">Execuções gravadas em <code>eval_runs</code>, com checagens determinísticas sobre o caminho real da plataforma (ADR-023)<% if params[:marca].present? %> · marca <code><%= params[:marca] %></code><% end %></p>
+  </div>
+</div>
+
+<div class="eval-scenarios">
+  <% @scenarios.each do |scenario| %>
+    <section class="card eval-scenario" id="scenario-<%= scenario.name %>">
+      <h2><%= scenario.title %> <code class="muted"><%= scenario.name %></code></h2>
+      <p class="muted"><%= scenario.description %></p>
+      <% if scenario.never_run? %>
+        <p class="eval-never"><span class="badge badge--eval badge--eval-never">Nunca executado</span>
+          Rode <code>bin/rails evals:run[<%= scenario.name %>]</code> em <code>src/platform</code> ou <code>make eval</code> na raiz.</p>
+      <% else %>
+        <% run = scenario.latest %>
+        <div class="eval-latest">
+          <h3>Última execução</h3>
+          <p>
+            <%= eval_status_badge(run) %>
+            <%= link_to panel_time(run.started_at), eval_path(run.id, marca: params[:marca].presence) %>
+            · agente <code><%= run.agent_model %></code> <code><%= run.agent_version %></code>
+            · <%= run.brand_name %>
+          </p>
+        </div>
+        <h3>Histórico</h3>
+        <ol class="eval-history">
+          <% scenario.runs.each do |item| %>
+            <li><%= eval_status_badge(item) %> <%= link_to panel_time(item.started_at), eval_path(item.id, marca: params[:marca].presence) %>
+              <span class="muted">· <%= item.agent_version %> · <%= item.brand_name %> · <%= duration_text(item.duration_ms) %></span></li>
+          <% end %>
+        </ol>
+      <% end %>
+    </section>
+  <% end %>
+</div>

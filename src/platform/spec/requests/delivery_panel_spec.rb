@@ -154,7 +154,9 @@ RSpec.describe "ROADMAP 05: entrega no painel" do
 
       body = response.body
       expect(body).to include("Saída gravada para entrega", "Envio ao canal", "Entrega ao canal", "180 ms",
-                              "seq 2 · turno 1", delivery.trace_id, "pmsg_0001")
+                              delivery.trace_id, "pmsg_0001")
+      # Bloco 07: seq e turno viram links para a conversa (#seq-N, #turn-N); o texto da célula continua o mesmo.
+      expect(Nokogiri::HTML(body).text).to include("seq 2 · turno 1")
     end
 
     it "ao escolher a falha, mostra a origem do erro, a resposta HTTP e a tentativa" do

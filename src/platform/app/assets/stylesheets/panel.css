@@ -196,3 +196,20 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .turn-stages h4 { margin: .25rem 0; }
 .turn-stages__list { margin: 0; padding-left: 1.2rem; }
 .turn-stages__total { margin: .35rem 0 0; }
+
+/* Bloco 07: turno superado e links entre mensagens e turnos (RN-56) */
+.message__turns { display: inline-flex; gap: .3rem; align-items: center; font-size: .8rem; color: var(--muted); }
+a.message__turn { text-decoration: none; }
+.turn__superseded { margin: .35rem 0; color: var(--danger); font-size: .9rem; }
+.timeline__row--turn_superseded td { background: #fff8f7; }
+
+/* Bloco 07: aba de evals (ADR-023) */
+.eval-scenarios { display: grid; gap: 1rem; }
+.eval-history { margin: .25rem 0 0; padding-left: 1.1rem; display: grid; gap: .2rem; }
+.badge--eval-passed { background: #e3f4ea; color: var(--ok); }
+.badge--eval-failed, .badge--eval-error { background: #fdecea; color: var(--danger); }
+.badge--eval-never { background: var(--system-bg); color: var(--system); }
+.eval-facts { margin-bottom: 1.25rem; }
+.eval-checks tr.check--failed td { background: #fdecea; font-weight: 600; }
+.eval-data { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.eval-data pre, .eval-error { white-space: pre-wrap; word-break: break-word; font-size: .8rem; margin: 0; }

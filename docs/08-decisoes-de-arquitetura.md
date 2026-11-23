@@ -30,6 +30,7 @@ Formato: ADR curto (contexto → decisão → alternativas → consequências). 
 | Prazo da IA | 20 s por turno, teto de 60 s por ciclo, escalação imediata em falha definitiva da publicação. Configurável por marca no bloco 12 | [ADR-020](#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo) |
 | Entrega ao canal | Identidade e ordem da entrega em cabeçalhos; aceite do provedor vale como entregue; falha certa avança a fila e só o resultado incerto vai para conciliação (proposto) | [ADR-021](#adr-021--entrega-ao-canal-identidade-aceite-e-conciliação) |
 | Contexto do turno | Versão do contexto no atendimento, digest SHA-256 do JSON canônico no turno e limites de tamanho do RN-49 (proposto) | [ADR-022](#adr-022--versão-e-prova-do-contexto-do-turno) |
+| Evals | Execuções gravadas em `eval_runs`, com checagens determinísticas sobre o caminho real da plataforma e relógio real (proposto) | [ADR-023](#adr-023--evals-com-execução-gravada-e-checagens-determinísticas) |
 
 ### Orçamento de memória (RNF-29: 4 vCPU, 8 GB)
 
@@ -594,6 +595,37 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - (+) Um contexto grande não trava o agente nem estoura o modelo.
 - (−) Até o bloco 10, um caso com pendentes acima do limite fica com a IA, sem turno, até o prazo do ciclo.
 - (−) Os limites são proposta; devem ser calibrados com o agente real.
+
+## ADR-023 — Evals com execução gravada e checagens determinísticas
+
+**Proposto em 21/11/2026, no bloco 07. Aguarda aprovação.** Antecipa a parte de evals do bloco 16 e segue a seção 4 do [09](09-evolucao-da-integracao-com-ia.md#4-como-avaliar-uma-nova-versão-do-agente) ("checagens determinísticas").
+
+**Contexto.** O bloco 07 pede o primeiro eval, o da corrida dos 3 s, com resultado esperado, observado e link para o turno. Nenhum documento dizia onde guardar o resultado nem como o eval roda.
+
+**Decisão.**
+
+1. **Tabela `eval_runs`**, só de inserção (07, seção 4): cenário, status, agente (modelo, versão, `config_hash`), esperado, observado, lista de checagens e o atendimento e o `trace_id` que servem de evidência.
+2. **O eval roda o caminho real da plataforma**: ingestão, `scheduler`, abertura do turno e aplicação da ação, com o relógio real, num atendimento sintético da marca. As ações do agente vêm de um gabarito fixo do cenário, válido no contrato `agent_outbound` e identificado como `eval-fixture`, para que o resultado dependa só da regra da plataforma.
+3. **Disparo** por comando (`bin/rails evals:run[corrida-3s]`, `make eval`), fora do `rspec`. O `rspec` testa o executor com o relógio controlado.
+4. **Painel**: a aba de evals mostra cada cenário conhecido, a última execução e o histórico; cenário que nunca rodou aparece como "nunca executado".
+5. **Isolamento da pilha real.** O atendimento do eval nasce marcado no commit da mensagem 1: a mensagem vem da conta de provedor de eval da marca (`<marca>-chat-eval`, `provider_accounts.evaluation = true`, inativa, criada pelo seed ou pelo eval), e a ingestão grava `tickets.evaluation = true`, que não muda depois (trigger). O worker não publica no broker o turno de um atendimento de eval (`agent_event.discarded`, `reason: eval`) nem entrega a saída dele ao canal (`deliveries.status = cancelled`, auditoria `delivery.cancelled`, `reason: eval`). O eval faz ele mesmo a volta do worker na saída e registra o desfecho em `observed.deliveries`. Uma ação de outro agente no atendimento torna a execução `error` ("cenário contaminado"), não `failed`. O eval só registra a abertura do próprio atendimento (`DispatchDue` com `brand_id` e `ticket_ids`). O executor não exercita a publicação no broker nem a entrega ao provedor: esses trechos têm testes próprios (blocos 03 e 05).
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| Guardar o resultado só na auditoria | A auditoria é do atendimento; um eval precisa de esperado, observado e checagens consultáveis por cenário |
+| Rodar o eval pelo simulador e pelo agent-mock com Kafka | Depende da latência do agente e do Compose; o resultado deixaria de ser determinístico. Fica para o bloco 16, como eval de ponta a ponta |
+| Eval dentro do `rspec` | O `rspec` usa transação e relógio de teste; o eval precisa mostrar o comportamento real e ficar registrado para o painel |
+
+**Consequências.**
+
+- (+) O critério de aceite da corrida dos 3 s fica demonstrável no navegador, com link para a evidência.
+- (+) O bloco 16 reaproveita a tabela e o executor para os outros cenários.
+- (−) O eval com gabarito fixo não mede a qualidade do agente, só a regra da plataforma.
+- (−) Uma execução leva alguns segundos de relógio real.
+- (+) O eval passa com o `scheduler`, o worker e o agent-mock no ar, e nada do eval chega ao agente nem ao cliente.
+- (−) Atendimentos de eval ficam no banco como dados sintéticos, fora do fluxo de saída. Um eval de ponta a ponta pelo simulador (bloco 16) vai precisar de outro desenho.
 
 ---
 

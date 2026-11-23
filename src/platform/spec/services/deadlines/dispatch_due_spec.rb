@@ -134,6 +134,31 @@ RSpec.describe Deadlines::DispatchDue, "ADR-016: abertura do turno registrada pe
     end
   end
 
+  describe "escopo opcional (ADR-023: o eval só toca o próprio atendimento)" do
+    let!(:ip) { pending_dispatch(due_at: now - 1.second, brand: "infinitepay", identity: "acc_ip_1") }
+    let!(:ip2) { pending_dispatch(due_at: now - 1.second, brand: "infinitepay", identity: "acc_ip_2") }
+    let!(:jm) { pending_dispatch(due_at: now - 1.second, brand: "jim") }
+
+    it "brand_id: só os atendimentos vencidos da marca" do
+      described_class.call(now: Time.current, limit: 100, brand_id: jim.id)
+
+      expect(dispatch_items.pluck(:ticket_id)).to eq([ jm.id ])
+    end
+
+    it "ticket_ids com brand_id: só esses atendimentos, e nunca de outra marca" do
+      described_class.call(now: Time.current, limit: 100, brand_id: infinitepay.id, ticket_ids: [ ip.id, jm.id ])
+
+      expect(dispatch_items.pluck(:ticket_id)).to eq([ ip.id ])
+      expect(AuditEvent.where(event_type: described_class::AUDIT_EVENT).pluck(:ticket_id)).to eq([ ip.id ])
+    end
+
+    it "sem escopo, continua global (o scheduler)" do
+      emit
+
+      expect(dispatch_items.pluck(:ticket_id)).to contain_exactly(ip.id, ip2.id, jm.id)
+    end
+  end
+
   describe "lote" do
     it "respeita o limite e começa pelo prazo mais antigo; o resto sai na volta seguinte" do
       late = pending_dispatch(due_at: now - 1.second, identity: "acc_1")

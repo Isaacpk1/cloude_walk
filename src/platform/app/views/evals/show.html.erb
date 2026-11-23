@@ -1,0 +1,77 @@
+<% run = @run %>
+<% content_for :title, "Eval #{run.scenario}" %>
+
+<div class="page-header">
+  <div>
+    <h1>Eval <%= @title || run.scenario %> <code class="muted"><%= run.scenario %></code></h1>
+    <p class="page-header__subtitle">Execução <code><%= run.id %></code> · <%= run.brand_name %></p>
+  </div>
+  <div class="page-header__actions">
+    <span class="eval-status"><%= eval_status_badge(run) %></span>
+    <%= link_to "Todos os evals", evals_path(marca: params[:marca].presence), class: "button" %>
+  </div>
+</div>
+
+<dl class="selected-event__fields eval-facts">
+  <div><dt>Agente</dt><dd><code><%= run.agent_model %></code> versão <code><%= run.agent_version %></code><% if run.short_config_hash %> · config <code title="<%= run.config_hash %>"><%= run.short_config_hash %></code><% end %></dd></div>
+  <div><dt>Início</dt><dd><%= panel_time(run.started_at, precise: true) %></dd></div>
+  <div><dt>Fim</dt><dd><%= run.finished_at ? panel_time(run.finished_at, precise: true) : "—" %></dd></div>
+  <div><dt>Duração</dt><dd class="mono"><%= duration_text(run.duration_ms) %></dd></div>
+  <div><dt>Evidência</dt><dd>
+    <% if run.ticket_id %>
+      <%= link_to "Conversa #{run.ticket_id}", conversation_path(run.ticket_id) %> · <%= link_to "linha do tempo", timeline_path(run.ticket_id) %>
+    <% else %>
+      <span class="muted">Sem atendimento de evidência</span>
+    <% end %>
+    <% if run.trace_id %> · trace_id <code><%= run.trace_id %></code><% end %>
+  </dd></div>
+</dl>
+
+<% if run.error? %>
+  <section class="card eval-error-card">
+    <h2>Erro</h2>
+    <pre class="eval-error"><%= run.error.presence || "Erro sem mensagem registrada" %></pre>
+  </section>
+<% end %>
+
+<h2>Checagens</h2>
+<% if run.checks.empty? %>
+  <p class="muted">Nenhuma checagem registrada.</p>
+<% end %>
+<table class="timeline eval-checks">
+  <thead>
+    <tr>
+      <th scope="col">Checagem</th>
+      <th scope="col">Esperado</th>
+      <th scope="col">Observado</th>
+      <th scope="col">ok</th>
+      <th scope="col">Evidência</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% run.checks.each do |check| %>
+      <tr class="<%= class_names("check", "check--ok" => check.ok, "check--failed" => check.failed?) %>">
+        <td><%= check.name %></td>
+        <td><code><%= agent_data_text(check.expected) %></code></td>
+        <td><code><%= agent_data_text(check.observed) %></code></td>
+        <td><%= check.ok ? "sim" : "não" %></td>
+        <td>
+          <% if run.ticket_id && check.turn %><%= link_to "turno #{check.turn}", conversation_path(run.ticket_id, anchor: "turn-#{check.turn}") %><% end %>
+          <% if run.ticket_id && check.seq %><%= link_to "seq #{check.seq}", conversation_path(run.ticket_id, anchor: "seq-#{check.seq}") %><% end %>
+          <% unless run.ticket_id && (check.turn || check.seq) %><span class="muted">—</span><% end %>
+        </td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<div class="eval-data">
+  <section class="card">
+    <h2>Esperado</h2>
+    <pre class="eval-expected"><%= eval_json(run.expected) %></pre>
+  </section>
+  <section class="card">
+    <h2>Observado</h2>
+    <pre class="eval-observed"><%= eval_json(run.observed) %></pre>
+  </section>
+</div>
