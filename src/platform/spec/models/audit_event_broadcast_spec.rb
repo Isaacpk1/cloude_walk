@@ -64,6 +64,16 @@ RSpec.describe AuditEvent, "RNF-06, invariante 2: broadcast do painel depois do 
     expect(brand_stream.size).to eq(2)
   end
 
+  it "RN-28, RNF-06: a triagem que manda o caso à fila humana avisa o painel; a atribuição à IA não" do
+    AuditEvent.create!(brand: infinitepay, ticket_id: ticket.id, actor_type: "system", event_type: "ticket.assigned",
+                       trace_id: "e" * 32, data: { "to" => "ia" })
+    expect(brand_stream).to be_empty
+
+    AuditEvent.create!(brand: infinitepay, ticket_id: ticket.id, actor_type: "system", event_type: "ticket.assigned",
+                       trace_id: "e" * 32, data: { "to" => "fila_humana" })
+    expect([ general.size, brand_stream.size, conversation.size ]).to eq([ 1, 1, 1 ])
+  end
+
   it "marca errada: o stream de outra marca não recebe o aviso" do
     audit!
 
