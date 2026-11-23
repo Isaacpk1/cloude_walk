@@ -5,7 +5,8 @@ class AuditEvent < ApplicationRecord
   # chamada ao ActionCable acontece com a transação aberta (invariante 2). O stream leva só o pedido de recarga, sem
   # dado do caso: a página recarrega pelo próprio escopo de marca (invariante 6).
   PANEL_EVENTS = %w[ticket.escalated handoff.summary_available handoff.summary_missing ticket.returned_to_queue
-                    ticket.priority_raised sla.breached analyst.availability_changed].freeze
+                    ticket.priority_raised sla.breached analyst.availability_changed ticket.resolved analyst.replied
+                    analyst.noted].freeze
   # Bloco 11 (RN-28): a triagem que manda o caso novo direto à fila humana também é uma entrada na fila.
   HUMAN_QUEUE_ASSIGNMENT = "ticket.assigned".freeze
   # Bloco 13 (RF-45): a atribuição da distribuição a um analista também muda a fila.

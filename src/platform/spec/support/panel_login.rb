@@ -29,6 +29,20 @@ module PanelLogin
   end
 end
 
+# Bloco 14: os system specs (Capybara) entram pelo formulário de login, como um supervisor.
+module PanelFormLogin
+  def log_in_as_supervisor
+    user = create(:user, role: "supervisor", email: "chefe@helpdesk.test", password: PanelLogin::PASSWORD)
+    Brand.find_each { |brand| TeamMembership.create!(user:, team: Team.find_by(brand:) || create(:team, brand:)) }
+    visit "/entrar"
+    fill_in "E-mail", with: user.email
+    fill_in "Senha", with: PanelLogin::PASSWORD
+    click_button "Entrar"
+    user
+  end
+end
+
 RSpec.configure do |config|
+  config.include PanelFormLogin, type: :system
   config.include PanelLogin, type: :request
 end

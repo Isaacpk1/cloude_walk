@@ -76,13 +76,14 @@ RSpec.describe AuditEvent, "RNF-06, invariante 2: broadcast do painel depois do 
 
   it "RF-27, RF-45, RN-25, RN-26, RN-31: atribuição ao analista, devolução, subida de prioridade, estouro e disponibilidade avisam o painel" do
     [ [ "ticket.assigned", { "to" => "analista" } ], [ "ticket.returned_to_queue", {} ], [ "ticket.priority_raised", {} ],
-      [ "sla.breached", {} ], [ "analyst.availability_changed", {} ] ].each do |type, data|
-      AuditEvent.create!(brand: infinitepay, ticket_id: type.start_with?("analyst") ? nil : ticket.id, actor_type: "system",
+      [ "sla.breached", {} ], [ "analyst.availability_changed", {} ], [ "ticket.resolved", {} ], [ "analyst.replied", {} ],
+      [ "analyst.noted", {} ] ].each do |type, data|
+      AuditEvent.create!(brand: infinitepay, ticket_id: type == "analyst.availability_changed" ? nil : ticket.id, actor_type: "system",
                          event_type: type, trace_id: "e" * 32, data:)
     end
 
-    expect([ general.size, brand_stream.size ]).to eq([ 5, 5 ])
-    expect(conversation.size).to eq(4) # a mudança de disponibilidade não tem atendimento
+    expect([ general.size, brand_stream.size ]).to eq([ 8, 8 ])
+    expect(conversation.size).to eq(7) # a mudança de disponibilidade não tem atendimento
   end
 
   it "marca errada: o stream de outra marca não recebe o aviso" do

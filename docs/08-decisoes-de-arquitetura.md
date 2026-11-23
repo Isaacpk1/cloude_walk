@@ -648,7 +648,7 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 
 ## ADR-024 — Login do painel e escopo por marca
 
-**Status:** proposta, bloco 14.
+**Status:** vigente (bloco 14).
 
 **Contexto.** O painel mostra dados de várias marcas e o analista não pode ver a marca que não é dele (RN-52, RNF-24). Até o bloco 13 o painel era aberto. RNF-26 pede senha com hash e sessão com expiração, no nível ASVS 1.
 

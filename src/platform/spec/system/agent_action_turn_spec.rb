@@ -8,6 +8,7 @@ RSpec.describe "ROADMAP 04, RF-31: abrir o turno e conferir a ação do agente" 
     turn = open_turn_for(ingest("meu repasse não caiu"))
     record_agent_action(turn, agent_action_payload(turn, text: "Seu repasse cai hoje até as 18h.", agent_ms: 2_345))
 
+    log_in_as_supervisor
     visit "/"
     click_link "meu repasse não caiu", match: :first
 

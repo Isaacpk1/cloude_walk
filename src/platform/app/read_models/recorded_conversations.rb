@@ -68,6 +68,9 @@ class RecordedConversations
   # Depois do handoff (bloco 08) o caso espera na fila humana da marca; a atribuição a analista é do bloco 13.
   # Bloco 11: sem handoff, a atribuição da triagem diz se o caso está com a IA (RF-24) ou na fila humana (RN-28).
   def assignee(ticket, handoff, triage)
+    # Bloco 13: com um analista (distribuição automática), o responsável é ele, não a fila.
+    return ConversationView::Participant.new(name: ticket.assignee.name, kind: "human") if ticket.state == "com_analista" && ticket.assignee&.human?
+
     queue = handoff.current_queue_name
     return ConversationView::Participant.new(name: queue, kind: "queue") if queue
 
@@ -175,7 +178,12 @@ class RecordedConversations
     )
   end
 
-  def author_name(ticket, record) = record.author_type == "customer" ? ticket.customer.display_name : record.author_type
+  def author_name(ticket, record)
+    return ticket.customer.display_name if record.author_type == "customer"
+    return record.author_type unless record.author_type == "analyst" && record.author_id
+
+    (@analyst_names ||= Hash.new { |names, id| names[id] = User.find_by(id:)&.name })[record.author_id] || "analista"
+  end
 
   # Recebimento: da chegada do webhook até a linha da mensagem. Gravação: da mensagem ao último
   # registro da mesma transação (o outbox). O 202 só sai depois do commit (invariante 1).

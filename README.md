@@ -18,6 +18,8 @@ make seed              # carrega os dados sintéticos (semente em SEED)
 
 Abra http://localhost:3000. A tela inicial lista as conversas de exemplo.
 
+**Entrar no painel.** O painel pede login (ADR-024). O seed cria, em cada marca, uma supervisora (`supervisora@helpdesk.test`) e analistas (`analista1.infinitepay@helpdesk.test`, `analista1.jim@helpdesk.test`, e assim por diante), todos com a senha sintética `senha-sintetica-1`. Cada usuário vê só as marcas da equipe dele; DLQ e evals são do supervisor. Se o seu banco é anterior ao bloco 14, rode `make reset` para criar as senhas.
+
 **Demonstração pelo chat.** O simulador do cliente fica em http://localhost:4000. O seed cria, em cada marca, um cliente **verificado** com conta no chat do app, para a IA poder consultar dados da conta (RN-05):
 
 | Conta do provedor | `account_id` | Cliente |

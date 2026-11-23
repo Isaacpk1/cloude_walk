@@ -22,7 +22,12 @@ Rails.application.routes.draw do
   post "entrar" => "sessions#create"
   delete "sair" => "sessions#destroy", as: :logout
   root "conversations#index"
-  resources :conversations, path: "conversas", only: %i[index show]
+  resources :conversations, path: "conversas", only: %i[index show] do
+    # Bloco 14 (RF-46, RF-48, RF-49): ações do analista responsável.
+    post "resposta", to: "analyst_actions#reply", as: :reply
+    post "notas", to: "analyst_actions#note", as: :note
+    post "resolucao", to: "analyst_actions#resolve", as: :resolution
+  end
   resources :timelines, path: "linha-do-tempo", only: %i[index show]
   # Bloco 07 (ADR-023): execuções gravadas em eval_runs.
   resources :evals, only: %i[index show]

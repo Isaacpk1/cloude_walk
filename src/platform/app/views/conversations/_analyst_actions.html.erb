@@ -1,0 +1,23 @@
+<%# Bloco 14 (RF-46, RF-48, RF-49): só o analista responsável vê, com o caso em com_analista. A conferência de verdade é do Human::Action. %>
+<% if @can_act %>
+  <section class="analyst-actions" aria-label="Atendimento">
+    <h2>Atendimento</h2>
+    <%= form_with url: conversation_reply_path(conversation.ticket_id), class: "analyst-reply" do |form| %>
+      <%= form.label :text, "Responder ao cliente" %>
+      <%= form.text_area :text, rows: 3, required: true %>
+      <%= form.submit "Enviar" %>
+    <% end %>
+    <%= form_with url: conversation_note_path(conversation.ticket_id), class: "analyst-note" do |form| %>
+      <%= form.label :text, "Nota interna (o cliente não vê)" %>
+      <%= form.text_area :text, rows: 2, required: true, id: "note_text" %>
+      <%= form.submit "Salvar nota" %>
+    <% end %>
+    <%= form_with url: conversation_resolution_path(conversation.ticket_id), class: "analyst-resolve" do |form| %>
+      <%= form.label :reason, "Resolver com o motivo" %>
+      <%= form.select :reason, Human::Resolve::REASONS.map { [ _1.humanize, _1 ] }, include_blank: "Escolha" %>
+      <%= form.label :text, "Mensagem de encerramento (opcional)", for: "resolve_text" %>
+      <%= form.text_field :text, id: "resolve_text" %>
+      <%= form.submit "Resolver" %>
+    <% end %>
+  </section>
+<% end %>
