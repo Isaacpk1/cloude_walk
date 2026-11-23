@@ -24,7 +24,14 @@ RSpec.describe "RF-12, RF-15, RF-18, RF-24, RF-54: pronto quando do bloco 11" do
     ] }
   end
 
-  before { RoutingRuleset.publish!(brand: infinitepay, rules:, default_queue: config[:default], created_by: supervisor) }
+  before do
+    # `travel` descarta os microssegundos: sem partir de um segundo exato, "2 s depois" pode cair antes do fim da janela.
+    freeze_time
+    RoutingRuleset.publish!(brand: infinitepay, rules:, default_queue: config[:default], created_by: supervisor)
+    stub_broker
+    stub_channels(*Array.new(4) { { status: 200, message_id: "chat_out_#{SecureRandom.hex(3)}" } })
+    allow(DatabaseClock).to receive(:now) { Time.current }
+  end
 
   def post_chat(text, customer:)
     raw = { message_id: SecureRandom.uuid, account_id: "acc_infinitepay_#{customer}", customer_ref: "cus_ref_#{customer}",
@@ -36,6 +43,9 @@ RSpec.describe "RF-12, RF-15, RF-18, RF-24, RF-54: pronto quando do bloco 11" do
       }
     end
     expect(response).to have_http_status(:accepted)
+    # RN-55: a triagem espera a janela de agrupamento; no fim dela, o scheduler e o Turns::Open triam o caso.
+    travel 2.seconds
+    perform_enqueued_jobs { Deadlines::DispatchDue.call(now: Time.current, limit: 10).each { OutboxJob.perform_later(_1) } }
     Ticket.order(:id).last
   end
 

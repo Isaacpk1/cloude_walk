@@ -58,6 +58,7 @@ RSpec.describe "RF-12, RF-24, RN-28, RN-34: triagem de ponta a ponta" do
 
   it "RN-28: categoria somente humana vai à fila de escalas sem turno nem chamada ao broker" do
     stub_broker
+    stub_channels({ status: 200, message_id: "chat_out_notice" })
     perform_enqueued_jobs { post_chat("preciso trocar o e-mail do cadastro") }
 
     ticket = Ticket.sole
@@ -69,6 +70,8 @@ RSpec.describe "RF-12, RF-24, RN-28, RN-34: triagem de ponta a ponta" do
     expect(Deadlines::CycleTimeout.call(now: Time.current, limit: 10)).to be_empty
     expect(AiTurn.count).to eq(0)
     expect(broker_requests).to be_empty
+    # RN-33 (item 3), RN-42: o cliente recebe o aviso de transferência, e só ele.
+    expect(channel_requests.map { JSON.parse(_1.body)["text"] }).to eq([ Handoff::Policy::DEFAULT.transfer_notice_text("pt-BR") ])
   end
 
   it "RN-34 (ordem): pedido de humano na primeira mensagem: sem triagem, o caso termina na fila de escalas" do

@@ -39,6 +39,7 @@ class OutboxJob < ApplicationJob
       result = Turns::Open.call(item.id)
       self.class.perform_later(result.turn.event_id) if result.status == :opened
       wake(result.handoff_event_id)
+      result.wake_ids.each { wake(_1) }
     when Turns::Open::EVENT_TYPE
       result = Outbox::Publish.call(item.id)
       self.class.set(wait_until: result.next_attempt_at).perform_later(item.id) if result.next_attempt_at
@@ -58,7 +59,7 @@ class OutboxJob < ApplicationJob
     when Handoff::Summarize::EVENT_TYPE
       Handoff::Summarize.call(item.id)
     when MESSAGE_RECEIVED
-      Triage::OnMessage.call(item.id)
+      Triage::OnMessage.call(item.id).wake_ids.each { wake(_1) }
     end
   end
 

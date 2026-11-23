@@ -56,6 +56,16 @@ RSpec.describe Triage::Classify, "RF-12: triagem por palavras-chave" do
     end
   end
 
+  it "RN-12 em inglês: formas sem contração também contam (verificação do bloco 11)" do
+    jim = build(:brand, :jim, locale: "en")
+    {
+      "my settlement did not arrive" => "alta", "I did not receive my payout" => "alta",
+      "my card machine does not turn on" => "critica", "I can not sell" => "critica", "I cannot sell anything" => "critica"
+    }.each do |text, priority|
+      expect(described_class.call(brand: jim, text:).priority).to eq(priority), text
+    end
+  end
+
   describe "RN-13: o que não casa" do
     it "\"oi\" → outros, média, sem classificação" do
       expect(classify("oi")).to have_attributes(category: "outros", priority: "media", tags: [], matched: [],

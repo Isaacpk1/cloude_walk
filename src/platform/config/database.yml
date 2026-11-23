@@ -13,6 +13,9 @@ development:
 test:
   <<: *default
   database: helpdesk_test<%= ENV["TEST_ENV_NUMBER"] %>
+  # Os testes de concorrência abrem até 8 threads, cada uma com a própria conexão (AGENTS.md, item 3).
+  # Com o pool de 5, três esperavam por conexão e estouravam o tempo quando o lock demorava.
+  max_connections: 10
 
 production:
   <<: *default

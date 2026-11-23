@@ -61,10 +61,12 @@ module Triage
     }.freeze
 
     EN_IMPACT = {
-      "critica" => [ "wont turn on", "doesnt turn on", "not turning on", "stopped working", "not working",
-                     "cant sell", "cannot sell", "cant receive", "cannot receive", "blocked", "frozen" ],
-      "alta" => [ "not received", "havent received", "didnt receive", "never received", "didnt arrive",
-                  "hasnt arrived", "missing", "wrong amount", "charged twice", "double charged" ]
+      "critica" => [ "wont turn on", "will not turn on", "doesnt turn on", "does not turn on", "not turning on",
+                     "stopped working", "not working", "cant sell", "can not sell", "cannot sell", "cant receive",
+                     "can not receive", "cannot receive", "blocked", "frozen" ],
+      "alta" => [ "not received", "havent received", "have not received", "didnt receive", "did not receive",
+                  "never received", "didnt arrive", "did not arrive", "hasnt arrived", "has not arrived", "missing",
+                  "wrong amount", "charged twice", "double charged" ]
     }.freeze
 
     # RF-10: tags que ajudam a regra de roteamento (campo `tags`, operador `contains`) e o analista.

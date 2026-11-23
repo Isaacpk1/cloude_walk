@@ -36,6 +36,9 @@ RSpec.describe HumanQueue do
       expect(entry).to have_attributes(ticket_id: ticket.id, reason: "fila_sem_ia", source: "triagem", escalated_at: t0)
       expect(entry.reason_label).to eq("Triagem: a fila decidida não tem IA primeiro (RF-24)")
       expect(entry.source_label).to eq("Triagem do caso novo (bloco 11)")
+      # Sem handoff, não há resumo a esperar: o histórico é a própria conversa (RN-40).
+      expect(entry.summary).to have_attributes(status: :missing, missing_reason: "sem_conversa_com_ia")
+      expect(entry.summary.label).to include("a triagem mandou o caso direto para a fila humana")
     end
 
     it "um escalado depois (handoff) vale como a entrada mais recente na fila" do

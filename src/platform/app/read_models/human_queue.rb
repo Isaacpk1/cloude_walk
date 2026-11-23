@@ -106,9 +106,18 @@ class HumanQueue
       queue_kind: data["queue_kind"] || queue_kind(version), reason: data["reason"], source: data["source"],
       priority: ticket.priority, priority_from: raised&.data&.dig("from"), priority_to: raised&.data&.dig("to"),
       escalated_at: escalated&.occurred_at || ticket.updated_at,
-      summary: summary(summaries[ticket.id], audits, data["from_assignment_version"]), trace_id: escalated&.trace_id,
+      summary: entry_summary(escalated, summaries[ticket.id], audits, data), trace_id: escalated&.trace_id,
       category: ticket.category
     )
+  end
+
+  # Caso que a triagem mandou direto para a fila humana (ticket.assigned): sem handoff, não há resumo a esperar.
+  def entry_summary(entrance, record, audits, data)
+    if entrance&.event_type == "ticket.assigned"
+      return ConversationView::HandoffSummary.new(status: :missing, missing_reason: "sem_conversa_com_ia")
+    end
+
+    summary(record, audits, data["from_assignment_version"])
   end
 
   def summary(record, audits, from_version)

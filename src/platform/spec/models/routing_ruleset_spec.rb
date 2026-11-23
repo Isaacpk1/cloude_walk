@@ -69,6 +69,28 @@ RSpec.describe RoutingRuleset do
     end
   end
 
+  describe "RF-17, RF-54: valores das condições e auditoria da alteração" do
+    it "RF-17: recusa categoria ou prioridade que a triagem não conhece (a regra nunca casaria)" do
+      bad = ruleset_json([ "Crédito", credito, [ [ %w[category eq credto], [ "priority", "in", %w[alta urgentissima] ] ] ] ])
+
+      expect { publish(rules: bad) }.to raise_error(described_class::InvalidRules) { |error|
+        expect(error.violations).to include(a_string_including("categoria desconhecida: credto"),
+                                            a_string_including("prioridade desconhecida: urgentissima"))
+      }
+      expect(described_class.count).to eq(0)
+    end
+
+    it "RF-54: grava routing_ruleset.published com a versão e o autor, na mesma transação" do
+      ruleset = publish
+
+      audit = AuditEvent.find_by!(event_type: "routing_ruleset.published")
+      expect(audit).to have_attributes(brand_id: brand.id, ticket_id: nil, actor_type: "user", actor_id: supervisor.id,
+                                       ruleset_version: 1)
+      expect(audit.data).to include("version" => 1, "routing_ruleset_id" => ruleset.id, "rules_count" => 1,
+                                    "default_queue_id" => geral.id)
+    end
+  end
+
   describe "ADR-003: o conjunto segue o esquema routing_rules v1" do
     it "recusa conjunto fora do esquema e não grava versão" do
       bad = rules.deep_dup.tap { _1["rules"][0]["any"][0]["all"][0]["op"] = "gt" }

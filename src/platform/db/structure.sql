@@ -1941,14 +1941,6 @@ ALTER TABLE ONLY public.team_memberships
 
 
 --
--- Name: tickets fk_rails_5ce8e37f94; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.tickets
-    ADD CONSTRAINT fk_rails_5ce8e37f94 FOREIGN KEY (queue_id) REFERENCES public.queues(id);
-
-
---
 -- Name: team_memberships fk_rails_61c29b529e; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2133,12 +2125,21 @@ ALTER TABLE ONLY public.tickets
 
 
 --
+-- Name: tickets fk_tickets_queue_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_tickets_queue_same_brand FOREIGN KEY (queue_id, brand_id) REFERENCES public.queues(id, brand_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261123020000'),
 ('20261123010000'),
 ('20261123000000'),
 ('20261122030000'),

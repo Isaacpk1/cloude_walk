@@ -5,7 +5,7 @@
 # brand_id do atendimento; fila de outra marca não tem o nome revelado.
 class TriagePhase
   AUDITS = %w[triage.classified routing.decided ticket.assigned triage.skipped].freeze
-  ASSIGN_REASONS = %w[ia_primeiro fila_sem_ia categoria_somente_humana].freeze
+  ASSIGN_REASONS = %w[ia_primeiro fila_sem_ia categoria_somente_humana sem_fila].freeze
 
   def initialize(ticket)
     @ticket = ticket

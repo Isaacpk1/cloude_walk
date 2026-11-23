@@ -22,8 +22,9 @@
 # tentativa; nenhum turno abre sem triagem, e o teto do ciclo (RN-46) leva o caso a um humano se a falha persistir.
 module Turns
   class Open
-    Result = Data.define(:status, :turn, :handoff_event_id) do
-      def initialize(handoff_event_id: nil, **) = super
+    # `wake_ids`: outros itens gravados aqui (o aviso de transferência da triagem, RN-42), acordados depois do commit.
+    Result = Data.define(:status, :turn, :handoff_event_id, :wake_ids) do
+      def initialize(handoff_event_id: nil, wake_ids: [], **) = super
     end
     # Recusas que pedem o handoff na hora (RN-46, RN-49; ADR-020 item 3), com o motivo do pedido. As demais
     # recusas terminais (sem_prazo, prazo_vencido) ficam para o teto do ciclo (Deadlines::CycleTimeout).
@@ -80,7 +81,9 @@ module Turns
     def triaged_to_human?
       return false unless ticket.state == "novo"
 
-      Triage::Run.call(ticket:, trace_id: item.trace_id).status == :triaged_to_human
+      triage = Triage::Run.call(ticket:, trace_id: item.trace_id)
+      @wake_ids = triage.wake_ids
+      triage.status == :triaged_to_human
     end
 
     def now = @now ||= Time.current
@@ -173,7 +176,7 @@ module Turns
     def not_opened(status, **data)
       complete_item
       audit("ai_turn.not_opened", **data)
-      Result.new(status:, turn: nil, handoff_event_id: @handoff_event_id)
+      Result.new(status:, turn: nil, handoff_event_id: @handoff_event_id, wake_ids: @wake_ids || [])
     end
 
     def complete_item = item.update!(completed_at: now, lease_until: nil)

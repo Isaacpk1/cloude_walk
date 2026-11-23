@@ -152,6 +152,12 @@ RSpec.describe "ROADMAP 11: triagem e roteamento na conversa (TriagePhase)" do
   describe "RF-24, RN-28: atribuição" do
     before { classify }
 
+    it "RF-15: marca sem fila: com a IA, sem fila (sem_fila)" do
+      at(t0 + 1.second) { record_ticket_assigned(ticket, to: "ia", reason: "sem_fila", queue: nil) }
+
+      expect(view.assignment.label).to eq("com a IA, sem fila: a marca não tem fila padrão nem regras (RF-15)")
+    end
+
     it "IA primeiro: com a IA" do
       bot = create(:user, :bot)
       at(t0 + 1.second) do

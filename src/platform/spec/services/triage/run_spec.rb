@@ -137,8 +137,32 @@ RSpec.describe Triage::Run, "RF-12, RF-24, RN-28: triagem e atribuição do caso
       expect(ticket.ai_turns).to be_empty
       expect(audits(ticket, "ticket.assigned").sole.data).to eq(
         "to" => "fila_humana", "reason" => "fila_sem_ia", "queue_id" => human.id, "assignee_id" => nil,
-        "state_from" => "novo", "state_to" => "aguardando_humano"
+        "state_from" => "novo", "state_to" => "aguardando_humano",
+        "transfer_delivery_id" => Delivery.find_by!(ticket_id: ticket.id, kind: "handoff_notice").delivery_id
       )
+    end
+
+    it "RN-33 (item 3), RN-42: o cliente recebe o aviso de transferência; o Result devolve o item para acordar" do
+      human = create(:queue_record, team: config[:team], brand: infinitepay)
+      human.publish_version!(name: "Crédito", ai_first: false, created_by: nil)
+      received = ingest("quero saber do meu empréstimo")
+
+      result = run_triage(received.ticket, evaluator: fixed_evaluator(routing_decision(human.reload)))
+
+      notice = Delivery.find_by!(ticket_id: received.ticket.id, kind: "handoff_notice")
+      expect(notice).to have_attributes(status: "pending", seq: 2, ai_assignment_version: nil)
+      expect(notice.message).to have_attributes(author_type: "system", body: Handoff::Policy::DEFAULT.transfer_notice_text("pt-BR"))
+      expect(result.wake_ids).to eq([ OutboxEvent.find_by!(dedup_key: "delivery:#{notice.delivery_id}").id ])
+      expect(audits(received.ticket, "ticket.assigned").sole.data).to include("transfer_delivery_id" => notice.delivery_id)
+    end
+
+    it "fila com IA primeiro não grava aviso nem item a acordar" do
+      received = ingest("meu repasse não caiu")
+
+      result = run_triage(received.ticket, evaluator: fixed_evaluator(routing_decision(config[:default])))
+
+      expect(result.wake_ids).to be_empty
+      expect(Delivery.where(ticket_id: received.ticket.id)).to be_empty
     end
 
     it "RN-20: vale a versão da fila que a decisão registrou, não uma publicada depois" do
@@ -194,6 +218,17 @@ RSpec.describe Triage::Run, "RF-12, RF-24, RN-28: triagem e atribuição do caso
       expect(audits(received.ticket, "triage.classified").sole.data).to include("category" => "maquininha")
       expect(audits(received.ticket, "routing.decided")).to be_empty
     end
+  end
+
+  it "RN-11: rajada com pedido de humano pendente classifica uma vez só (a 2ª mensagem não reclassifica)" do
+    first = ingest("quero falar com um atendente")
+    run_triage(first.ticket, evaluator: fixed_evaluator(routing_decision(config[:default])), seq: 1)
+    ingest("e sobre meu cadastro")
+
+    result = run_triage(first.ticket, evaluator: fixed_evaluator(routing_decision(config[:default])), seq: 2)
+
+    expect(result).to have_attributes(status: :skipped, reason: "ja_triado")
+    expect(audits(first.ticket, "triage.classified").count).to eq(1)
   end
 
   describe "repetição" do

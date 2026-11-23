@@ -31,7 +31,10 @@ module Triage
   class Run
     class QueueOutsideBrand < StandardError; end
 
-    Result = Data.define(:status, :reason)
+    # `wake_ids`: itens do outbox gravados aqui (o aviso de transferência, RN-42), para quem chamou acordar depois do commit.
+    Result = Data.define(:status, :reason, :wake_ids) do
+      def initialize(wake_ids: [], **) = super
+    end
 
     CYCLE_RESET = { first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil,
                     progress_due_at: nil }.freeze
@@ -47,7 +50,12 @@ module Triage
 
     def call
       if ticket.state == "novo"
-        return classify_only("handoff_pedido") if Handoff::Request.pending?(ticket)
+        if Handoff::Request.pending?(ticket)
+          # Uma classificação por caso: a rajada com o pedido pendente não reclassifica a cada mensagem.
+          return skip("ja_triado") if classified_seq
+
+          return classify_only("handoff_pedido")
+        end
 
         return triage
       end
@@ -107,9 +115,11 @@ module Triage
     def to_humans(queue, queue_version, reason)
       state_from = ticket.state
       ticket.update_columns(state: "aguardando_humano", assignee_id: nil, queue_id: queue.id, queue_version:, **CYCLE_RESET)
+      # RN-33 (item 3), RN-42: ir para a fila humana é uma escalação; o cliente recebe o aviso de transferência.
+      notice = Handoff::TransferNotice.call(ticket:, trace_id: @trace_id)
       audit("ticket.assigned", to: "fila_humana", reason:, queue_id: queue.id, assignee_id: nil, state_from:,
-                               state_to: "aguardando_humano")
-      Result.new(status: :triaged_to_human, reason:)
+                               state_to: "aguardando_humano", transfer_delivery_id: notice&.delivery&.delivery_id)
+      Result.new(status: :triaged_to_human, reason:, wake_ids: [ notice&.outbox_event_id ].compact)
     end
 
     # RN-28: a fila de escalas ativa da marca, na versão corrente; sem ela, a fila decidida.

@@ -26,6 +26,7 @@ class RoutingRuleset < ApplicationRecord
   def self.publish!(brand:, rules:, default_queue:, created_by:)
     rules = rules.deep_stringify_keys
     violations = HelpdeskContracts.errors(:routing_rules, rules).map(&:to_s)
+    violations += value_violations(brand, rules) if violations.empty?
     raise InvalidRules, violations if violations.any?
 
     transaction do
@@ -37,9 +38,33 @@ class RoutingRuleset < ApplicationRecord
       raise InvalidRules, violations if violations.any?
 
       version = where(brand_id: brand.id).maximum(:version).to_i + 1
-      create!(brand:, version:, rules:, default_queue:, created_by:)
+      create!(brand:, version:, rules:, default_queue:, created_by:).tap { audit_published(_1, created_by) }
     end
   end
+
+  # RF-54: alteração de configuração gera auditoria imutável, na mesma transação da versão.
+  def self.audit_published(ruleset, created_by)
+    AuditEvent.create!(brand_id: ruleset.brand_id, ticket_id: nil, actor_type: "user", actor_id: created_by&.id,
+                       event_type: "routing_ruleset.published", trace_id: SecureRandom.hex(16),
+                       ruleset_version: ruleset.version,
+                       data: { version: ruleset.version, routing_ruleset_id: ruleset.id, rules_count: ruleset.rules["rules"].size,
+                               default_queue_id: ruleset.default_queue_id })
+  end
+  private_class_method :audit_published
+
+  # RF-17: categoria e prioridade que a triagem não conhece fariam a regra nunca casar, sem aviso ao supervisor.
+  def self.value_violations(brand, rules)
+    known = { "category" => Triage::Policy.for(brand).categories, "priority" => Handoff::Policy::PRIORITIES }
+    labels = { "category" => "categoria", "priority" => "prioridade" }
+    rules["rules"].each_with_index.flat_map do |rule, index|
+      conditions = rule["any"].flat_map { _1["all"] }.select { known.key?(_1["field"]) }
+      conditions.flat_map do |condition|
+        Array(condition["value"]).reject { known[condition["field"]].include?(_1) }
+                                 .map { "regra #{index + 1} «#{rule['name']}»: #{labels[condition['field']]} desconhecida: #{_1}" }
+      end
+    end
+  end
+  private_class_method :value_violations
 
   # RF-17, RN-15: a fila padrão existe, e ela e toda queue_id das regras são filas ativas da mesma marca.
   def self.queue_violations(brand, rules, default_queue)
