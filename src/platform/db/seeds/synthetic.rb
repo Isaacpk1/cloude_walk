@@ -17,6 +17,10 @@ module Seeds
     BOT_CAPACITY = 1_000
     # Número de WhatsApp sintético por marca (07, seção 5.0). Ligado à URL da conta.
     WHATSAPP_PHONE_NUMBER_IDS = { "infinitepay" => "100000000000001", "jim" => "100000000000002" }.freeze
+    # RN-05: conta do cliente no chat do app (account_id do webhook) do primeiro cliente, verificado, de cada
+    # marca. A da InfinitePay é a que o simulador (channels-mock) traz preenchida; a da JIM segue o mesmo
+    # formato. Sem ela, quem entra pelo chat chega como cliente não verificado e a IA pede identificação.
+    CHAT_ACCOUNT_IDS = { "infinitepay" => "acc_infinitepay_000021", "jim" => "acc_jim_000021" }.freeze
 
     def self.call(...) = new(...).call
 
@@ -87,15 +91,24 @@ module Seeds
         email = "#{local}.#{i}@#{brand.slug}.example.test"
 
         identity = CustomerIdentity.find_by(brand:, channel: "whatsapp", external_id: phone)
-        next identity.customer if identity
-
-        customer = Customer.create!(brand:, display_name: name, verified: i.even?)
-        customer.identities.create!(brand:, channel: "whatsapp", external_id: phone)
-        customer.identities.create!(brand:, channel: "email", external_id: email)
+        customer = identity&.customer || Customer.create!(brand:, display_name: name, verified: i.even?).tap do |created|
+          created.identities.create!(brand:, channel: "whatsapp", external_id: phone)
+          created.identities.create!(brand:, channel: "email", external_id: email)
+        end
+        chat_identity_for(customer) if i.zero?
         customer
       end
     ensure
       Faker::Number.unique.clear
+    end
+
+    # O primeiro cliente é verificado (i.even?). Se a conta já pertence a outro cliente (ex.: criado pela
+    # ingestão antes do seed), não muda o dono: o seed não mexe em dados que não criou.
+    def chat_identity_for(customer)
+      attrs = { brand_id: customer.brand_id, channel: "chat", external_id: CHAT_ACCOUNT_IDS.fetch(customer.brand.slug) }
+      return if CustomerIdentity.exists?(attrs)
+
+      customer.identities.create!(attrs)
     end
   end
 end

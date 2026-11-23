@@ -24,8 +24,9 @@ logs: ## Acompanha os logs
 seed: ## Carrega os dados sintéticos (SEED e CUSTOMERS_PER_BRAND no .env)
 	$(PLATFORM) bin/rails db:seed
 
-reset: ## Recria o banco e carrega o seed
+reset: ## Recria o banco, carrega o seed e reinicia o channels-mock (o estado dele fica em memória, ADR-021)
 	$(PLATFORM) bin/rails db:reset
+	$(COMPOSE) restart channels-mock
 
 test: ## Roda o rspec da plataforma, dos contratos, do broker, do agente mock e dos canais simulados
 	$(PLATFORM) sh -c "RAILS_ENV=test bin/rails db:prepare && bundle exec rspec"

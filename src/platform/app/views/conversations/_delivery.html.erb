@@ -1,0 +1,17 @@
+<%# ROADMAP 05: status da entrega de uma mensagem de saída (ConversationView::DeliveryStatus). Texto vindo do provedor só com o escape padrão do ERB. %>
+<div class="delivery delivery--<%= delivery.status %>">
+  <% if delivery.turn %><span class="chip chip--applied">Resposta do turno <%= delivery.turn %></span><% end %>
+  <% if delivery.delivered? %>
+    <span>entregue às <%= panel_time(delivery.delivered_at) %></span>
+    <code title="provider_message_id"><%= delivery.provider_message_id %></code>
+  <% end %>
+  <% if delivery.attempts.positive? %><span class="muted">tentativa <%= delivery.attempts %></span><% end %>
+  <% if delivery.next_attempt_at %><span>nova tentativa às <%= panel_time(delivery.next_attempt_at) %></span><% end %>
+  <% if delivery.failed? %>
+    <span class="delivery__reason"><%= delivery.failure_reason_label || "motivo não registrado" %><%= " · HTTP #{delivery.http_status}" if delivery.http_status %></span>
+  <% end %>
+  <% if delivery.last_error && !delivery.delivered? %><span class="muted" title="last_error"><%= delivery.last_error %></span><% end %>
+  <% if delivery.reconciliation_needed %>
+    <span class="badge badge--error" title="Confirmação do provedor incerta (07, seção 6)">Conciliação pendente</span>
+  <% end %>
+</div>

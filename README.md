@@ -18,6 +18,15 @@ make seed              # carrega os dados sintéticos (semente em SEED)
 
 Abra http://localhost:3000. A tela inicial lista as conversas de exemplo.
 
+**Demonstração pelo chat.** O simulador do cliente fica em http://localhost:4000. O seed cria, em cada marca, um cliente **verificado** com conta no chat do app, para a IA poder consultar dados da conta (RN-05):
+
+| Conta do provedor | `account_id` | Cliente |
+| --- | --- | --- |
+| `infinitepay-chat-mock` | `acc_infinitepay_000021` (já vem preenchido no simulador) | verificado |
+| `jim-chat-mock` | `acc_jim_000021` | verificado |
+
+Qualquer outro `account_id` chega como cliente não verificado, e a IA pede identificação antes de consultar. Num banco que já recebeu mensagens dessas contas antes do seed, a identidade continua com o cliente não verificado: rode `make reset`.
+
 | Comando | Para |
 | --- | --- |
 | `make check` | Testes, rubocop e brakeman. Precisa passar antes de abrir o pull request |

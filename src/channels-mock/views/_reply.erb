@@ -1,0 +1,24 @@
+<li class="reply">
+  <div><%= record.text %></div>
+  <div class="muted">
+    <% if total %><span class="total">Tempo total <%= total.total_label %></span> (<%= total.total_ms %> ms) · <% end %>
+    seq <%= record.seq %> · <code><%= record.message_id %></code> · reply_to <code><%= record.reply_to || "—" %></code>
+  </div>
+  <div class="muted">
+    Idempotency-Key (delivery_id) <code><%= record.key %></code> · conversa <code><%= record.conversation_id %></code>
+    <% if record.replays.positive? %> · <span class="badge badge--dup">repetida <%= record.replays %>×</span><% end %>
+    <% if record.trace_id %> · trace <code><%= record.trace_id %></code><% end %>
+  </div>
+  <div class="muted">
+    Status enviado à plataforma: <code><%= record.last_status %></code>
+    <% if (last = record.statuses.last) %>
+      (<%= last["attempts"] %> tentativa(s)<%= ", HTTP #{last['http_status']}" if last["http_status"] %><%= ", #{last['error']}" if last["error"] %>)
+    <% end %>
+    <form method="post" action="/provider/chat/messages/<%= record.message_id %>/status">
+      <input type="hidden" name="status" value="read"><button class="secondary" type="submit">Marcar como lida</button>
+    </form>
+    <form method="post" action="/provider/chat/messages/<%= record.message_id %>/status">
+      <input type="hidden" name="status" value="failed"><button class="secondary" type="submit">Simular falha de entrega</button>
+    </form>
+  </div>
+</li>

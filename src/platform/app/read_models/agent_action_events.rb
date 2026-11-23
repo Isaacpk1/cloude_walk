@@ -32,6 +32,15 @@ class AgentActionEvents
 
   def events = audits.flat_map { action_events(_1) }
 
+  # Quando a plataforma registrou a ação do turno (ROADMAP 05, estágio "ação recebida"): a auditoria da
+  # ação aplicada, no turno applied; senão a da primeira ação recebida; sem auditoria, response_received_at.
+  def received_at(turn)
+    return unless turn.response
+
+    event_id = turn.status == "applied" ? turn.applied_event_id : turn.response["event_id"]
+    audits.find { _1.data["event_id"] == event_id }&.occurred_at || turn.response_received_at
+  end
+
   private
 
   def applied_action(turn)

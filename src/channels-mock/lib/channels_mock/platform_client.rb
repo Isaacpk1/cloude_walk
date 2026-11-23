@@ -1,6 +1,7 @@
 require "json"
 require "net/http"
 require "securerandom"
+require_relative "clock"
 
 module ChannelsMock
   # Faz o papel do provedor que chama o webhook da plataforma (07, seção 3.1).
@@ -17,13 +18,22 @@ module ChannelsMock
 
     # tamper_signature: assina com outro segredo, para demonstrar a recusa (RNF-23).
     def deliver(channel:, account:, payload:, tamper_signature: false)
+      post("/webhooks/#{channel}/#{account}", account:, payload:, tamper_signature:)
+    end
+
+    # Callback de status do chat, assinado como o webhook de entrada (interface do bloco 05, seção 3).
+    def deliver_status(account:, payload:) = post("/webhooks/chat/#{account}/status", account:, payload:)
+
+    private
+
+    def post(path, account:, payload:, tamper_signature: false)
       trace_id = SecureRandom.hex(16)
-      uri = URI.join(@base_url, "/webhooks/#{channel}/#{account}")
+      uri = URI.join(@base_url, path)
       body = JSON.generate(payload)
       secret = tamper_signature ? "segredo-errado-#{SecureRandom.hex(4)}" : self.class.secret_for(account)
       request = Net::HTTP::Post.new(uri, "Content-Type" => "application/json",
                                          "traceparent" => "00-#{trace_id}-#{SecureRandom.hex(8)}-01",
-                                         HelpdeskContracts::Signature::HEADER => HelpdeskContracts::Signature.header(body, secret:))
+                                         HelpdeskContracts::Signature::HEADER => HelpdeskContracts::Signature.header(body, secret:, at: Clock.now))
       request.body = body
 
       response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
@@ -31,8 +41,6 @@ module ChannelsMock
     rescue SystemCallError, Timeout::Error, SocketError, IOError => e
       Response.new(status: nil, body: nil, error: e.message, trace_id:)
     end
-
-    private
 
     def parse(body)
       JSON.parse(body.to_s)

@@ -9,6 +9,9 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
+  # Status de entrega do chat (bloco 05; 07, seção 5.0). A conta da URL define a marca.
+  post "webhooks/chat/:provider_account/status" => "webhooks/chat_statuses#create", as: :chat_status_webhook
+
   # Entrada dos provedores de canal (bloco 02; 07, seção 5.0). Marca e conta vêm da URL.
   post "webhooks/:channel/:provider_account" => "webhooks/channels#create", as: :channel_webhook,
        constraints: { channel: /chat|whatsapp|email/ }

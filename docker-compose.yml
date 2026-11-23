@@ -15,6 +15,8 @@ x-platform: &platform
     DATABASE_URL: postgres://${POSTGRES_USER:-helpdesk}:${POSTGRES_PASSWORD:-helpdesk}@postgres:5432
     REDIS_URL: redis://redis:6379/0
     BROKER_URL: http://broker:4100/webhooks
+    # Provedor simulado dos canais: o worker entrega as saídas aqui (bloco 05; 07, seção 3.2).
+    CHANNELS_URL: http://channels-mock:4000
     # Log na saída do contêiner (docker compose logs), não em arquivo na pasta montada: no Windows,
     # cada escrita nela é lenta (config/environments/development.rb).
     RAILS_LOG_TO_STDOUT: "1"
@@ -242,6 +244,8 @@ services:
     environment:
       PLATFORM_URL: http://web:3000              # de contêiner para contêiner
       PLATFORM_PUBLIC_URL: http://localhost:3000 # links abertos no navegador
+      # Falha simulada do provedor do chat (none, lose_ack, unavailable, reject); a tela também troca.
+      CHAT_PROVIDER_FAULT: ${CHAT_PROVIDER_FAULT:-none}
     ports:
       - "4000:4000"
     depends_on:

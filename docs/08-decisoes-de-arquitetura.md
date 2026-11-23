@@ -28,6 +28,7 @@ Formato: ADR curto (contexto → decisão → alternativas → consequências). 
 | Formato dos canais simulados | Subconjunto fiel da Cloud API do WhatsApp e da API do Gmail, com adaptador de entrada e de saída por canal | [ADR-018](#adr-018--canais-simulados-no-formato-dos-provedores-reais) |
 | Contas e autenticação dos webhooks de entrada | Conta do provedor na URL e cadastrada na tabela `provider_accounts`, com segredo criptografado. Cada canal confere a assinatura do seu provedor | [ADR-019](#adr-019--contas-dos-provedores-e-autenticação-dos-webhooks-de-entrada) |
 | Prazo da IA | 20 s por turno, teto de 60 s por ciclo, escalação imediata em falha definitiva da publicação. Configurável por marca no bloco 12 | [ADR-020](#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo) |
+| Entrega ao canal | Identidade e ordem da entrega em cabeçalhos; aceite do provedor vale como entregue; falha certa avança a fila e só o resultado incerto vai para conciliação (proposto) | [ADR-021](#adr-021--entrega-ao-canal-identidade-aceite-e-conciliação) |
 
 ### Orçamento de memória (RNF-29: 4 vCPU, 8 GB)
 
@@ -533,6 +534,34 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - (−) Dois prazos para validar em vez de um: o consumer confere o do turno, que nunca passa do teto.
 - Os valores (20 s e 60 s) são proposta. Devem ser calibrados com o p95 do agente real e com o E4.
 - Implementação: o bloco 03 grava o teto do ciclo e o prazo do turno a partir da `Turns::Policy`. A tela de configuração entra no bloco 12. O handoff no vencimento e na falha definitiva entra nos blocos 08 e 10.
+
+## ADR-021 — Entrega ao canal: identidade, aceite e conciliação
+
+**Proposto em 20/11/2026, no bloco 05. Aguarda aprovação.** Detalha a seção 3.2 e a 5.0 do [07](07-arquitetura.md). Mantém o [ADR-016](#adr-016--prazos-do-atendimento-e-ações-duráveis-no-outbox) e o [ADR-018](#adr-018--canais-simulados-no-formato-dos-provedores-reais).
+
+**Contexto.** O bloco 05 entrega a resposta da IA ao canal de origem. O 07 pede `delivery_id` estável, ordem pelo `seq`, provedor que deduplica e recusa `seq` anterior, e conciliação quando o resultado fica incerto. Faltava decidir onde esses dados viajam, quando uma entrega conta como entregue e o que fazer quando as retentativas acabam.
+
+**Decisão.**
+
+1. **Identidade e ordem em cabeçalhos.** O corpo segue o formato do provedor. `Idempotency-Key` leva o `delivery_id`; `X-Conversation-Id` e `X-Conversation-Seq` levam a conversa e o `seq`; o corpo é assinado com o segredo da conta (ADR-019). O provedor devolve a mesma confirmação para a mesma chave, com `Idempotent-Replayed: true`.
+2. **Aceite é entrega.** No chat, o `200` do `POST /messages` com `message_id` vale como `delivered`, com `provider_message_id` e `delivered_at`. O callback de status só muda a entrega quando traz `failed`. Todo callback aceito vira `delivery.status_received` na auditoria. Callback de uma mensagem que a plataforma ainda não registrou recebe `503`, para o provedor repetir depois do commit da confirmação.
+3. **Falha certa avança, resultado incerto concilia.** `4xx` (exceto `429`) é rejeição definitiva: `failed`, e a próxima saída do atendimento segue. Esgotadas as retentativas (RN-43), a entrega vira `failed` (`provedor_indisponivel`) quando todas as tentativas foram sem efeito certo (conexão recusada, `503` ou `429` do provedor), e a fila avança. Se ao menos uma tentativa teve resultado incerto (timeout de leitura, conexão cortada depois do envio, outro `5xx`), a entrega fica em `sending`, o item do outbox é encerrado com `last_error = reconciliation_needed` e as saídas seguintes esperam a conciliação.
+
+**Alternativas consideradas.**
+
+| Alternativa | Por que não |
+| --- | --- |
+| `delivery_id` e `seq` no corpo | Muda o formato do provedor (ADR-018) e não existe no provedor real |
+| Esperar o callback `delivered` para avançar a fila | O e-mail não tem callback de entrega, e um callback perdido travaria a conversa |
+| Toda falha esgotada vai para conciliação | Conexão recusada é não entrega certa: travaria o atendimento sem motivo, inclusive o aviso de transferência do bloco 10 |
+| Toda falha esgotada vira `failed` | Um timeout depois do envio pode ter entregado: avançar mandaria a próxima resposta fora de ordem ou duplicada |
+
+**Consequências.**
+
+- (+) A mesma regra serve aos três canais e a um provedor real com idempotência.
+- (+) Uma queda do provedor não trava o atendimento; só a dúvida real trava.
+- (−) A conciliação precisa de tela e ação do analista (bloco 09). Até lá, uma conversa em conciliação para de receber saídas.
+- (−) O `channels-mock` guarda o estado em memória: reiniciá-lo zera a deduplicação, e recriar o banco com o mock no ar colide nas conversas (`make reset` reinicia o mock).
 
 ---
 

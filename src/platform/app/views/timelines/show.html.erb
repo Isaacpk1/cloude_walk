@@ -17,6 +17,7 @@
   <div class="stat"><dt>Duração total</dt><dd><%= duration_text(t.total_duration_ms) %></dd></div>
   <div class="stat"><dt>Espera intencional</dt><dd><%= duration_text(t.duration_ms_of(:intentional_wait)) %></dd></div>
   <div class="stat"><dt>Execução do agente</dt><dd><%= duration_text(t.duration_ms_of(:agent_run)) %></dd></div>
+  <div class="stat"><dt>Entrega ao canal</dt><dd><%= duration_text(t.duration_ms_of(:delivered)) %></dd></div>
   <div class="stat"><dt>Eventos</dt><dd><%= t.events.size %></dd></div>
 </dl>
 

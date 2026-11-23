@@ -34,20 +34,57 @@
 </section>
 
 <section class="card">
-  <h2>Envios</h2>
-  <% if entries.empty? %>
+  <h2>Provedor do chat: falhas simuladas</h2>
+  <p class="muted">A plataforma entrega as respostas em <code>POST /provider/chat/&lt;conta&gt;/messages</code>
+    (07, seção 5.0), com <code>Idempotency-Key</code> = <code>delivery_id</code>. Use as falhas para ver a retentativa
+    e a conciliação (07, seção 3.2).</p>
+  <p>Falha ativa: <code><%= fault["fault"] %></code>
+    <% if fault["remaining"].positive? %><span class="muted">(próximas <%= fault["remaining"] %> entregas)</span><% end %></p>
+  <form method="post" action="/simulador/falhas" class="row">
+    <div>
+      <label for="fault">Próximas entregas</label>
+      <select id="fault" name="fault">
+        <% { "none" => "Sem falha", "lose_ack" => "Perder a confirmação (grava e responde 504)",
+             "unavailable" => "Recusar com 503 (transitório, sem efeito)",
+             "reject" => "Recusar definitivo com 422 (sem efeito)" }.each do |value, label| %>
+          <option value="<%= value %>" <%= "selected" if fault["fault"] == value %>><%= label %></option>
+        <% end %>
+      </select>
+    </div>
+    <div>
+      <label for="times">Quantas vezes</label>
+      <input id="times" name="times" type="number" min="1" value="1">
+    </div>
+    <div><button type="submit">Aplicar</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Conversa</h2>
+  <p class="muted"><a href="/?atualizar=3">Atualizar a cada 3 s</a> · <a href="/">Parar</a>.
+    Tempo total = chegada da resposta ao provedor − envio do cliente (RNF-05, latência percebida).</p>
+  <% if items.empty? %>
     <p class="muted">Nenhum envio ainda.</p>
   <% else %>
     <table>
-      <thead><tr><th>#</th><th>Mensagem</th><th>Resposta da plataforma</th><th>Conversa</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>Mensagem do cliente e respostas</th><th>Resposta da plataforma</th><th>Conversa</th><th></th></tr></thead>
       <tbody>
-        <% entries.each do |entry| %>
+        <% items.each do |item| %>
+          <% entry = item.entry %>
           <% css = { "Confirmada" => "ok", "Duplicada" => "dup" }.fetch(entry.outcome, "err") %>
           <tr>
             <td><%= entry.id %></td>
             <td>
               <%= entry.payload["text"] %>
               <div class="muted"><%= entry.account %> · <code><%= entry.payload["message_id"] %></code></div>
+              <% if item.resend_of %><div class="muted">Reenvio do #<%= item.resend_of %>: as respostas aparecem lá.</div><% end %>
+              <% unless item.replies.empty? %>
+                <ul class="replies">
+                  <% item.replies.each do |reply| %>
+                    <%== render("_reply", locals: { record: reply.record, total: reply }) %>
+                  <% end %>
+                </ul>
+              <% end %>
             </td>
             <td>
               <span class="badge badge--<%= css %>"><%= entry.outcome %></span>
@@ -57,11 +94,12 @@
               <% if entry.error || entry.response&.error %>
                 <div class="muted"><%= entry.error ? "Mensagem fora do contrato: #{entry.error}" : entry.response.error %></div>
               <% end %>
-              <% if entry.response %><div class="muted">trace <code><%= entry.response.trace_id[0, 8] %></code></div><% end %>
+              <% if entry.response %><div class="muted">trace <code><%= entry.response.trace_id %></code></div><% end %>
             </td>
             <td>
               <% if entry.ticket_id %>
                 <a href="<%= platform_url %>/conversas/<%= entry.ticket_id %>">Abrir conversa <%= entry.ticket_id %></a>
+                <div><a href="<%= platform_url %>/linha-do-tempo/<%= entry.ticket_id %>">Linha do tempo</a></div>
               <% end %>
             </td>
             <td>
@@ -77,3 +115,15 @@
     </table>
   <% end %>
 </section>
+
+<% unless orphans.empty? %>
+  <section class="card">
+    <h2>Respostas sem envio ligado</h2>
+    <p class="muted">O <code>reply_to</code> não corresponde a nenhum envio deste simulador (por exemplo, depois de reiniciar o mock).</p>
+    <ul class="replies">
+      <% orphans.each do |record| %>
+        <%== render("_reply", locals: { record:, total: nil }) %>
+      <% end %>
+    </ul>
+  </section>
+<% end %>

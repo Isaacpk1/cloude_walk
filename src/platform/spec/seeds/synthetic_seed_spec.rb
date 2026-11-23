@@ -83,6 +83,38 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
     expect(User.where(kind: "human").pluck(:capacity)).to all(eq(5))
   end
 
+  describe "RN-05: cliente de chat verificado para a demonstração" do
+    it "cada marca tem um cliente verificado com a identidade chat do account_id do simulador" do
+      Seeds::Synthetic.call(seed: 42)
+
+      expect(Seeds::Synthetic::CHAT_ACCOUNT_IDS).to eq("infinitepay" => "acc_infinitepay_000021", "jim" => "acc_jim_000021")
+      Seeds::Synthetic::CHAT_ACCOUNT_IDS.each do |slug, account_id|
+        identity = CustomerIdentity.find_by!(brand: Brand.find_by!(slug:), channel: "chat", external_id: account_id)
+        expect(identity.customer).to have_attributes(verified: true, brand_id: identity.brand_id)
+      end
+    end
+
+    it "é determinístico pela semente e não duplica ao rodar de novo" do
+      Seeds::Synthetic.call(seed: 42)
+      owner = CustomerIdentity.where(channel: "chat").order(:external_id).map { _1.customer.display_name }
+
+      Seeds::Synthetic.call(seed: 42)
+      expect(CustomerIdentity.where(channel: "chat").count).to eq(2)
+      DatabaseCleaner.clean_with(:truncation)
+
+      Seeds::Synthetic.call(seed: 42)
+      expect(CustomerIdentity.where(channel: "chat").order(:external_id).map { _1.customer.display_name }).to eq(owner)
+    end
+
+    it "a mensagem do simulador pelo chat chega de um cliente verificado, e a de outra marca não o alcança" do
+      Seeds::Synthetic.call(seed: 42)
+
+      expect(ingest(brand: "infinitepay", identity: "acc_infinitepay_000021").ticket.customer.verified).to be(true)
+      expect(ingest("my payout", brand: "jim", identity: "acc_jim_000021").ticket.customer.verified).to be(true)
+      expect(ingest("my payout", brand: "jim", identity: "acc_infinitepay_000021").ticket.customer.verified).to be(false)
+    end
+  end
+
   it "RN-42: cada marca com o idioma da mensagem padrão (pt-BR na InfinitePay, inglês na JIM)" do
     Seeds::Synthetic.call(seed: 42)
 

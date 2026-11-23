@@ -30,6 +30,12 @@ RSpec.describe Outbox::Recover, "RNF-14: recuperação dos itens abertos do outb
     expect(described_class.call).to eq([])
   end
 
+  it "RF-06: reoferece a saída para o canal (delivery.requested) cujo aviso se perdeu" do
+    lost = item(event_type: "delivery.requested")
+
+    expect(described_class.call).to eq([ lost.id ])
+  end
+
   it "só reoferece tipos que o worker sabe processar" do
     item(event_type: "tipo.de.bloco.futuro")
 

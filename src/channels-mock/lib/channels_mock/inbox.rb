@@ -1,3 +1,5 @@
+require_relative "clock"
+
 module ChannelsMock
   # Histórico do simulador, só em memória (docs/10, seção 3.4). Não é fonte da verdade.
   module Inbox
@@ -20,7 +22,7 @@ module ChannelsMock
     class << self
       def add(**attrs)
         @lock.synchronize do
-          entry = Entry.new(id: (@entries.first&.id || 0) + 1, sent_at: Time.now, tampered: false, **attrs)
+          entry = Entry.new(id: (@entries.first&.id || 0) + 1, sent_at: Clock.now, tampered: false, **attrs)
           @entries.unshift(entry)
           @entries.pop while @entries.size > LIMIT
           entry
