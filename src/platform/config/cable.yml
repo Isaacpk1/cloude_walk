@@ -1,5 +1,10 @@
+# Bloco 10 (RNF-06; 07, seção 3.2 "Broadcast por ActionCable"): o aviso da fila humana sai do worker (Sidekiq) e do
+# consumer, não do web. Em desenvolvimento o adaptador precisa cruzar processos: o `async` só vale dentro de um
+# processo. O PostgreSQL (LISTEN/NOTIFY) já está no Compose e não pede gem nova; o aviso é só o pedido de recarga,
+# bem abaixo do limite de 8 000 bytes do NOTIFY. Produção segue o 07 (Redis), que pede a gem `redis`.
 development:
-  adapter: async
+  adapter: postgresql
+  channel_prefix: platform_development
 
 test:
   adapter: test

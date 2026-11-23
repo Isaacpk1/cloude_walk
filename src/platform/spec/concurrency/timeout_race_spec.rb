@@ -153,8 +153,11 @@ RSpec.describe "RN-46: timeout, resposta, handoff e ingestão concorrendo pelo a
     end
 
     def expect_human_without_cycle(ticket)
-      expect(ticket).to have_attributes(state: "aguardando_humano", assignment_version: 1, latest_customer_seq: 2,
+      # O seq da mensagem nova depende da ordem: o aviso de transferência (RN-42) também ocupa um seq.
+      customer_seq = Message.where(ticket_id: ticket.id, brand_id: ticket.brand_id, author_type: "customer").maximum(:seq)
+      expect(ticket).to have_attributes(state: "aguardando_humano", assignment_version: 1, latest_customer_seq: customer_seq,
                                         first_pending_seq: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+      expect(Message.where(ticket_id: ticket.id, author_type: "customer").count).to eq(2)
       emitted = travel_to(t0 + 30.seconds) do
         Deadlines::Loop::REGISTRATIONS.sum { _1.constantize.call(now: Time.current, limit: 10).size }
       end

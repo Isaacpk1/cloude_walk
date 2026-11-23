@@ -29,8 +29,13 @@
 #    Erro de caractere do Postgres dentro da transação (defesa além da checagem do passo 1) também é
 #    permanente e vai para a DLQ; qualquer outro erro de banco é transitório e sobe (o offset não é confirmado).
 #
-# Fora do escopo aqui: o envio ao provedor (Deliveries::Send, no worker), o handoff da `escalate` e o aviso
-# de transferência (bloco 10) e o encerramento da `resolve` (RN-36).
+# 5. Handoff (bloco 10; RN-33, itens 1 e 6): a `escalate` aplicada pede o handoff `decisao_do_agente` com o resumo do
+#    agente, sem saída ao cliente; cada `reply` aplicado soma uma troca em `tickets.ai_turns_count` e, no limite da
+#    Handoff::Policy, pede `limite_de_trocas`; a `resolve` aplicada zera a contagem. O pedido sai na transação do
+#    `applied` e o OutboxJob dele é acordado depois do commit; a auditoria `agent_action.applied` leva `handoff_event_id`.
+#
+# Fora do escopo aqui: o envio ao provedor (Deliveries::Send, no worker), o Escalate e o aviso de transferência
+# (Handoff::Escalate) e o encerramento da `resolve` (RN-36).
 module AgentActions
   class Apply
     Result = Data.define(:status, :reason, :turn)
@@ -48,8 +53,9 @@ module AgentActions
 
     # Saída da transação: o que aconteceu e o que fazer depois do commit.
     # delivery_event_id: o item delivery.requested gravado, para acordar o worker depois do commit.
-    Outcome = Data.define(:status, :reason, :turn, :trace_id, :dead_letter, :delivery_event_id) do
-      def initialize(delivery_event_id: nil, **) = super
+    # handoff_event_id: o pedido de handoff gravado (escalate ou limite de trocas), para acordar o Escalate.
+    Outcome = Data.define(:status, :reason, :turn, :trace_id, :dead_letter, :delivery_event_id, :handoff_event_id) do
+      def initialize(delivery_event_id: nil, handoff_event_id: nil, **) = super
     end
 
     def self.call(...) = new(...).call
@@ -65,7 +71,8 @@ module AgentActions
       violations = unstorable(JSON.parse(@raw)) if violations.empty?
       outcome = violations.any? ? invalid(violations) : decide
       dead_letter(outcome) if outcome.dead_letter
-      notify_worker(outcome) if outcome.delivery_event_id
+      notify_worker(outcome.delivery_event_id, outcome.trace_id) if outcome.delivery_event_id
+      notify_worker(outcome.handoff_event_id, outcome.trace_id) if outcome.handoff_event_id
       log(outcome) # depois da confirmação da DLQ: se o Kafka recusar, o erro sobe sem logar dead_lettered
       Result.new(status: outcome.status, reason: outcome.reason, turn: outcome.turn)
     end
@@ -218,12 +225,57 @@ module AgentActions
       # "Marca o turno applied, registra a ação final, limpa os prazos e cancela o aviso de progresso do ciclo que
       # ainda estiver pending" (07, seção 3.4; RN-57).
       cycle_seq = @ticket.first_pending_seq
+      handoff = handoff_effects
       @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil,
                              progress_due_at: nil)
-      audit("agent_action.applied")
+      audit("agent_action.applied", **handoff)
       cancel_progress_notice(cycle_seq)
       request_delivery
       outcome(:applied, nil)
+    end
+
+    # --- Handoff pela ação do agente (bloco 10; RN-33, itens 1 e 6; 07, seção 3.2) ---
+
+    # Com o turno já `applied` (o Request só expira turnos eligible: não desfaz a ação final) e antes de limpar o
+    # ciclo, para o pedido levar o first_pending_seq. Devolve o que entra na auditoria `agent_action.applied`.
+    def handoff_effects
+      case action.fetch("action")
+      when "escalate"
+        { handoff_event_id: request_handoff("decisao_do_agente", summary: action.dig("escalation", "summary")) }
+      when "reply" then count_exchange
+      when "resolve" then reset_exchanges
+      else {}
+      end
+    end
+
+    # RN-33, item 6. Uma troca é um turno com `reply` aplicado na atribuição atual da IA: escalate, resolve e
+    # respostas rejeitadas não contam. A soma é no banco, com a linha travada e o escopo da marca (invariante 8);
+    # ao chegar ao limite, o pedido sai na mesma transação. A 10ª resposta é gravada aqui também, com seq menor
+    # que o do aviso de transferência, que só o Escalate grava, depois do commit (RN-42; 07, seção 3.2).
+    def count_exchange
+      count = update_exchanges("ai_turns_count = ai_turns_count + 1")
+      limit = Handoff::Policy.for(@ticket.brand).exchanges_limit
+      return { ai_turns_count: count } if count < limit
+
+      { ai_turns_count: count, handoff_event_id: request_handoff("limite_de_trocas") }.compact
+    end
+
+    # RN-33, item 6 ("sem resolver"): a resolve aplicada encerra a sequência de trocas.
+    def reset_exchanges = { ai_turns_count: update_exchanges("ai_turns_count = 0") }
+
+    def update_exchanges(assignment)
+      sql = Ticket.sanitize_sql_array([ "UPDATE tickets SET #{assignment} WHERE id = ? AND brand_id = ? RETURNING ai_turns_count",
+                                        @ticket.id, @ticket.brand_id ])
+      value = Ticket.connection.select_value(sql, "Ticket Exchanges")
+      @ticket[:ai_turns_count] = value
+      @ticket.clear_attribute_changes([ :ai_turns_count ])
+      value
+    end
+
+    # Um pedido por atribuição (chave do Request): colisão devolve nil e não muda o applied.
+    def request_handoff(reason, summary: nil)
+      @handoff_event_id = Handoff::Request.call(ticket: @ticket, reason:, source: "agent", turn: @turn.turn, summary:,
+                                                trace_id:)
     end
 
     # RN-57: o aviso do ciclo que ainda não saiu (pending) não vale mais. Um aviso em `sending` fica para a
@@ -245,7 +297,7 @@ module AgentActions
 
     # --- Saída ao cliente (bloco 05; 07, seção 3.1, passo 6, e seção 3.2; RF-06, RNF-14, RNF-15) ---
 
-    # Texto para o cliente e o tipo da entrega. A escalate não tem texto: o aviso de transferência é do bloco 10.
+    # Texto para o cliente e o tipo da entrega. A escalate não tem texto: o aviso de transferência é do Escalate.
     def outgoing
       case action.fetch("action")
       when "reply" then [ action.dig("reply", "text"), "reply" ]
@@ -332,7 +384,8 @@ module AgentActions
     def content = action.slice(*CONTENT_FIELDS).transform_keys(&:to_sym)
 
     def outcome(status, reason)
-      Outcome.new(status:, reason:, turn: @turn, trace_id:, dead_letter: nil, delivery_event_id: @delivery_event&.id)
+      Outcome.new(status:, reason:, turn: @turn, trace_id:, dead_letter: nil, delivery_event_id: @delivery_event&.id,
+                  handoff_event_id: @handoff_event_id)
     end
 
     # --- Rastreio (RF-56) ---
@@ -350,11 +403,11 @@ module AgentActions
 
     # Despertador do envio, como na ingestão. Se o Redis estiver fora, a entrega já está gravada e o item segue
     # aberto no outbox: a recuperação o reoferece (07, seção 6).
-    def notify_worker(outcome)
-      OutboxJob.perform_later(outcome.delivery_event_id)
+    # O mesmo vale para o pedido de handoff (escalate, limite de trocas).
+    def notify_worker(event_id, trace_id)
+      OutboxJob.perform_later(event_id)
     rescue StandardError => e
-      JsonLog.warn("outbox.enqueue_failed", trace_id: outcome.trace_id, event_id: outcome.delivery_event_id,
-                                            error: e.class.name)
+      JsonLog.warn("outbox.enqueue_failed", trace_id:, event_id:, error: e.class.name)
     end
 
     def log(outcome)

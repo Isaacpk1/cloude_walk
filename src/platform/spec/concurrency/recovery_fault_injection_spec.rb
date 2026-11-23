@@ -245,7 +245,8 @@ RSpec.describe "RNF-14, RNF-17, RF-34 + RF-35: injeção de falhas e recuperaç�
       expect(broker_requests.size).to eq(1) # só a tentativa que falhou
       expect(AiTurn.where(ticket_id: ticket.id).count).to eq(turns)
       expect(audits("agent_action.applied", ticket)).to be_empty
-      expect(outbound_messages(ticket)).to be_empty
+      # Saída da IA; o aviso de transferência do Escalate (author_type system, RN-42) não reativa a IA.
+      expect(outbound_messages(ticket).where(author_type: "bot")).to be_empty
     end
 
     it "mensagem nova: o despertador da retentativa encontra o turno superado e não publica" do

@@ -24,4 +24,6 @@ Rails.application.routes.draw do
   resources :evals, only: %i[index show]
   # Bloco 09 (RF-37): DLQ para o supervisor. Reprocessar fica para o bloco seguinte.
   resources :dead_letters, path: "dlq", only: %i[index show]
+  # Bloco 10 (RF-42, RF-45, RN-29): casos em aguardando_humano. ?marca=<slug> restringe à marca.
+  get "fila" => "human_queue#index", as: :human_queue
 end

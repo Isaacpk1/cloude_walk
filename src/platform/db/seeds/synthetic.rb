@@ -43,6 +43,7 @@ module Seeds
           team = Team.find_or_create_by!(brand:, name: "Suporte N1")
           [ bot, supervisor, *analysts_for(brand) ].each { |user| TeamMembership.find_or_create_by!(user:, team:) }
           default_queue_for(brand, team, created_by: supervisor)
+          escalation_queue_for(brand, team, created_by: supervisor)
           provider_accounts_for(brand)
           ProviderAccount.evaluation_for!(brand, "chat") # ADR-023, item 5: conta do eval, inativa
           customers_for(brand)
@@ -81,6 +82,13 @@ module Seeds
     def default_queue_for(brand, team, created_by:)
       queue = HelpdeskQueue.find_or_create_by!(brand:, is_default: true) { _1.team = team }
       queue.publish_version!(name: "Geral", ai_first: true, created_by:) if queue.current_version.nil?
+      queue
+    end
+
+    # RF-42 (bloco 10): a fila humana para onde o handoff vai até o roteamento por regras (bloco 11).
+    def escalation_queue_for(brand, team, created_by:)
+      queue = HelpdeskQueue.find_or_create_by!(brand:, escalation: true, active: true) { _1.team = team }
+      queue.publish_version!(name: "Escalas N1", ai_first: false, created_by:) if queue.current_version.nil?
       queue
     end
 

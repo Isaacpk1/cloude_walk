@@ -54,7 +54,7 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
       expect(turn.reload.response).to eq(action)
     end
 
-    it "bloco 04: escalate e resolve ficam registrados; handoff (bloco 10) e encerramento ainda não mudam o estado" do
+    it "bloco 04: escalate e resolve ficam registrados; o Apply não muda o estado (o handoff é do Escalate, apply_handoff_spec.rb)" do
       escalate = agent_action_for(turn, action: "escalate", escalation: {
         "reason" => "retencao_suspeita", "summary" => { "problema" => "Repasse retido", "dados_cliente" => "Lojista",
                                                         "acoes_tomadas" => "Consultou o repasse", "motivo" => "Retenção",

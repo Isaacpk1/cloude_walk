@@ -36,6 +36,8 @@ module AgentActionRecordHelpers
                          "turn_status" => turn.status, "platform_received_at" => now.utc.iso8601(6))
                   .merge(payload.slice("reply", "escalation", "resolution")).compact
     data["reason"] = rejected if rejected
+    # Bloco 10 (RN-33, item 6): a aplicada de reply ou resolve leva a contagem de trocas; o helper não a soma no atendimento.
+    data["ai_turns_count"] = payload["action"] == "reply" ? 1 : 0 if !rejected && %w[reply resolve].include?(payload["action"])
     AuditEvent.create!(brand_id: turn.brand_id, ticket_id: turn.ticket_id, actor_type: "agent",
                        event_type: rejected ? "agent_action.rejected" : "agent_action.applied", data:,
                        trace_id: OutboxEvent.find_by(id: turn.event_id)&.trace_id || SecureRandom.hex(16),

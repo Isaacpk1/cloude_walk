@@ -134,6 +134,30 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
       expect(AuditEvent.where(ticket_id: ticket.id, event_type: "ticket.escalated").count).to eq(1)
     end
 
+    it "RN-42, RN-39: handoff.requested acorda, depois do commit, o aviso de transferência e o pedido de resumo" do
+      ticket = ingest.ticket
+      id = request_handoff(ticket)
+      clear_enqueued_jobs
+
+      described_class.perform_now(id)
+
+      notice = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "delivery.requested")
+      summary = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "handoff.summary")
+      expect(described_class).to have_been_enqueued.with(notice.id).on_queue("critical")
+      expect(described_class).to have_been_enqueued.with(summary.id).on_queue("critical")
+    end
+
+    it "RN-42: Redis fora ao acordar o aviso: o handoff já está gravado e a recuperação reoferece o item" do
+      ticket = ingest.ticket
+      id = request_handoff(ticket)
+      allow(described_class).to receive(:perform_later).and_raise(RedisClient::CannotConnectError)
+
+      expect { described_class.perform_now(id) }.not_to raise_error
+
+      expect(ticket.reload.state).to eq("aguardando_humano")
+      expect(OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "delivery.requested").completed_at).to be_nil
+    end
+
     it "RN-46: publicação esgotada acorda o handoff pedido pelo outbox" do
       stub_broker({ status: 401 })
       described_class.perform_now(due_dispatch(ingest).id)
@@ -180,6 +204,26 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
 
     it "a recuperação do outbox reoferece o tipo (OutboxJob::HANDLED)" do
       expect(described_class::HANDLED).to include("progress.notice")
+    end
+  end
+
+  describe "RN-39, RN-40: handoff.summary (bloco 10)" do
+    it "monta o resumo da plataforma pelo ID e está em HANDLED, para a recuperação reoferecê-lo" do
+      expect(described_class::HANDLED).to include("handoff.summary")
+      turn = opened_turn
+      request_handoff(turn.ticket, reason: "prazo_do_turno", source: "scheduler", turn: turn.turn)
+      Handoff::Escalate.call(handoff_items(turn.ticket).sole.id)
+      # O Escalate (bloco 10) já grava este item; o teste o regrava com o payload que controla.
+      OutboxEvent.where(dedup_key: "summary:#{turn.ticket_id}:0").delete_all
+      item = OutboxEvent.create!(brand_id: turn.brand_id, ticket_id: turn.ticket_id, event_type: "handoff.summary",
+                                 dedup_key: "summary:#{turn.ticket_id}:0", trace_id: "d" * 32, next_attempt_at: Time.current,
+                                 payload: { "ticket_id" => turn.ticket_id, "from_assignment_version" => 0,
+                                            "reason" => "prazo_do_turno", "escalated_at" => Time.current.utc.iso8601(6) })
+
+      described_class.perform_now(item.id)
+
+      expect(HandoffSummary.find_by!(ticket_id: turn.ticket_id)).to have_attributes(source: "platform", status: "available")
+      expect(item.reload.completed_at).to be_present
     end
   end
 

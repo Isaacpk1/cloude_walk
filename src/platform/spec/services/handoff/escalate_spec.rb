@@ -1,8 +1,8 @@
 require "rails_helper"
 
 # Handoff mínimo do bloco 08 (interface combinada, item 1; 07, seção 3.2 "Transferência e ordem de entrega";
-# RN-33, RN-46, RF-36). O aviso de transferência (RN-42), o resumo (RN-39) e a atribuição a analista são do
-# bloco 10.
+# RN-33, RN-46, RF-36). O aviso de transferência (RN-42) e o resumo (RN-39) do bloco 10 estão em
+# escalate_transfer_spec.rb.
 RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
   let!(:infinitepay) { create(:brand, :infinitepay) }
   let!(:jim) { create(:brand, :jim) }
@@ -161,7 +161,8 @@ RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
 
       ingest("ainda estou esperando")
 
-      expect(ticket.reload).to have_attributes(latest_customer_seq: 2, first_pending_seq: nil, dispatch_due_at: nil,
+      # seq 2 é o aviso de transferência (RN-42, bloco 10).
+      expect(ticket.reload).to have_attributes(latest_customer_seq: 3, first_pending_seq: nil, dispatch_due_at: nil,
                                                ai_deadline_at: nil)
       expect(Deadlines::DispatchDue.call(now: 1.minute.from_now, limit: 10)).to eq([])
     end
@@ -173,7 +174,7 @@ RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
       result = AgentActions::Apply.call(agent_action_for(turn), traceparent: AgentActionHelpers::TRACEPARENT)
 
       expect(result).to have_attributes(status: :rejected, reason: "atribuicao_mudou")
-      expect(Message.where(ticket_id: turn.ticket_id, direction: "outbound")).to be_empty
+      expect(Message.where(ticket_id: turn.ticket_id, direction: "outbound", author_type: "bot")).to be_empty
     end
 
     it "evento antigo do turno no outbox é descartado pela publicação (turno_expired)" do

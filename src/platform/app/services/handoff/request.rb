@@ -11,9 +11,10 @@
 module Handoff
   class Request
     EVENT_TYPE = "handoff.requested".freeze
+    # Bloco 10: pedido_do_cliente (RN-34), decisao_do_agente (RN-33, item 1) e limite_de_trocas (item 6).
     REASONS = %w[prazo_do_turno teto_do_ciclo publicacao_falhou contexto_excede_limite falha_de_integracao
-                 limite_de_trocas].freeze
-    SOURCES = %w[scheduler outbox turns dlq].freeze
+                 limite_de_trocas pedido_do_cliente decisao_do_agente].freeze
+    SOURCES = %w[scheduler outbox turns dlq ingestion agent].freeze
 
     def self.call(...) = new(...).call
 
@@ -31,7 +32,8 @@ module Handoff
     # Gatilhos de prazo (RN-46): a resposta que chega depois deles mostra prazo_vencido, não handoff_pedido.
     DEADLINE_REASONS = %w[prazo_do_turno teto_do_ciclo].freeze
 
-    def initialize(ticket:, reason:, source:, trace_id:, turn: nil)
+    # `summary`: os cinco campos do resumo (RN-39) quando o agente escala com eles; o Escalate grava o resumo.
+    def initialize(ticket:, reason:, source:, trace_id:, turn: nil, summary: nil)
       raise ArgumentError, "motivo de handoff desconhecido: #{reason}" unless REASONS.include?(reason)
       raise ArgumentError, "origem de handoff desconhecida: #{source}" unless SOURCES.include?(source)
 
@@ -40,18 +42,20 @@ module Handoff
       @source = source
       @turn = turn
       @trace_id = trace_id
+      @summary = summary
     end
 
     def call
       now = Time.current
       row = { brand_id: @ticket.brand_id, ticket_id: @ticket.id, event_type: EVENT_TYPE, dedup_key: self.class.dedup_key(@ticket),
-              payload:, trace_id: @trace_id, next_attempt_at: now, created_at: now }
+              payload: item_payload, trace_id: @trace_id, next_attempt_at: now, created_at: now }
       id = OutboxEvent.insert_all([ row ], unique_by: :index_outbox_events_on_dedup_key, returning: [ :id ],
                                            record_timestamps: false).rows.first&.first
       return unless id
 
       audit(id)
       expire_turns
+      AiDeliveries.cancel(ticket: @ticket, handoff_reason: @reason) # RN-38: no commit do pedido
       # RN-57: com o handoff pedido, o aviso do ciclo não é mais devido (o worker o descartaria por handoff_pedido).
       # No próprio objeto travado de quem chamou: sem tocar o lock_version, para ele seguir válido no resto da transação.
       @ticket.update_columns(progress_due_at: nil) if @ticket.progress_due_at
@@ -64,6 +68,8 @@ module Handoff
       { "ticket_id" => @ticket.id, "reason" => @reason, "source" => @source, "turn" => @turn,
         "first_pending_seq" => @ticket.first_pending_seq, "assignment_version" => @ticket.assignment_version }
     end
+
+    def item_payload = @summary ? payload.merge("summary" => @summary) : payload
 
     # RN-46, RN-56: com o pedido gravado, nenhuma resposta da atribuição é aplicada até o Escalate. Os turnos
     # eligible expiram na mesma transação (quem chamou pode já tê-los expirado, como o Deadlines::Expire).
@@ -80,7 +86,7 @@ module Handoff
 
     def audit(id)
       AuditEvent.create!(brand_id: @ticket.brand_id, ticket_id: @ticket.id, actor_type: "system", event_type: EVENT_TYPE,
-                         trace_id: @trace_id, data: payload.merge("outbox_event_id" => id))
+                         trace_id: @trace_id, data: payload.merge("outbox_event_id" => id, "summary_from_agent" => !@summary.nil?))
     end
   end
 end

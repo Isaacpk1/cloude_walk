@@ -11,9 +11,15 @@
 # Concorrência: o índice único da identidade e o do atendimento aberto decidem as corridas de criação.
 # A linha do atendimento fica travada até o commit, então mensagens da mesma conversa entram em fila
 # e a deduplicação é refeita com a trava (07, seção 3.4).
+#
+# Pedido explícito de humano (RN-34; 07, seção 3.2 "Gatilhos"): depois de gravar a mensagem, na mesma transação e
+# com a linha travada, as expressões da marca e do idioma (Handoff::Policy) decidem. Caso com a IA: a mensagem não
+# abre ciclo da IA e o Handoff::Request (pedido_do_cliente) expira o turno em andamento; o Escalate faz o resto.
+# Caso já humano: o pedido só entra no histórico. Os dois saem em `customer.human_requested`.
 module Ingestion
   class Receive
-    Result = Data.define(:status, :ticket, :message, :outbox_event_id) do
+    Result = Data.define(:status, :ticket, :message, :outbox_event_id, :handoff_event_id) do
+      def initialize(handoff_event_id: nil, **) = super
       def created? = status == :created
       def duplicate? = status == :duplicate
     end
@@ -52,10 +58,15 @@ module Ingestion
 
     # Depois do commit (invariante 2). Se o Redis estiver fora, a mensagem já está gravada e o item
     # segue aberto no outbox: a recuperação o reoferece (07, seção 6). O provedor recebe o 202.
+    # O pedido de handoff (RN-34) é acordado do mesmo jeito, cada item por si: a falha de um não segura o outro.
     def notify_worker(result)
-      OutboxJob.perform_later(result.outbox_event_id)
+      [ result.outbox_event_id, result.handoff_event_id ].compact.each { wake(_1) }
+    end
+
+    def wake(event_id)
+      OutboxJob.perform_later(event_id)
     rescue StandardError => e
-      JsonLog.warn("outbox.enqueue_failed", trace_id:, event_id: result.outbox_event_id, error: e.class.name)
+      JsonLog.warn("outbox.enqueue_failed", trace_id:, event_id:, error: e.class.name)
     end
 
     def channel = @msg.fetch("channel")
@@ -119,10 +130,17 @@ module Ingestion
         external_id: @msg.fetch("external_id"), seq:, trace_id:, provider_payload: @provider_payload,
         received_at: Time.iso8601(@msg.fetch("received_at"))
       )
-      window = window_for(ticket)
+      state_before = ticket.state
+      human_request = human_request?(ticket, message)
+      # RN-34: o pedido de humano não abre ciclo da IA (sem janela nem prazos novos). Uma mensagem comum depois dele,
+      # antes do Escalate, agrupa como hoje: o Turns::Open recusa o turno (handoff_pedido) e o Escalate encerra o ciclo.
+      window = window_for(ticket) unless human_request
       ticket.update!(latest_customer_seq: seq, **cycle_deadlines(ticket, seq, window))
       # RN-55, RF-33: a mensagem muda o que a IA veria. Mesma transação, linha travada (07, seção 3.4).
       context_version = ticket.bump_context_version!
+      # O pedido vem antes da superação: o turno em andamento expira pelo pedido (RN-34), e a resposta atrasada é
+      # rejeitada como handoff_pedido, não como turno_superado.
+      handoff_event_id = request_human(ticket, seq, state_before) if human_request
       supersede_turns(ticket, seq)
 
       audit(ticket, "ticket.created", state: ticket.state, channel:, linked_ticket_id: ticket.linked_ticket_id) if opened
@@ -140,7 +158,32 @@ module Ingestion
         payload: { ticket_id: ticket.id, message_id: message.id, seq: }
       )
 
-      Result.new(status: :created, ticket:, message:, outbox_event_id: notice.id)
+      Result.new(status: :created, ticket:, message:, outbox_event_id: notice.id, handoff_event_id:)
+    end
+
+    # RN-34: as expressões da marca, no idioma da marca.
+    def human_request?(ticket, message) = Handoff::Policy.for(ticket.brand).human_request?(message.body, ticket.brand.locale)
+
+    # RN-34, RF-39 (aceite: repetir o pedido não duplica o handoff). Caso com a IA, inclusive novo, em_triagem e
+    # aguardando_cliente: pede o handoff com o turno eligible mais novo. Um pedido por atribuição (chave do outbox):
+    # outro pedido já gravado nesta atribuição, deste ou de outro gatilho, devolve nil (handoff_ja_pedido). Caso
+    # já humano: só o registro no histórico. Devolve o id do item do pedido, para acordar depois do commit.
+    def request_human(ticket, seq, state_before)
+      handoff_event_id = nil
+      outcome = if ticket.with_ai?
+        turn = ticket.ai_turns.eligible.where(brand_id: ticket.brand_id, assignment_version: ticket.assignment_version)
+                     .maximum(:turn)
+        handoff_event_id = Handoff::Request.call(ticket:, reason: "pedido_do_cliente", source: "ingestion", turn:, trace_id:)
+        # RN-38: com o pedido já gravado por outro gatilho (o limite de trocas mantém as respostas), o pedido explícito
+        # cancela mesmo assim as saídas da IA que não começaram.
+        Handoff::AiDeliveries.cancel(ticket:, handoff_reason: "pedido_do_cliente") unless handoff_event_id
+        handoff_event_id ? "handoff_pedido" : "handoff_ja_pedido"
+      else
+        "registrado"
+      end
+      audit(ticket, "customer.human_requested", **{ seq:, state: state_before, outcome:,
+                                                    outbox_event_id: handoff_event_id }.compact)
+      handoff_event_id
     end
 
     # RN-55 (ADR-020): a janela do canal na política da marca. Canal sem parâmetro é erro (KeyError), não

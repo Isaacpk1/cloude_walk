@@ -1,4 +1,6 @@
-<li class="reply">
+<% system = ChannelsMock::HumanRequest.transfer_notice?(record.text) %>
+<li class="reply<%= " reply--system" if system %>">
+  <% if system %><div><span class="badge badge--system">Sistema</span> <strong>Aviso de transferência</strong> <span class="muted">(RN-42)</span></div><% end %>
   <div><%= record.text %></div>
   <div class="muted">
     <% if total %><span class="total">Tempo total <%= total.total_label %></span> (<%= total.total_ms %> ms) · <% end %>
