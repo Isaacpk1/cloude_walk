@@ -13,6 +13,7 @@ class ProviderAccount < ApplicationRecord
   validates :slug, presence: true, format: { with: /\A[a-z0-9][a-z0-9-]*\z/ }
   validates :secret, presence: true
   validates :phone_number_id, presence: true, if: -> { channel == "whatsapp" }
+  validates :email_address, presence: true, if: -> { channel == "email" }
 
   scope :active, -> { where(active: true) }
 
@@ -32,7 +33,8 @@ class ProviderAccount < ApplicationRecord
   def self.create_evaluation(brand, channel, slug)
     transaction(requires_new: true) do
       create!(brand:, channel:, slug:, evaluation: true, active: false, secret: SecureRandom.hex(32),
-              phone_number_id: ("eval-#{brand.slug}" if channel == "whatsapp"))
+              phone_number_id: ("eval-#{brand.slug}" if channel == "whatsapp"),
+              email_address: ("eval@#{brand.slug}.example" if channel == "email"))
     end
   rescue ActiveRecord::RecordNotUnique
     find_by!(slug:)

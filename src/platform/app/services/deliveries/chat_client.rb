@@ -24,8 +24,8 @@ module Deliveries
 
     def self.base_url = ENV.fetch("CHANNELS_URL", "http://localhost:4000")
 
-    def deliver(provider_account:, body:, secret:, headers:)
-      uri = URI("#{self.class.base_url.chomp('/')}/provider/chat/#{provider_account}/messages")
+    def deliver(provider_account:, body:, secret:, headers:, path: nil)
+      uri = URI("#{self.class.base_url.chomp('/')}#{path || "/provider/chat/#{provider_account}/messages"}")
       request = Net::HTTP::Post.new(uri, headers.merge("Content-Type" => "application/json",
                                                        HelpdeskContracts::Signature::HEADER => HelpdeskContracts::Signature.header(body, secret:)))
       request.body = body

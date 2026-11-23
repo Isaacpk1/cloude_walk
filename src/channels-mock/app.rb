@@ -9,6 +9,8 @@ require_relative "lib/channels_mock/faults"
 require_relative "lib/channels_mock/chat_deliveries"
 require_relative "lib/channels_mock/status_callbacks"
 require_relative "lib/channels_mock/providers/chat_api"
+require_relative "lib/channels_mock/providers/whatsapp"
+require_relative "lib/channels_mock/providers/gmail"
 require_relative "lib/channels_mock/conversation_view"
 require_relative "lib/channels_mock/scenarios"
 require_relative "lib/channels_mock/scenario_view"
@@ -54,6 +56,58 @@ module ChannelsMock
         end
       end
 
+      # WhatsApp (Cloud API): a plataforma envia a resposta (07, seção 5.0; bloco 15).
+      r.on "provider", "whatsapp" do
+        r.post String, String, "messages" do |account, phone_number_id|
+          status, body = Providers::Whatsapp.receive(account:, phone_number_id:, raw_body: r.body.read,
+                                                          signature: r.get_header("HTTP_X_HELPDESK_SIGNATURE"), key: r.get_header("HTTP_IDEMPOTENCY_KEY"))
+          json_reply(status, body)
+        end
+      end
+
+      # E-mail (Gmail): a plataforma busca o histórico e a mensagem, e envia a resposta (07, seção 5.0; bloco 15).
+      r.on "provider", "email", String, "gmail", "v1", "users", String do |account, address|
+        signature = r.get_header("HTTP_X_HELPDESK_SIGNATURE")
+        r.get "history" do
+          status, body = Providers::Gmail.history(account:, address:, signature:, start: r.params["startHistoryId"])
+          json_reply(status, body)
+        end
+        r.get "messages", String do |id|
+          status, body = Providers::Gmail.message(account:, address:, signature:, id:)
+          json_reply(status, body)
+        end
+        r.post "messages", "send" do
+          status, body = Providers::Gmail.receive(account:, address:, raw_body: r.body.read, signature:, key: r.get_header("HTTP_IDEMPOTENCY_KEY"))
+          json_reply(status, body)
+        end
+      end
+
+      # O cliente escreve pelo WhatsApp ou pelo e-mail (simulador).
+      r.post "whatsapp", "messages" do
+        account = r.params["account"].to_s
+        r.halt(422, "conta desconhecida: #{account}") unless Providers::Whatsapp::ACCOUNTS.key?(account)
+
+        payload = Providers::Whatsapp.webhook(account:, from: r.params["from"].to_s, text: r.params["text"].to_s, id: r.params["message_id"].to_s)
+        response = CLIENT.deliver(channel: "whatsapp", account:, payload:, tamper_signature: r.params["tamper_signature"] == "1")
+        Inbox.add(channel: "whatsapp", account:, payload:, response:, error: nil, tampered: r.params["tamper_signature"] == "1")
+        r.redirect "/#canais"
+      rescue HelpdeskContracts::InvalidPayload => e
+        Inbox.add(channel: "whatsapp", account:, payload: r.params.slice("from", "text"), response: nil, error: e.message)
+        r.redirect "/#canais"
+      end
+
+      r.post "email", "messages" do
+        account = r.params["account"].to_s
+        r.halt(422, "conta desconhecida: #{account}") unless Providers::Gmail::ACCOUNTS.key?(account)
+
+        attachments = r.params["attachment"].to_s.strip.then { _1.empty? ? [] : [ _1 ] }
+        push = Providers::Gmail.deliver_mail(account:, from: r.params["from"].to_s, subject: r.params["subject"].to_s, text: r.params["text"].to_s,
+                                             thread_id: r.params["thread_id"].to_s, attachments:)
+        response = CLIENT.deliver(channel: "email", account:, payload: push, tamper_signature: r.params["tamper_signature"] == "1")
+        Inbox.add(channel: "email", account:, payload: push, response:, error: nil, tampered: r.params["tamper_signature"] == "1")
+        r.redirect "/#canais"
+      end
+
       r.root do
         entries = Inbox.all
         items, orphans = ConversationView.build(entries:, records: ChatDeliveries.all)
@@ -61,7 +115,9 @@ module ChannelsMock
         view("index", locals: { items:, orphans:, accounts: Providers::Chat::ACCOUNTS, platform_url: PLATFORM_PUBLIC_URL,
                                 last: entries.first, fault: Faults.state, refresh:,
                                 scenarios: Scenarios.catalog, runs: Scenarios.runs.map(&:snapshot),
-                                agent_profile: AgentProfile.view_state },
+                                agent_profile: AgentProfile.view_state,
+                                whatsapp_accounts: Providers::Whatsapp::ACCOUNTS.keys, email_accounts: Providers::Gmail::ACCOUNTS.keys,
+                                whatsapp_sent: Providers::Whatsapp.sent, email_sent: Providers::Gmail.sent },
                       layout_opts: { locals: { refresh: } })
       end
 

@@ -85,6 +85,7 @@ module Seeds
         ProviderAccount.find_or_create_by!(slug:) do |account|
           account.assign_attributes(
             brand:, channel:, phone_number_id: (WHATSAPP_PHONE_NUMBER_IDS.fetch(brand.slug) if channel == "whatsapp"),
+            email_address: ("suporte@#{brand.slug}.example" if channel == "email"),
             secret: ENV.fetch("PROVIDER_SECRET_#{slug.upcase.tr('-', '_')}", "dev-secret-#{slug}")
           )
         end

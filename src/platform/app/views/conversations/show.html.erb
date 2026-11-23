@@ -64,6 +64,22 @@
     <% if c.deadlines %><%= render "conversations/deadlines", deadlines: c.deadlines %><% end %>
     <% c.reconciliations.each do |reconciliation| %><%= render "conversations/reconciliation", reconciliation: %><% end %>
 
+    <% unless c.source.synthetic? %>
+    <section class="card customer-history">
+      <h2>Atendimentos anteriores do cliente</h2>
+      <% if @history.empty? %>
+        <p class="muted">Primeiro atendimento deste cliente.</p>
+      <% else %>
+        <ul>
+          <% @history.each do |entry| %>
+            <li data-ticket-id="<%= entry.ticket_id %>"><%= link_to "Conversa #{entry.ticket_id}", conversation_path(entry.ticket_id) %>
+              · <%= entry.channel %> · <%= entry.state %> · <%= l(entry.created_at, format: :short) %></li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+    <% end %>
+
     <section class="card">
       <h2>Responsável atual</h2>
       <p><strong><%= c.assignee.name %></strong> <span class="badge badge--assignee-<%= c.assignee.kind %>"><%= c.assignee.kind_label %></span></p>
