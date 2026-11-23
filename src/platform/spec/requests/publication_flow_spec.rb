@@ -39,7 +39,8 @@ RSpec.describe "RF-29, RF-30, RF-56: do webhook do canal ao webhook assinado par
     ticket = Ticket.sole
     expect(event).to include("conversation_id" => "tkt_#{ticket.id}", "brand" => "infinitepay", "turn" => 1)
     expect(request.headers["Traceparent"]).to start_with("00-#{trace_id}-")
-    expect(ticket.audit_events.pluck(:event_type)).to eq(%w[ticket.created message.received ai_turn.opened
+    expect(ticket.audit_events.pluck(:event_type)).to eq(%w[ticket.created message.received triage.classified
+                                                             routing.decided ticket.assigned ai_turn.opened
                                                              agent_event.published])
     expect(ticket.audit_events.pluck(:trace_id).uniq).to eq([ trace_id ])
   end

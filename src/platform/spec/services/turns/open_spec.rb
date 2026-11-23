@@ -49,7 +49,9 @@ RSpec.describe Turns::Open, "RF-29, RF-33, RN-55, ADR-016: abertura do turno pel
         "locale" => "pt-BR", "turn" => 1, "context_until_seq" => 1, "assignment_version" => 0,
         "occurred_at" => start.utc.iso8601(3)
       )
-      expect(payload["ticket"]).to eq("state" => "novo", "channel" => "chat", "ai_turns" => 0)
+      # Bloco 11: o Open faz a triagem do caso novo antes do turno; o evento já leva o estado e a classificação.
+      expect(payload["ticket"]).to eq("state" => "com_ia", "channel" => "chat", "ai_turns" => 0, "category" => "repasses",
+                                      "priority" => "alta")
       expect(payload["customer"]).to include("id" => "cus_#{received.ticket.customer_id}", "verified" => false)
       expect(payload["message"]).to eq("id" => "msg_#{received.message.id}", "seq" => 1, "text" => "meu repasse não caiu")
     end

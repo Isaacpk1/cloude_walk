@@ -83,7 +83,7 @@ RSpec.describe Ingestion::Receive do
       expect(audits(turn.ticket, "ai_turn.expired").sole.data).to include("turn" => turn.turn, "reason" => "pedido_do_cliente")
       expect(audits(turn.ticket, "ai_turn.superseded")).to be_empty
       expect(handoff_items(turn.ticket).sole.payload).to include("turn" => turn.turn, "first_pending_seq" => 1)
-      expect(human_audits(turn.ticket).sole.data).to include("seq" => 2, "state" => "novo", "outcome" => "handoff_pedido")
+      expect(human_audits(turn.ticket).sole.data).to include("seq" => 2, "state" => "com_ia", "outcome" => "handoff_pedido")
       expect(result.ticket.reload.latest_customer_seq).to eq(2)
     end
 

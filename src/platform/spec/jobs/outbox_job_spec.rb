@@ -31,12 +31,14 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
     expect(enqueued_jobs).to be_empty
   end
 
-  it "RN-55: o aviso message.received é encerrado sem abrir turno (a triagem entra no bloco 11)" do
+  it "RF-12, RN-55: o aviso message.received faz a triagem e é encerrado sem abrir turno" do
     received = ingest
     clear_enqueued_jobs
 
     described_class.perform_now(received_item(received).id)
 
+    expect(received.ticket.reload).to have_attributes(state: "com_ia", category: "repasses", priority: "alta")
+    expect(AuditEvent.where(event_type: "triage.classified").count).to eq(1)
     expect(AiTurn.count).to eq(0)
     expect(OutboxEvent.where(event_type: "agent.event")).to be_empty
     expect(received_item(received).completed_at).to eq(start)
