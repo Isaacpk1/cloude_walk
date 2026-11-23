@@ -302,6 +302,15 @@ Proposta do bloco 13 (RN-29 a RN-32, RF-19, RF-25, RF-27, RF-45). Só o Postgres
 
 **Ordem dos locks.** Atendimento, depois usuário (igual à seção 3.5).
 
+### 3.7 Configuração pelo supervisor (bloco 12)
+
+Só o supervisor (RN-53), dentro das marcas das equipes dele (RNF-24), em `/configuracao`. Cada alteração roda numa transação, valida em texto o que a tela mostra e grava `audit_events` sem atendimento (RF-54): `queue.created`, `queue.version_published` (com o que mudou), `queue.deactivated`, `queue.activated`, `queue.deleted`, `team.created`, `analyst.created` (sem a senha) e `routing_ruleset.published`.
+
+- **Filas (RF-13, RF-18).** Editar nome, IA primeiro ou SLA publica uma versão nova sob a trava da fila (RN-20); a antiga não muda. A fila padrão e a de escalas da marca não são desativadas nem excluídas, e nenhuma fila usada pelas regras atuais também não (RF-17). **Excluir arquiva** (`queues.archived_at`): as versões são imutáveis no banco e os atendimentos antigos continuam apontando para a fila. Só vale sem atendimento aberto.
+- **Regras (RF-14, RF-15, RF-17).** O formulário manda a lista inteira (grupos OU, condições E) e a fila padrão; vira o JSON do ADR-003 e `RoutingRuleset.publish!` valida esquema, categorias e filas ativas da marca. A versão nova vale para o atendimento seguinte, porque o cache do avaliador confere a versão a cada roteamento (RF-16, RNF-07). A decisão fica no `routing.decided` do atendimento, com a versão do conjunto.
+- **Equipes e atendentes (RF-22, RF-58).** Equipe com nome único na marca; atendente humano com senha (bcrypt, 10 caracteres ou mais), perfil analista ou supervisor, capacidade de 1 a 50 e uma equipe da marca.
+- **Fora deste bloco:** cadastro de marcas (as marcas vêm do seed), tempos da IA por marca versionados em `Turns::Policy.for(brand)` e SLA por horário de atendimento da fila.
+
 ## 4. Modelo de dados
 
 ```mermaid

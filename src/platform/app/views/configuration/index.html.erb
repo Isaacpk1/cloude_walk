@@ -1,0 +1,122 @@
+<% content_for :title, "Configuração" %>
+<% slug = @brand.slug %>
+<div class="page-header">
+  <div>
+    <h1>Configuração</h1>
+    <p class="page-header__subtitle">Marca <strong><%= @brand.name %></strong>. Filas, regras de roteamento, equipes e atendentes. Cada alteração vale para o próximo atendimento, sem reiniciar nada.</p>
+  </div>
+  <div class="page-header__actions">
+    <% @brands.each do |b| %>
+      <%= link_to b.name, configuration_path(marca: b.slug), class: class_names("button", "button--active" => b.id == @brand.id) %>
+    <% end %>
+  </div>
+</div>
+
+<% if flash[:notice] %><p class="flash flash--notice" role="status"><%= flash[:notice] %></p><% end %>
+<% if flash[:alert] %><p class="flash flash--alert" role="alert"><%= flash[:alert] %></p><% end %>
+
+<section class="card config-section" aria-label="Filas">
+  <h2>Filas</h2>
+  <% priorities = Handoff::Policy::PRIORITIES %>
+  <% @queues.each do |queue| %>
+    <% version = queue.current_version %>
+    <div class="config-queue">
+      <h3><%= version&.name %> <span class="muted">versão <%= version&.version %> · equipe <%= queue.team.name %></span>
+        <% if queue.is_default %><span class="badge">padrão</span><% end %>
+        <% if queue.escalation %><span class="badge">escalas</span><% end %>
+        <% unless queue.active %><span class="badge badge--internal">inativa</span><% end %>
+      </h3>
+      <%= form_with url: configuration_queue_path(queue, marca: slug), method: :patch, class: "config-form" do |f| %>
+        <%= f.label :name, "Nome", for: "name_#{queue.id}" %>
+        <%= f.text_field :name, value: version&.name, id: "name_#{queue.id}", required: true %>
+        <label><%= f.check_box :ai_first, { checked: version&.ai_first, id: "ai_#{queue.id}" }, "1", "0" %> IA atende primeiro</label>
+        <fieldset><legend>Prazo de assunção por prioridade (segundos; vazio usa o padrão)</legend>
+          <% priorities.each do |priority| %>
+            <label><%= ConversationView::Priority.label(priority) %>
+              <%= number_field_tag "sla[#{priority}]", version&.sla_policy&.dig(priority, "assume_s"), id: "sla_#{queue.id}_#{priority}", min: 1 %></label>
+          <% end %>
+        </fieldset>
+        <%= f.submit "Salvar nova versão" %>
+      <% end %>
+      <div class="config-queue__actions">
+        <% if queue.active %>
+          <%= button_to "Desativar", desativar_configuration_queue_path(queue), params: { marca: slug }, method: :post %>
+        <% else %>
+          <%= button_to "Reativar", ativar_configuration_queue_path(queue), params: { marca: slug }, method: :post %>
+        <% end %>
+        <%= button_to "Excluir", configuration_queue_path(queue, marca: slug), method: :delete, form: { data: { turbo_confirm: "Excluir a fila?" } } %>
+      </div>
+    </div>
+  <% end %>
+
+  <h3>Nova fila</h3>
+  <%= form_with url: configuration_queues_path, class: "config-form" do |f| %>
+    <%= hidden_field_tag :marca, slug %>
+    <%= f.label :name, "Nome", for: "new_queue_name" %>
+    <%= f.text_field :name, id: "new_queue_name", required: true %>
+    <%= f.label :team_id, "Equipe", for: "new_queue_team" %>
+    <%= f.select :team_id, @teams.map { [ _1.name, _1.id ] }, {}, id: "new_queue_team" %>
+    <label><%= f.check_box :ai_first, { checked: true, id: "new_queue_ai" }, "1", "0" %> IA atende primeiro</label>
+    <%= f.submit "Criar fila" %>
+  <% end %>
+</section>
+
+<section class="card config-section" aria-label="Regras de roteamento">
+  <h2>Regras de roteamento
+    <span class="config-rules__version muted"><%= @ruleset ? "versão #{@ruleset.version} em uso" : "sem regras publicadas" %></span>
+  </h2>
+  <p class="muted">A primeira regra que casa decide. Dentro de um grupo todas as condições valem (E); basta um grupo casar (OU). Sem regra que case, vai para a fila padrão.</p>
+  <% usable = @queues.select { _1.active && _1.current_version } %>
+  <%= form_with url: configuration_rules_path, method: :put, class: "config-form config-rules" do |f| %>
+    <%= hidden_field_tag :marca, slug %>
+    <% @rule_rows.each_with_index do |rule, r| %>
+      <fieldset class="config-rule">
+        <legend>Regra <%= r + 1 %></legend>
+        <%= text_field_tag "rules[#{r}][name]", rule["name"], placeholder: "Nome da regra", id: "rule_#{r}_name" %>
+        <%= select_tag "rules[#{r}][queue_id]", options_for_select(usable.map { [ _1.current_version.name, _1.id ] }, rule["queue_id"]), include_blank: "Fila de destino", id: "rule_#{r}_queue" %>
+        <% rule["groups"].each_with_index do |group, g| %>
+          <div class="config-group"><strong><%= g.zero? ? "Quando" : "ou quando" %></strong>
+            <% group["conditions"].each_with_index do |cond, c| %>
+              <% base = "rules[#{r}][groups][#{g}][conditions][#{c}]" %>
+              <%= select_tag "#{base}[field]", options_for_select([ [ "campo", "" ], [ "canal", "channel" ], [ "categoria", "category" ], [ "prioridade", "priority" ], [ "tag", "tags" ], [ "marca", "brand" ] ], cond["field"]), id: "rule_#{r}_#{g}_#{c}_field" %>
+              <%= select_tag "#{base}[op]", options_for_select([ [ "é", "eq" ], [ "não é", "neq" ], [ "é um de", "in" ], [ "não é um de", "not_in" ] ], cond["op"]), id: "rule_#{r}_#{g}_#{c}_op" %>
+              <%= text_field_tag "#{base}[value]", cond["value"], placeholder: "valor (vários: separe por vírgula)", id: "rule_#{r}_#{g}_#{c}_value" %>
+            <% end %>
+          </div>
+        <% end %>
+      </fieldset>
+    <% end %>
+    <p class="muted">Categorias da triagem: <%= @categories.join(", ") %>. Prioridades: <%= Handoff::Policy::PRIORITIES.join(", ") %>. Campo "tag" casa se o caso tiver a tag. Para apagar uma regra, esvazie o nome, a fila e as condições.</p>
+    <%= label_tag :default_queue_id, "Fila padrão (quando nenhuma regra casa)" %>
+    <%= select_tag :default_queue_id, options_for_select(usable.map { [ _1.current_version.name, _1.id ] }, @ruleset&.default_queue_id || usable.find(&:is_default)&.id), id: "default_queue_id" %>
+    <%= submit_tag "Publicar regras" %>
+  <% end %>
+</section>
+
+<section class="card config-section" aria-label="Equipes e atendentes">
+  <h2>Equipes</h2>
+  <ul><% @teams.each do |team| %><li class="config-team"><%= team.name %></li><% end %></ul>
+  <%= form_with url: configuration_teams_path, class: "config-form" do |f| %>
+    <%= hidden_field_tag :marca, slug %>
+    <%= f.label :name, "Nova equipe", for: "new_team_name" %>
+    <%= f.text_field :name, id: "new_team_name", required: true %>
+    <%= f.submit "Criar equipe" %>
+  <% end %>
+
+  <h2>Atendentes</h2>
+  <ul>
+    <% @analysts.each do |user| %>
+      <li class="config-analyst"><%= user.name %> <span class="muted"><%= user.email %> · <%= user.role == "supervisor" ? "supervisor" : "analista" %> · capacidade <%= user.capacity %> · <%= user.team_memberships.map { _1.team.name }.join(", ") %></span></li>
+    <% end %>
+  </ul>
+  <%= form_with url: configuration_analysts_path, class: "config-form" do |f| %>
+    <%= hidden_field_tag :marca, slug %>
+    <%= f.label :name, "Nome", for: "new_analyst_name" %><%= f.text_field :name, id: "new_analyst_name", required: true %>
+    <%= f.label :email, "E-mail", for: "new_analyst_email" %><%= f.email_field :email, id: "new_analyst_email", required: true %>
+    <%= f.label :password, "Senha (mín. 10 caracteres)", for: "new_analyst_password" %><%= f.password_field :password, id: "new_analyst_password", autocomplete: "new-password", required: true %>
+    <%= f.label :role, "Perfil", for: "new_analyst_role" %><%= f.select :role, [ [ "Analista", "analyst" ], [ "Supervisor", "supervisor" ] ], {}, id: "new_analyst_role" %>
+    <%= f.label :capacity, "Capacidade (casos simultâneos)", for: "new_analyst_capacity" %><%= f.number_field :capacity, value: 5, min: 1, max: 50, id: "new_analyst_capacity" %>
+    <%= f.label :team_id, "Equipe", for: "new_analyst_team" %><%= f.select :team_id, @teams.map { [ _1.name, _1.id ] }, {}, id: "new_analyst_team" %>
+    <%= f.submit "Cadastrar atendente" %>
+  <% end %>
+</section>

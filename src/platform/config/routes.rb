@@ -35,6 +35,17 @@ Rails.application.routes.draw do
   resources :dead_letters, path: "dlq", only: %i[index show]
   # Bloco 10 (RF-42, RF-45, RN-29): casos em aguardando_humano. ?marca=<slug> restringe à marca.
   get "fila" => "human_queue#index", as: :human_queue
+  # Bloco 12 (RF-13 a RF-18, RF-22, RF-58): configuração pelo supervisor. ?marca=<slug> (ou o campo marca do formulário).
+  get "configuracao" => "configuration#index", as: :configuration
+  scope "configuracao", as: :configuration do
+    resources :queues, path: "filas", controller: "configuration_queues", only: %i[create update destroy] do
+      post "ativar", on: :member, action: :activate
+      post "desativar", on: :member, action: :deactivate
+    end
+    put "regras" => "configuration_rules#update", as: :rules
+    resources :teams, path: "equipes", controller: "configuration_teams", only: :create
+    resources :analysts, path: "atendentes", controller: "configuration_analysts", only: :create
+  end
   # Bloco 13 (RF-27): disponibilidade do analista (online, pausa, offline). ?marca=<slug> exige que o analista seja da marca.
   patch "analistas/:id/disponibilidade" => "analyst_availabilities#update", as: :analyst_availability
 end

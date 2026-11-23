@@ -689,7 +689,8 @@ CREATE TABLE public.queues (
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    escalation boolean DEFAULT false NOT NULL
+    escalation boolean DEFAULT false NOT NULL,
+    archived_at timestamp(6) without time zone
 );
 
 
@@ -2191,6 +2192,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261124040000'),
 ('20261124030000'),
 ('20261124020000'),
 ('20261124010000'),
