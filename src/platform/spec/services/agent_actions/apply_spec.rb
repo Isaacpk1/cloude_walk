@@ -20,7 +20,7 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
       expect(turn).to have_attributes(status: "applied", applied_event_id: action["event_id"], response: action)
       expect(turn.response_received_at).to be_between(before_call, db_now)
       expect(ticket.reload).to have_attributes(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil,
-                                               ai_deadline_at: nil, latest_customer_seq: 1, state: "novo")
+                                               ai_deadline_at: nil, latest_customer_seq: 1, state: "com_ia")
       expect(ProcessedEvent.where(consumer: "agent_actions", event_id: action["event_id"])).to exist
     end
 
@@ -63,7 +63,7 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
       escalate.delete("reply")
 
       expect(apply(escalate).status).to eq(:applied)
-      expect(ticket.reload).to have_attributes(state: "novo", assignee_id: nil, assignment_version: 0)
+      expect(ticket.reload).to have_attributes(state: "com_ia", assignee_id: nil, assignment_version: 0)
       data = audits("agent_action.applied").sole.data
       expect(data).to include("action" => "escalate", "escalation" => escalate["escalation"])
       expect(data.keys).not_to include("reply", "resolution")

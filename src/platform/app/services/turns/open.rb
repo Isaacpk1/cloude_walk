@@ -15,8 +15,11 @@
 # O evento fica pronto e imutável: as retentativas reenviam o mesmo conteúdo com o mesmo event_id
 # (invariante 3). A publicação acontece depois, fora da transação.
 #
-# A atribuição ao bot entra com a triagem (bloco 11): até lá, todo caso que não está com um humano vai
-# para a IA.
+# Triagem antes do primeiro turno (bloco 11; 07, seção 3.1, passo 2): se o caso ainda estiver `novo` (o worker do
+# message.received não rodou), o Triage::Run roda aqui, sob o mesmo lock, antes de qualquer outra conferência.
+# Triado para humano (fila sem IA ou categoria somente humana, RN-28), o turno não abre (`triaged_to_human`) e o
+# ciclo já saiu encerrado pela triagem. Erro na triagem sobe: nada é gravado e a ação fica aberta para a nova
+# tentativa; nenhum turno abre sem triagem, e o teto do ciclo (RN-46) leva o caso a um humano se a falha persistir.
 module Turns
   class Open
     Result = Data.define(:status, :turn, :handoff_event_id) do
@@ -56,6 +59,7 @@ module Turns
     attr_reader :ticket, :item
 
     def decide
+      return settled(:triaged_to_human, reason: "triado_para_humano", state: ticket.state) if triaged_to_human?
       return settled(:skipped, reason: "fora_da_ia", state: ticket.state) unless ticket.with_ai?
 
       expected = item.payload["assignment_version"]
@@ -71,6 +75,12 @@ module Turns
       return settled(:covered, reason: "coberto", covered_by_turn: covering.turn) if covering
 
       window_closed? ? check_deadline : window_still_open
+    end
+
+    def triaged_to_human?
+      return false unless ticket.state == "novo"
+
+      Triage::Run.call(ticket:, trace_id: item.trace_id).status == :triaged_to_human
     end
 
     def now = @now ||= Time.current
