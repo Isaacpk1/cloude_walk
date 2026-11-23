@@ -1,7 +1,7 @@
 # Abertura de um turno da IA pela ação "turn.dispatch" do outbox (07, seção 3.1, passo 3, e seção 3.4;
 # RN-55; ADR-016).
 #
-#   Turns::Open.call(outbox_event_id) # => Result(status:, turn:)
+#   Turns::Open.call(outbox_event_id) # => Result(status:, turn:, handoff_event_id:)
 #
 # A ingestão grava os prazos do ciclo no atendimento (dispatch_due_at, ai_deadline_at). Quando a janela
 # de agrupamento vence, o scheduler grava a ação "turn.dispatch" no outbox e o worker chega aqui.
@@ -19,7 +19,12 @@
 # para a IA.
 module Turns
   class Open
-    Result = Data.define(:status, :turn)
+    Result = Data.define(:status, :turn, :handoff_event_id) do
+      def initialize(handoff_event_id: nil, **) = super
+    end
+    # Recusas que pedem o handoff na hora (RN-46, RN-49; ADR-020 item 3), com o motivo do pedido. As demais
+    # recusas terminais (sem_prazo, prazo_vencido) ficam para o teto do ciclo (Deadlines::CycleTimeout).
+    HANDOFF_REASONS = { "contexto_excede_limite" => "contexto_excede_limite", "contrato" => "publicacao_falhou" }.freeze
 
     DISPATCH_TYPE = Deadlines::DispatchDue::EVENT_TYPE
     EVENT_TYPE = "agent.event".freeze
@@ -59,6 +64,9 @@ module Turns
                                              current_version: ticket.assignment_version)
       end
 
+      # RN-46: com o handoff pedido nesta atribuição, o caso não volta para a IA enquanto o Escalate não roda.
+      return settled(:handoff_requested, reason: "handoff_pedido") if Handoff::Request.pending?(ticket)
+
       covering = ticket.ai_turns.eligible.where(context_until_seq: ticket.latest_customer_seq...).order(:turn).last
       return settled(:covered, reason: "coberto", covered_by_turn: covering.turn) if covering
 
@@ -86,7 +94,8 @@ module Turns
 
     def open_turn
       context = ContextBuilder.call(ticket:, policy:, now:)
-      # RN-49: pendentes acima do limite não abrem turno. O handoff com o histórico completo entra no bloco 10.
+      # RN-49: pendentes acima do limite não abrem turno e o caso vai para humano (handoff pedido na recusa).
+      # O histórico completo no handoff (resumo, RN-39) entra no bloco 10.
       if context.pending_chars > policy.pending_chars_limit
         return refused(:context_too_large, reason: "contexto_excede_limite", pending_chars: context.pending_chars,
                                            limit: policy.pending_chars_limit, pending_seqs: context.pending.map(&:seq))
@@ -144,12 +153,17 @@ module Turns
 
     # Recusa terminal do ciclo atual (TERMINAL_REASONS): além de zerar dispatch_due_at, o ciclo pendente fica
     # (first_pending_*, ai_deadline_at) para o timeout e o handoff (blocos 08 e 10). O painel mostra a recusa.
-    def refused(status, **data) = settled(status, **data)
+    # RN-46, RN-49: contexto_excede_limite e contrato pedem o handoff na mesma transação (origem `turns`).
+    def refused(status, **data)
+      handoff = HANDOFF_REASONS[data[:reason]]
+      @handoff_event_id = Handoff::Request.call(ticket:, reason: handoff, source: "turns", trace_id: item.trace_id) if handoff
+      settled(status, **data)
+    end
 
     def not_opened(status, **data)
       complete_item
       audit("ai_turn.not_opened", **data)
-      Result.new(status:, turn: nil)
+      Result.new(status:, turn: nil, handoff_event_id: @handoff_event_id)
     end
 
     def complete_item = item.update!(completed_at: now, lease_until: nil)

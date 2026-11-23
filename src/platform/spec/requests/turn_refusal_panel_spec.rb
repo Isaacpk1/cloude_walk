@@ -52,16 +52,18 @@ RSpec.describe "RN-49, RN-46, RN-55, RF-55, RF-56: recusa terminal do turno no p
       expect(body).not_to include("o caso vai para humano")
     end
 
-    it "mensagem nova do cliente: agrupa de novo, tenta um turno novo e recusa de novo (ainda acima)" do
+    it "mensagem nova do cliente: agrupa de novo, mas o handoff já pedido pela recusa impede um turno novo" do
       ticket
       ingest_at(t0 + 31.seconds, "alguém?")
       expect(refusal_section(page(conversation_path(ticket.id), t0 + 31.seconds))).to be_nil
       expect(page(conversation_path(ticket.id), t0 + 31.seconds)).to include("Agrupando mensagens", "seq 1, 2, 3")
 
-      expect(tick_at(t0 + 33.seconds).map(&:status)).to eq([ :context_too_large ])
+      expect(tick_at(t0 + 33.seconds).map(&:status)).to eq([ :handoff_requested ])
 
-      section = refusal_section(page(conversation_path(ticket.id), t0 + 33.seconds))
-      expect(section).to include("contexto_excede_limite", "seq 1, 2, 3", "18007 caracteres pendentes")
+      html = page(conversation_path(ticket.id), t0 + 33.seconds)
+      expect(html).not_to include("Agrupando mensagens")
+      expect(ticket.reload.ai_turns).to be_empty
+      expect(html).to include("Handoff pedido: aguardando o worker", "Contexto excede o limite do turno (RN-49)")
     end
 
     it "marca errada: a recusa de uma marca não aparece na conversa da outra" do

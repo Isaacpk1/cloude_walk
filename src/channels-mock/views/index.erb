@@ -33,6 +33,63 @@
   </form>
 </section>
 
+<section class="card" id="agente">
+  <h2>Perfil do agente mock</h2>
+  <p class="muted">Troca o perfil do agente sem reiniciar (RF-38). O simulador grava a escolha no Redis de controle e o
+    agente lê a cada evento novo; a marca vale antes do global, e "padrão" volta ao <code>AGENT_PROFILE</code> do agente.
+    Também por script: <code>POST /simulador/agente/perfil</code> (README).</p>
+  <table>
+    <thead><tr><th>Perfil</th><th>Latência</th><th>O que demonstra</th></tr></thead>
+    <tbody>
+      <% agent_profile["profiles"].each do |profile| %>
+        <tr><td><%= profile["title"] %> <code><%= profile["name"] %></code></td><td><%= profile["latency"] %></td><td><%= profile["demonstrates"] %></td></tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% if agent_profile["available"] %>
+    <% titles = agent_profile["profiles"].to_h { [ _1["name"], _1["title"] ] } %>
+    <% sources = { "brand" => "escolhido para a marca", "global" => "escolhido para todas", "env" => "padrão do agente (AGENT_PROFILE)" } %>
+    <h3>Ativo agora</h3>
+    <table>
+      <thead><tr><th>Escopo</th><th>Marca</th><th>Perfil ativo</th><th>Origem</th></tr></thead>
+      <tbody>
+        <% agent_profile["scopes"].each do |scope| %>
+          <tr>
+            <td><%= scope["scope"] %></td>
+            <td><%= scope["brand"] || "todas" %></td>
+            <td><strong><%= scope["effective"] ? titles.fetch(scope["effective"], scope["effective"]) : "padrão do agente" %></strong></td>
+            <td class="muted"><%= sources.fetch(scope["source"], scope["source"]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <form method="post" action="/simulador/agente/perfil">
+      <div class="row">
+        <div>
+          <label for="agent_scope">Escopo</label>
+          <select id="agent_scope" name="scope">
+            <% agent_profile["scopes"].each do |scope| %>
+              <option value="<%= scope["scope"] %>"><%= scope["scope"] == "global" ? "global (todas as marcas)" : scope["scope"] %></option>
+            <% end %>
+          </select>
+        </div>
+        <div>
+          <label for="agent_profile">Perfil</label>
+          <select id="agent_profile" name="profile">
+            <% agent_profile["profiles"].each do |profile| %>
+              <option value="<%= profile["name"] %>"><%= profile["title"] %></option>
+            <% end %>
+            <option value="padrao">Padrão do agente (AGENT_PROFILE)</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit">Aplicar perfil</button>
+    </form>
+  <% else %>
+    <p><span class="badge badge--err">Indisponível</span> <%= agent_profile["error"] %></p>
+  <% end %>
+</section>
+
 <section class="card" id="cenarios">
   <h2>Cenários de rajada</h2>
   <p class="muted">Enviam várias mensagens do mesmo cliente em horários planejados, pelo mesmo webhook do formulário

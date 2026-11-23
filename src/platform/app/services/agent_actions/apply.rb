@@ -21,7 +21,9 @@
 #    `resolution.text`), grava também a saída (bloco 05; 07, seções 3.1 passo 6 e 3.2): a mensagem `outbound`
 #    com o próximo seq do atendimento travado, pelo canal e pela conta da última mensagem do cliente (RF-06),
 #    a versão do contexto (`Ticket#bump_context_version!`), a entrega `pending` (delivery_id estável, RNF-15), o item `delivery.requested` no outbox e a auditoria
-#    `delivery.requested`. Rejeitada, duplicada ou inválida não grava saída.
+#    `delivery.requested`. Aplicada (com ou sem texto), zera progress_due_at e cancela a entrega do aviso de progresso
+#    do ciclo que ainda estiver `pending` (RN-57; auditoria delivery.cancelled `resposta_aplicada`); a que já estiver
+#    em `sending` fica para a conciliação. Rejeitada, duplicada ou inválida não grava saída.
 # 4. Fora da transação (invariante 2): a DLQ pelo produtor do Karafka, se for o caso, o despertador do envio
 #    (OutboxJob com o item delivery.requested; o envio HTTP é do worker) e depois o log JSON.
 #    Erro de caractere do Postgres dentro da transação (defesa além da checagem do passo 1) também é
@@ -36,6 +38,7 @@ module AgentActions
     TOPICS = { outbound: "helpdesk.agent.outbound.v1", dlq: "helpdesk.agent.dlq.v1" }.freeze
     CONSUMER = "agent_actions".freeze
     DELIVERY_EVENT = "delivery.requested".freeze
+    CANCEL_REASON = "resposta_aplicada".freeze
     CONTENT_FIELDS = %w[reply escalation resolution].freeze
     CONVERSATION_ID = /\Atkt_(?<id>[1-9]\d{0,18})\z/
     TRACEPARENT = /\A00-(?<trace_id>\h{32})-\h{16}-\h{2}\z/
@@ -153,17 +156,27 @@ module AgentActions
       reason ? reject(reason) : apply
     end
 
+    # A atribuição vem primeiro no motivo: depois de um handoff (bloco 08) o turno também fica `expired`, e a
+    # ação atrasada deve aparecer como `atribuicao_mudou`/`fora_da_ia`, não como prazo vencido. O resultado
+    # (rejeitar) é o mesmo em qualquer ordem.
     def rejection_reason
-      turn_reason || assignment_reason || context_reason || deadline_reason
+      assignment_reason || turn_reason || context_reason || deadline_reason || handoff_reason
     end
 
     # 1. Turno atual e elegível.
     def turn_reason
       return "turno_superado" if @turn.status == "superseded"
-      return "prazo_vencido" if @turn.status == "expired"
+      return expired_reason if @turn.status == "expired"
       return "turno_nao_elegivel" unless @turn.eligible?
 
       "turno_superado" if @ticket.ai_turns.where(turn: (@turn.turn + 1)..).exists?
+    end
+
+    # Turno expirado pelo pedido de handoff de um gatilho que não é prazo (falha definitiva, DLQ, contexto): o motivo é o
+    # pedido. Expirado pelo timeout, ou por um pedido de prazo: prazo_vencido.
+    def expired_reason
+      reason = Handoff::Request.pending_reason(@ticket)
+      reason && !Handoff::Request::DEADLINE_REASONS.include?(reason) ? "handoff_pedido" : "prazo_vencido"
     end
 
     # 2. Mesma atribuição, que continua com a IA.
@@ -172,6 +185,12 @@ module AgentActions
       return "atribuicao_mudou" if returned != @turn.assignment_version || @turn.assignment_version != @ticket.assignment_version
 
       "fora_da_ia" unless @ticket.with_ai?
+    end
+
+    # 5. RN-45, RN-46: pedido o handoff nesta atribuição, a IA já não responde. Fica por último: um turno expirado
+    # ou vencido mostra o motivo do prazo. O pedido já expira os turnos eligible; isto é a defesa sob o mesmo lock.
+    def handoff_reason
+      "handoff_pedido" if Handoff::Request.pending?(@ticket)
     end
 
     # 3. Contexto devolvido igual ao persistido, e o persistido cobre a última mensagem do cliente.
@@ -196,11 +215,32 @@ module AgentActions
       # Sob o lock não há corrida; se outro caminho mudar o turno sem o lock, a regra do banco decide.
       return reject("turno_nao_elegivel") unless applied
 
-      # "Marca o turno applied, registra a ação final, limpa os prazos" (07, seção 3.4).
-      @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+      # "Marca o turno applied, registra a ação final, limpa os prazos e cancela o aviso de progresso do ciclo que
+      # ainda estiver pending" (07, seção 3.4; RN-57).
+      cycle_seq = @ticket.first_pending_seq
+      @ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil,
+                             progress_due_at: nil)
       audit("agent_action.applied")
+      cancel_progress_notice(cycle_seq)
       request_delivery
       outcome(:applied, nil)
+    end
+
+    # RN-57: o aviso do ciclo que ainda não saiu (pending) não vale mais. Um aviso em `sending` fica para a
+    # conciliação (07, seção 3.2) e sai antes da resposta, que tem seq maior. O item do envio é concluído aqui,
+    # na mesma transação, como o Deliveries::Send faz no cancelamento do eval.
+    def cancel_progress_notice(cycle_seq)
+      Delivery.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id, kind: "progress", status: "pending",
+                     ai_first_pending_seq: cycle_seq).find_each do |delivery|
+        delivery.update!(status: "cancelled", lease_until: nil, last_error: CANCEL_REASON)
+        OutboxEvent.where(brand_id: @ticket.brand_id, dedup_key: "delivery:#{delivery.delivery_id}", completed_at: nil)
+                   .update_all(completed_at: Time.current, lease_until: nil, last_error: CANCEL_REASON)
+        AuditEvent.create!(
+          brand_id: @ticket.brand_id, ticket: @ticket, actor_type: "system", event_type: "delivery.cancelled", trace_id:,
+          data: { delivery_id: delivery.delivery_id, seq: delivery.seq, kind: delivery.kind, reason: CANCEL_REASON,
+                  first_pending_seq: cycle_seq, turn: @turn.turn }
+        )
+      end
     end
 
     # --- Saída ao cliente (bloco 05; 07, seção 3.1, passo 6, e seção 3.2; RF-06, RNF-14, RNF-15) ---

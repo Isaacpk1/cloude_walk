@@ -3,7 +3,8 @@
 # - Abertura do turno: as mensagens pendentes e as do histórico que o turno levou, os tamanhos em
 #   caracteres, o context_version e o digest abreviado. Sem os campos do bloco 06, usa ai_turns.context.
 # - Turno não aberto: só as recusas terminais (Turns::Open::TERMINAL_REASONS): contexto_excede_limite (RN-49),
-#   com o tamanho das pendentes e o limite, e prazo_vencido, sem_prazo e contrato (RN-46). O handoff fica pendente (bloco 10).
+#   com o tamanho das pendentes e o limite, e prazo_vencido, sem_prazo e contrato (RN-46). Com um handoff.requested
+#   gravado depois da recusa (id maior, bloco 08), o detalhe diz o motivo pedido; sem ele, o handoff fica pendente (bloco 10).
 #   Os outros motivos (coberto, janela_aberta, fora_da_ia...) são rotina do scheduler e ficam fora.
 # Isolamento por marca (invariante 6): auditoria e turnos filtrados pelo brand_id do atendimento.
 class TurnContextEvents
@@ -23,7 +24,7 @@ class TurnContextEvents
 
   def audits
     @audits ||= AuditEvent.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id,
-                                 event_type: %w[ai_turn.opened ai_turn.not_opened]).order(:occurred_at, :id).to_a
+                                 event_type: %w[ai_turn.opened ai_turn.not_opened handoff.requested]).order(:occurred_at, :id).to_a
   end
 
   def opened_event(turn, audit)
@@ -52,7 +53,7 @@ class TurnContextEvents
       kind: :turn_not_opened, started_at: audit.occurred_at, finished_at: audit.occurred_at, ticket_id: @ticket.id.to_s,
       seq:, turn: nil, trace_id: audit.trace_id, source: DataSource::SYSTEM,
       detail: "Turno não aberto (#{data['reason']}): #{refusal_numbers(data)}" \
-              "#{seqs.any? ? " nas mensagens seq #{list(seqs)}" : " até a seq #{seq}"}; #{pending_handoff(data['reason'])}"
+              "#{seqs.any? ? " nas mensagens seq #{list(seqs)}" : " até a seq #{seq}"}; #{handoff_text(audit)}"
     )
   end
 
@@ -65,7 +66,12 @@ class TurnContextEvents
     end
   end
 
-  def pending_handoff(reason) = "handoff para humano pendente (bloco 10; #{reason == TOO_LARGE ? 'RN-49' : 'RN-46'})"
+  def handoff_text(audit)
+    request = audits.find { _1.event_type == "handoff.requested" && _1.id > audit.id }
+    return "handoff para humano pedido: #{ConversationView::Handoff.reason_label(request.data['reason'])}" if request
+
+    "handoff para humano pendente (bloco 10; #{audit.data['reason'] == TOO_LARGE ? 'RN-49' : 'RN-46'})"
+  end
 
   def panel_time(iso) = iso && PanelClock.format(Time.zone.parse(iso), precise: true)
   def chars(items) = Array(items).sum { _1["text"].to_s.length }

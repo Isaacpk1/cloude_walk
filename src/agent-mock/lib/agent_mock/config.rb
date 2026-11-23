@@ -15,9 +15,12 @@ module AgentMock
 
     def self.load(path: DEFAULT_PATH, env: ENV) = new(YAML.safe_load_file(path), env:)
 
-    def initialize(raw, env: ENV)
+    # profile: perfil escolhido em tempo de execução pelo simulador (Profiles); tem precedência sobre o
+    # AGENT_PROFILE. As sobreposições AGENT_* do ambiente valem em qualquer perfil.
+    def initialize(raw, env: ENV, profile: nil)
       @raw = raw
-      @profile = env.fetch("AGENT_PROFILE", raw.fetch("default_profile"))
+      @env = env
+      @profile = profile || env.fetch("AGENT_PROFILE", raw.fetch("default_profile"))
       settings = raw.fetch("profiles").fetch(@profile) { raise Invalid, "perfil desconhecido: #{@profile}" }
       @seed = integer(env.fetch("AGENT_SEED", raw.fetch("seed")), "AGENT_SEED")
       @latency = parse_latency(env.fetch("AGENT_LATENCY_MS", settings.fetch("latency_ms")))
@@ -30,6 +33,11 @@ module AgentMock
       @rules.each { Scenarios::Rule.new(_1) }
       @replies = raw.fetch("replies")
     end
+
+    def profile_names = @raw.fetch("profiles").keys
+
+    # A mesma configuração com outro perfil (o ambiente continua valendo). Perfil desconhecido: Invalid.
+    def with_profile(name) = name == profile ? self : self.class.new(@raw, env: @env, profile: name)
 
     def effective
       {

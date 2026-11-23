@@ -206,7 +206,8 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
     end
 
     it "4: ciclo já encerrado" do
-      ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+      ticket.update_columns(first_pending_seq: nil, first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil,
+                            progress_due_at: nil)
 
       expect_rejected(agent_action_for(turn), "ciclo_encerrado")
     end

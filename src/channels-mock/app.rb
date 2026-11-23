@@ -12,6 +12,7 @@ require_relative "lib/channels_mock/providers/chat_api"
 require_relative "lib/channels_mock/conversation_view"
 require_relative "lib/channels_mock/scenarios"
 require_relative "lib/channels_mock/scenario_view"
+require_relative "lib/channels_mock/agent_profile"
 
 module ChannelsMock
   # Provedores simulados e simulador do cliente (RF-04, ADR-012). Bloco 02: só o chat do app, na entrada.
@@ -58,7 +59,8 @@ module ChannelsMock
         refresh = r.params["atualizar"].to_s[/\A[1-9]\d?\z/]
         view("index", locals: { items:, orphans:, accounts: Providers::Chat::ACCOUNTS, platform_url: PLATFORM_PUBLIC_URL,
                                 last: entries.first, fault: Faults.state, refresh:,
-                                scenarios: Scenarios.catalog, runs: Scenarios.runs.map(&:snapshot) },
+                                scenarios: Scenarios.catalog, runs: Scenarios.runs.map(&:snapshot),
+                                agent_profile: AgentProfile.view_state },
                       layout_opts: { locals: { refresh: } })
       end
 
@@ -68,6 +70,34 @@ module ChannelsMock
         r.redirect "/"
       rescue ArgumentError, TypeError => e
         r.halt(422, e.message)
+      end
+
+      # Perfil do agente mock (bloco 08; RF-38, RN-46, RN-57): pela tela (formulário) ou por script (JSON).
+      r.on "simulador", "agente", "perfil" do
+        r.get true do
+          json_reply(200, AgentProfile.state)
+        rescue AgentProfile::Disabled, AgentProfile::Unavailable => e
+          agent_profile_unavailable(e)
+        end
+
+        r.post true do
+          json = r.content_type.to_s.start_with?("application/json")
+          params = json ? JSON.parse(r.body.read.then { _1.empty? ? "{}" : _1 }) : r.params
+          raise ArgumentError, "corpo precisa ser um objeto" unless params.is_a?(Hash)
+
+          state = AgentProfile.set(scope: params["scope"], profile: params["profile"])
+          next r.redirect("/#agente") unless json
+
+          json_reply(200, state)
+        rescue AgentProfile::UnknownProfile => e
+          json_reply(422, { "error" => "perfil_desconhecido", "details" => e.message })
+        rescue AgentProfile::UnknownScope => e
+          json_reply(422, { "error" => "escopo_desconhecido", "details" => e.message })
+        rescue AgentProfile::Disabled, AgentProfile::Unavailable => e
+          agent_profile_unavailable(e)
+        rescue ArgumentError, JSON::ParserError => e
+          json_reply(422, { "error" => "pedido_invalido", "details" => e.message })
+        end
       end
 
       # Cenários de rajada (bloco 06; RN-55, RN-56): pela tela (formulário) ou por script (JSON).
@@ -128,6 +158,11 @@ module ChannelsMock
       response["Content-Type"] = "application/json"
       headers.each { |name, value| response[name] = value }
       JSON.generate(body)
+    end
+
+    def agent_profile_unavailable(error)
+      code = error.is_a?(AgentProfile::Disabled) ? "controle_desligado" : "controle_indisponivel"
+      json_reply(503, { "error" => code, "details" => error.message })
     end
 
     def send_chat(account, params)

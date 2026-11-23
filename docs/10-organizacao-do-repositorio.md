@@ -242,6 +242,7 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Dados iniciais (marca, fila, cliente, bot) | `src/platform/db/seeds/synthetic.rb`, chamado por `db/seeds.rb`. Rode com `make seed`; a semente vem de `SEED` no `.env` |
 | Versão do Ruby | No `.ruby-version` de cada serviço em `src/` (hoje Ruby 4.0.10, ADR-001). O CI e o `Makefile` leem esse arquivo; o `ARG RUBY_VERSION` do `Dockerfile` e o `TargetRubyVersion` do `.rubocop.yml` dos serviços repetem o mesmo valor. Ao trocar de versão, mude todos juntos e confira se o `ruby/setup-ruby` já publica a versão para o `ubuntu-latest` |
 | Conexão com o Redis | `src/platform/config/initializers/redis.rb`, com a URL em `REDIS_URL` |
+| Perfil do agente mock escolhido no simulador (`rapido`, `lento`, `mudo`) | Redis de controle em `AGENT_CONTROL_REDIS_URL` (no Compose, `redis://redis:6379/1`), chaves `helpdesk:agent-mock:profile:brand:<marca>` e `helpdesk:agent-mock:profile:global`. O `channels-mock` grava (`POST /simulador/agente/perfil`); o `agent-mock` lê a cada evento (`lib/agent_mock/profile_source.rb`), com `AGENT_PROFILE` como padrão se o Redis faltar |
 | Filas e pesos do Sidekiq | `src/platform/config/sidekiq.yml` |
 | ActionCable no Redis | `src/platform/config/cable.yml` |
 | Rate limit por marca e canal | `src/platform/app/services/rate_limit/` |
@@ -275,7 +276,7 @@ Migration existe para mudar o esquema de dados que precisam sobreviver. Só o Po
 | Componente | Guarda | Tem migration? | Onde fica a configuração |
 | --- | --- | --- | --- |
 | Postgres | Atendimentos, mensagens, configuração, outbox, auditoria | **Sim:** `src/platform/db/migrate/` | `config/database.yml`, `infra/postgres/init.sql` |
-| Redis | Filas do Sidekiq, pub/sub do ActionCable, contadores do rate limit | **Não.** São estruturas criadas sob demanda e descartáveis. Se o Redis perder tudo, o outbox republica (ADR-005, ADR-016) | `config/initializers/redis.rb`, `config/sidekiq.yml`, `config/cable.yml` |
+| Redis | Filas do Sidekiq, pub/sub do ActionCable, contadores do rate limit, perfil do agente mock escolhido no simulador (banco 1) | **Não.** São estruturas criadas sob demanda e descartáveis. Se o Redis perder tudo, o outbox republica (ADR-005, ADR-016) | `config/initializers/redis.rb`, `config/sidekiq.yml`, `config/cable.yml` |
 | Kafka | Eventos em trânsito entre plataforma, broker e agente | **Não como migration**, mas os tópicos são declarados em `infra/kafka/topics.yml` e criados pelo `kafka-init` | `infra/kafka/`, `karafka.rb` de cada serviço |
 
 Consequência prática: nenhum dado que precise ser consultado depois pode existir só no Redis ou só no Kafka. Se precisar, ele ganha uma tabela e uma migration.

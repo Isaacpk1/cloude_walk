@@ -46,6 +46,8 @@ RSpec.describe "07, seção 6: falha terminal da publicação revalida o turno c
     discarded = AuditEvent.where(ticket_id: turn.ticket_id, event_type: "agent_event.discarded").sole
     expect(discarded.data).to include("reason" => "turno_applied", "event_id" => turn.event_id)
     expect(OutboxEvent.find(turn.event_id).completed_at).to be_present
+    # RN-46 (bloco 08): caso já respondido não escala.
+    expect(handoff_items).to be_empty
   end
 
   it "turno ainda elegível: a falha terminal continua registrada como prazo_vencido" do
@@ -55,6 +57,8 @@ RSpec.describe "07, seção 6: falha terminal da publicação revalida o turno c
 
     expect(result.status).to eq(:expired)
     expect(terminal_failures(turn).sole.data).to include("outcome" => "prazo_vencido", "origin" => "broker_indisponivel")
+    # RN-46 (bloco 08): a falha definitiva escala na hora.
+    expect(result.handoff_event_id).to eq(handoff_items.sole.id)
   end
 end
 

@@ -73,3 +73,26 @@ module KafkaHelpers
     list.first
   end
 end
+
+module KafkaHelpers
+  # Redis em memória com a mesma interface usada (mget), e que pode cair como o de verdade.
+  class FakeControlRedis
+    attr_reader :reads
+
+    def initialize
+      @data = {}
+      @reads = 0
+    end
+
+    def set(key, value) = @data[key] = value
+    def del(key) = @data.delete(key)
+    def down! = @down = true
+
+    def mget(*keys)
+      @reads += 1
+      raise Redis::CannotConnectError, "Connection refused - connect(2) for 127.0.0.1:6379" if @down
+
+      keys.flatten.map { @data[_1] }
+    end
+  end
+end

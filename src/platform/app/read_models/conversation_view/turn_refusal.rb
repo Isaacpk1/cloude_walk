@@ -2,10 +2,17 @@
 # por um motivo que nenhuma volta do scheduler muda (Turns::Open::TERMINAL_REASONS) e o ciclo espera o handoff
 # (bloco 10). Ocupa o lugar da fase de agrupamento. `pending_seqs`: as mensagens que ficaram sem turno;
 # `pending_chars` e `limit` no contexto_excede_limite; `deadline_at` (teto do ciclo) no prazo_vencido;
-# `violations` (ponteiros JSON) no contrato.
+# `violations` (ponteiros JSON) no contrato. Bloco 08: `handoff_reason` é o motivo do handoff.requested gravado depois
+# da recusa; sem ele, o handoff continua pendente (bloco 10).
 class ConversationView::TurnRefusal < Data.define(:reason, :pending_seqs, :pending_chars, :limit, :deadline_at,
-                                                  :violations, :occurred_at, :trace_id)
-  def headline = "Turno não aberto: #{reason} — handoff pendente (bloco 10)"
+                                                  :violations, :occurred_at, :trace_id, :handoff_reason)
+  def initialize(handoff_reason: nil, **rest) = super
+
+  def headline
+    return "Turno não aberto: #{reason} — handoff pendente (bloco 10)" unless handoff_reason
+
+    "Turno não aberto: #{reason} — handoff pedido (#{ConversationView::Handoff.reason_label(handoff_reason)})"
+  end
 
   def detail
     case reason
