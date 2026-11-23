@@ -48,6 +48,7 @@ RSpec.describe "RF-58 / ROADMAP 01: tela de conversas" do
     it "não depende do provedor sintético: mostra o selo da fonte que alimenta a tela" do
       synthetic = SyntheticConversations.new.find("exemplo-repasse")
       real = synthetic.with(source: DataSource::SYSTEM)
+      create(:brand, :infinitepay) # bloco 14: a conversa de registro real só aparece para quem é da marca
       ConversationReader.source = instance_double(SyntheticConversations, find: real)
 
       get conversation_path("exemplo-repasse")

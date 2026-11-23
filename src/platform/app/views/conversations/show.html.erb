@@ -17,6 +17,9 @@
   </div>
 </div>
 
+<% if flash[:notice] %><p class="flash flash--notice" role="status"><%= flash[:notice] %></p><% end %>
+<% if flash[:alert] %><p class="flash flash--alert" role="alert"><%= flash[:alert] %></p><% end %>
+
 <div class="conversation">
   <section class="conversation__messages" aria-label="Mensagens">
     <h2>Mensagens <span class="muted">(ordem do seq)</span></h2>
@@ -27,6 +30,7 @@
             <span class="seq">seq <%= message.seq %></span>
             <%= author_badge(message) %>
             <strong><%= message.author_name %></strong>
+            <% if message.internal %><span class="badge badge--internal" title="Nunca é enviada ao cliente (RN-50)">nota interna</span><% end %>
             <time class="muted" datetime="<%= message.occurred_at.iso8601(3) %>"><%= panel_time(message.occurred_at) %></time>
           </div>
           <p class="message__body"><%= message.body %></p>
@@ -47,6 +51,7 @@
         </li>
       <% end %>
     </ol>
+    <%= render "conversations/analyst_actions", conversation: c %>
   </section>
 
   <aside class="conversation__side">

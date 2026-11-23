@@ -1,0 +1,8 @@
+<% content_for :title, "Entrar" %>
+<div class="page-header"><div><h1>Entrar</h1><p class="page-header__subtitle">Painel do help desk. Dados sintéticos.</p></div></div>
+<% if flash[:alert] %><p class="login__error" role="alert"><%= flash[:alert] %></p><% end %>
+<%= form_with url: login_path, class: "login" do |form| %>
+  <p><%= form.label :email, "E-mail" %><br><%= form.email_field :email, autocomplete: "username", required: true %></p>
+  <p><%= form.label :password, "Senha" %><br><%= form.password_field :password, autocomplete: "current-password", required: true %></p>
+  <p><%= form.submit "Entrar" %></p>
+<% end %>

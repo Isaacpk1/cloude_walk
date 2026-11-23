@@ -1,5 +1,7 @@
 # Aba de evals (ADR-023): lê só pelo EvalPanel. ?marca=<slug> restringe à marca.
 class EvalsController < PanelController
+  before_action :require_supervisor
+
   rescue_from EvalPanel::NotFound do
     render "evals/not_found", status: :not_found
   end
@@ -15,5 +17,5 @@ class EvalsController < PanelController
 
   private
 
-  def panel = @panel ||= EvalPanel.new(brand_slug: params[:marca])
+  def panel = @panel ||= EvalPanel.new(brand_slug: params[:marca], brand_ids: scope_brand_ids)
 end

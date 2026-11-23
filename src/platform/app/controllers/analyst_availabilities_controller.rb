@@ -16,13 +16,14 @@ class AnalystAvailabilitiesController < PanelController
   private
 
   def find_analyst
-    scope = User.where(kind: "human", role: "analyst")
+    brand_ids = scope_brand_ids
     if params[:marca].present?
-      brand = Brand.find_by(slug: params[:marca])
+      brand = Brand.find_by(id: brand_ids, slug: params[:marca])
       return unless brand
 
-      scope = scope.where(id: TeamMembership.joins(:team).where(teams: { brand_id: brand.id }).select(:user_id))
+      brand_ids = [ brand.id ]
     end
-    scope.find_by(id: params[:id])
+    User.where(kind: "human", role: "analyst")
+        .where(id: TeamMembership.joins(:team).where(teams: { brand_id: brand_ids }).select(:user_id)).find_by(id: params[:id])
   end
 end

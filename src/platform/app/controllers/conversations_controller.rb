@@ -1,9 +1,12 @@
 class ConversationsController < PanelController
   def index
-    @conversations = ConversationReader.all
+    @conversations = visible_conversations
   end
 
   def show
-    @conversation = ConversationReader.find(params[:id])
+    @conversation = find_visible_conversation(params[:id])
+    # Bloco 14: só o analista responsável, com o caso em com_analista, vê as ações (a conferência de verdade é do Human::Action).
+    @can_act = !@conversation.source.synthetic? && @conversation.state == "com_analista" &&
+               Ticket.exists?(id: @conversation.ticket_id, brand_id: scope_brand_ids, assignee_id: current_user.id)
   end
 end

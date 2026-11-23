@@ -9,6 +9,9 @@ require "faker"
 
 module Seeds
   class Synthetic
+    # Senha sintética dos usuários do seed (RN-51); só para desenvolvimento e demonstração.
+    SEED_PASSWORD = "senha-sintetica-1".freeze
+
     BRANDS = [
       { slug: "infinitepay", name: "InfinitePay", locale: "pt-BR" },
       { slug: "jim", name: "JIM", locale: "en" } # RN-42
@@ -67,7 +70,11 @@ module Seeds
     private
 
     def upsert_user(email:, **attrs)
-      User.find_or_create_by!(email:) { |user| user.assign_attributes(attrs) }
+      # Bloco 14 (ADR-024): humanos entram no painel com a senha sintética do seed (RN-51: só dados sintéticos); o bot não tem senha.
+      User.find_or_create_by!(email:) do |user|
+        user.assign_attributes(attrs)
+        user.password = SEED_PASSWORD unless attrs[:kind] == "bot"
+      end.tap { |user| user.update!(password: SEED_PASSWORD) if user.human? && user.password_digest.blank? }
     end
 
     # ADR-019: uma conta por canal. O segredo segue a regra do channels-mock: variável

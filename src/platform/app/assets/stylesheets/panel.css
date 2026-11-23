@@ -284,3 +284,12 @@ a.message__turn { text-decoration: none; }
 .analyst-capacity__status--offline { color: #57606a; font-weight: 600; }
 .analyst-capacity__alert { color: #9b1c12; font-weight: 600; }
 .analyst-capacity__form { display: inline; }
+
+/* Bloco 14: ações do analista e avisos */
+.analyst-actions form { display: grid; gap: .4rem; margin-bottom: 1rem; max-width: 40rem; }
+.badge--internal { background: #fff8c5; color: #6a5300; }
+.flash { padding: .5rem .75rem; border-radius: 4px; font-weight: 600; }
+.flash--notice { background: #dafbe1; color: #116329; }
+.flash--alert { background: #ffebe9; color: #9b1c12; }
+.login { max-width: 22rem; }
+.login__error { color: #9b1c12; font-weight: 600; }

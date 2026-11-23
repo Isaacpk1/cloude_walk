@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "ROADMAP 01: abrir uma conversa a partir da lista" do
   it "vai da lista à conversa e dela à linha do tempo" do
+    log_in_as_supervisor
     visit "/"
     click_link "Repasse não caiu"
 
