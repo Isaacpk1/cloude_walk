@@ -86,7 +86,7 @@ module Seeds
 
     def analysts_for(brand)
       Array.new(2) do |i|
-        upsert_user(name: "Analista #{i + 1} #{brand.name}", email: "analista#{i + 1}.#{brand.slug}@helpdesk.test")
+        upsert_user(name: "Analista #{i + 1} #{brand.name}", email: "analista#{i + 1}.#{brand.slug}@helpdesk.test", status: "online")
       end
     end
 

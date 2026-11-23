@@ -16,9 +16,17 @@ class HumanQueue
   NotFound = Class.new(StandardError)
   LIMIT = 200
   STATE = "aguardando_humano".freeze
+  # Bloco 13: além de quem espera, a fila mostra quem já está com um analista (RF-45), depois dos que esperam.
+  STATES = [ STATE, "com_analista" ].freeze
   STREAM = :human_queue
   PRIORITY_ORDER = <<~SQL.squish.freeze
     CASE tickets.priority WHEN 'critica' THEN 0 WHEN 'alta' THEN 1 WHEN 'baixa' THEN 3 ELSE 2 END
+  SQL
+  # RN-29: quem espera antes de quem já tem analista; depois prioridade, prazo de SLA (sem prazo por último), o mais
+  # antigo na fila e o id. O mais antigo conta desde a entrada na fila humana (sla_started_at, que não reinicia, RN-23).
+  ORDER = <<~SQL.squish.freeze
+    CASE tickets.state WHEN 'aguardando_humano' THEN 0 ELSE 1 END, #{PRIORITY_ORDER}, tickets.sla_due_at ASC NULLS LAST,
+    COALESCE(tickets.sla_started_at, escalation.occurred_at, tickets.updated_at), tickets.id
   SQL
   # A entrada mais nova do caso na fila humana, na marca do caso (invariante 6): o ticket.escalated do handoff ou o
   # ticket.assigned da triagem para a fila humana (bloco 11: fila sem IA ou categoria somente humana).
@@ -57,10 +65,10 @@ class HumanQueue
   private
 
   def scope
-    records = Ticket.includes(:brand, :customer).joins(LAST_ESCALATION).where(state: STATE)
+    records = Ticket.includes(:brand, :customer).includes(:assignee).joins(LAST_ESCALATION).where(state: STATES)
     records = records.where(brand_id: brand.id) if brand
     records.select("tickets.*", "escalation.id AS escalation_audit_id")
-           .order(Arel.sql("#{PRIORITY_ORDER}, COALESCE(escalation.occurred_at, tickets.updated_at), tickets.id"))
+           .order(Arel.sql(ORDER))
            .limit(LIMIT)
   end
 
@@ -107,7 +115,8 @@ class HumanQueue
       priority: ticket.priority, priority_from: raised&.data&.dig("from"), priority_to: raised&.data&.dig("to"),
       escalated_at: escalated&.occurred_at || ticket.updated_at,
       summary: entry_summary(escalated, summaries[ticket.id], audits, data), trace_id: escalated&.trace_id,
-      category: ticket.category
+      category: ticket.category, assignee_name: ticket.assignee&.name, sla_due_at: ticket.sla_due_at,
+      sla_alerted_at: ticket.sla_alerted_at, sla_breached: ticket.sla_breached
     )
   end
 

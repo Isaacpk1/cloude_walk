@@ -38,6 +38,18 @@ END $$;
 
 
 --
+-- Name: eval_runs_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.eval_runs_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'eval_runs é só de inserção';
+END $$;
+
+
+--
 -- Name: handoff_summaries_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -48,18 +60,6 @@ BEGIN
   RAISE EXCEPTION 'handoff_summaries é só inserção (RN-39, RN-54): o primeiro resumo do handoff vale';
 END;
 $$;
-
-
---
--- Name: eval_runs_immutable(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.eval_runs_immutable() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-  RAISE EXCEPTION 'eval_runs é só de inserção';
-END $$;
 
 
 --
@@ -126,6 +126,21 @@ BEGIN
   RAISE EXCEPTION 'tickets.evaluation não muda depois da criação';
 END;
 $$;
+
+
+--
+-- Name: tickets_sla_breached_permanent(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.tickets_sla_breached_permanent() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.sla_breached AND NOT NEW.sla_breached THEN
+    RAISE EXCEPTION 'tickets.sla_breached é permanente (RN-26): atendimento %', OLD.id;
+  END IF;
+  RETURN NEW;
+END $$;
 
 
 SET default_tablespace = '';
@@ -360,8 +375,8 @@ CREATE TABLE public.dead_letters (
     outcome character varying,
     reprocessed_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT dead_letters_outcome_check CHECK (((outcome IS NULL) OR ((outcome)::text = ANY ((ARRAY['escalated'::character varying, 'audited'::character varying, 'uncorrelated'::character varying])::text[])))),
-    CONSTRAINT dead_letters_source_check CHECK (((source)::text = ANY ((ARRAY['broker'::character varying, 'agent-mock'::character varying, 'platform'::character varying, 'unknown'::character varying])::text[]))),
+    CONSTRAINT dead_letters_outcome_check CHECK (((outcome IS NULL) OR ((outcome)::text = ANY (ARRAY[('escalated'::character varying)::text, ('audited'::character varying)::text, ('uncorrelated'::character varying)::text])))),
+    CONSTRAINT dead_letters_source_check CHECK (((source)::text = ANY (ARRAY[('broker'::character varying)::text, ('agent-mock'::character varying)::text, ('platform'::character varying)::text, ('unknown'::character varying)::text]))),
     CONSTRAINT dead_letters_ticket_brand_check CHECK (((ticket_id IS NULL) OR (brand_id IS NOT NULL)))
 );
 
@@ -480,8 +495,8 @@ CREATE TABLE public.handoff_summaries (
     missing_reason character varying,
     trace_id character varying NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT handoff_summaries_source_check CHECK (((source)::text = ANY ((ARRAY['agent'::character varying, 'platform'::character varying])::text[]))),
-    CONSTRAINT handoff_summaries_status_check CHECK (((status)::text = ANY ((ARRAY['available'::character varying, 'missing'::character varying])::text[]))),
+    CONSTRAINT handoff_summaries_source_check CHECK (((source)::text = ANY (ARRAY[('agent'::character varying)::text, ('platform'::character varying)::text]))),
+    CONSTRAINT handoff_summaries_status_check CHECK (((status)::text = ANY (ARRAY[('available'::character varying)::text, ('missing'::character varying)::text]))),
     CONSTRAINT handoff_summaries_status_fields_check CHECK (((((status)::text = 'available'::text) AND (fields IS NOT NULL)) OR (((status)::text = 'missing'::text) AND (missing_reason IS NOT NULL))))
 );
 
@@ -837,6 +852,10 @@ CREATE TABLE public.tickets (
     evaluation boolean DEFAULT false NOT NULL,
     progress_due_at timestamp(6) without time zone,
     ai_turns_count integer DEFAULT 0 NOT NULL,
+    sla_started_at timestamp(6) without time zone,
+    sla_due_at timestamp(6) without time zone,
+    sla_alerted_at timestamp(6) without time zone,
+    sla_breached boolean DEFAULT false NOT NULL,
     CONSTRAINT tickets_ai_turns_count_check CHECK ((ai_turns_count >= 0)),
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
@@ -844,6 +863,8 @@ CREATE TABLE public.tickets (
     CONSTRAINT tickets_first_pending_pair_check CHECK (((first_pending_seq IS NULL) = (first_pending_at IS NULL))),
     CONSTRAINT tickets_first_pending_seq_check CHECK (((first_pending_seq IS NULL) OR (first_pending_seq >= 1))),
     CONSTRAINT tickets_progress_requires_cycle_check CHECK (((progress_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
+    CONSTRAINT tickets_sla_alert_requires_start_check CHECK (((sla_alerted_at IS NULL) OR (sla_started_at IS NOT NULL))),
+    CONSTRAINT tickets_sla_due_after_start_check CHECK (((sla_due_at IS NULL) OR ((sla_started_at IS NOT NULL) AND (sla_due_at >= sla_started_at)))),
     CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text])))
 );
 
@@ -882,6 +903,8 @@ CREATE TABLE public.users (
     active_count integer DEFAULT 0 NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    status_changed_at timestamp(6) without time zone,
+    last_assigned_at timestamp(6) without time zone,
     CONSTRAINT users_capacity_check CHECK (((active_count >= 0) AND (active_count <= capacity))),
     CONSTRAINT users_kind_check CHECK (((kind)::text = ANY (ARRAY[('human'::character varying)::text, ('bot'::character varying)::text]))),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('supervisor'::character varying)::text, ('analyst'::character varying)::text, ('agent'::character varying)::text]))),
@@ -1624,10 +1647,24 @@ CREATE UNIQUE INDEX index_teams_on_id_and_brand_id ON public.teams USING btree (
 
 
 --
+-- Name: index_tickets_analyst_cases; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_analyst_cases ON public.tickets USING btree (brand_id, assignee_id) WHERE (((state)::text = ANY (ARRAY[('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text])) AND (assignee_id IS NOT NULL));
+
+
+--
 -- Name: index_tickets_dispatch_due; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX index_tickets_dispatch_due ON public.tickets USING btree (dispatch_due_at) WHERE (dispatch_due_at IS NOT NULL);
+
+
+--
+-- Name: index_tickets_human_queue_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_human_queue_order ON public.tickets USING btree (brand_id, queue_id, priority, sla_due_at, id) WHERE ((state)::text = 'aguardando_humano'::text);
 
 
 --
@@ -1694,6 +1731,13 @@ CREATE UNIQUE INDEX index_tickets_one_open_per_customer_channel ON public.ticket
 
 
 --
+-- Name: index_users_distribution; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_users_distribution ON public.users USING btree (status, active_count, last_assigned_at) WHERE (((kind)::text = 'human'::text) AND ((role)::text = 'analyst'::text));
+
+
+--
 -- Name: index_users_on_email; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1715,17 +1759,17 @@ CREATE TRIGGER dead_letters_retention BEFORE DELETE ON public.dead_letters FOR E
 
 
 --
--- Name: handoff_summaries handoff_summaries_immutable; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER handoff_summaries_immutable BEFORE DELETE OR UPDATE ON public.handoff_summaries FOR EACH ROW EXECUTE FUNCTION public.handoff_summaries_immutable();
-
-
---
 -- Name: eval_runs eval_runs_no_update; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER eval_runs_no_update BEFORE DELETE OR UPDATE ON public.eval_runs FOR EACH ROW EXECUTE FUNCTION public.eval_runs_immutable();
+
+
+--
+-- Name: handoff_summaries handoff_summaries_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER handoff_summaries_immutable BEFORE DELETE OR UPDATE ON public.handoff_summaries FOR EACH ROW EXECUTE FUNCTION public.handoff_summaries_immutable();
 
 
 --
@@ -1754,6 +1798,13 @@ CREATE TRIGGER routing_rulesets_queues_of_brand BEFORE INSERT ON public.routing_
 --
 
 CREATE TRIGGER tickets_evaluation_immutable BEFORE UPDATE OF evaluation ON public.tickets FOR EACH ROW WHEN ((new.evaluation IS DISTINCT FROM old.evaluation)) EXECUTE FUNCTION public.tickets_evaluation_immutable();
+
+
+--
+-- Name: tickets tickets_sla_breached_permanent; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER tickets_sla_breached_permanent BEFORE UPDATE OF sla_breached ON public.tickets FOR EACH ROW EXECUTE FUNCTION public.tickets_sla_breached_permanent();
 
 
 --
@@ -2139,6 +2190,8 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261124020000'),
+('20261124010000'),
 ('20261123020000'),
 ('20261123010000'),
 ('20261123000000'),

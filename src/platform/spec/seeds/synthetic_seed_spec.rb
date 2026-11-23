@@ -22,6 +22,18 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
     [ ruleset.brand.slug, ruleset.version, names.fetch(ruleset.default_queue_id), rules ]
   end
 
+  it "RN-30, RF-25 (bloco 13): os analistas de cada marca nascem online, com capacidade 5 e na equipe da fila humana" do
+    Seeds::Synthetic.call(seed: 42)
+
+    Brand.find_each do |brand|
+      analysts = User.joins(teams: :brand).where(brands: { id: brand.id }, kind: "human", role: "analyst")
+      expect(analysts.count).to be >= 2
+      expect(analysts).to all(have_attributes(status: "online", capacity: 5, active_count: 0))
+      queue = HelpdeskQueue.find_by!(brand:, escalation: true)
+      expect(analysts.map { _1.team_memberships.pluck(:team_id) }.flatten).to all(eq(queue.team_id))
+    end
+  end
+
   it "cria marca, fila, cliente sintético e usuário bot (bloco 01)" do
     Seeds::Synthetic.call(seed: 42)
 

@@ -268,3 +268,19 @@ a.message__turn { text-decoration: none; }
 .conversation-list__triage { display: flex; gap: .35rem; align-items: center; font-size: .85rem; }
 .bar__fill--triage_classified, .bar__fill--routing_decided, .bar__fill--triage_assigned { background: #1f6f8b; }
 .bar__fill--triage_skipped { background: #888; }
+
+/* Bloco 13: SLA da fila e capacidade dos analistas */
+.human-queue__sla { font-size: .85rem; font-weight: 600; }
+.human-queue__sla--ok { color: #116329; }
+.human-queue__sla--alert { color: #8a4b00; }
+.human-queue__sla--breached { color: #9b1c12; }
+.human-queue__sla--none { color: #57606a; font-weight: 400; }
+.analyst-capacity { margin-bottom: 1.5rem; }
+.analyst-capacity__list { list-style: none; padding: 0; display: grid; gap: .4rem; }
+.analyst-capacity__row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.analyst-capacity__name { font-weight: 600; }
+.analyst-capacity__status--online { color: #116329; font-weight: 600; }
+.analyst-capacity__status--pausa { color: #8a4b00; font-weight: 600; }
+.analyst-capacity__status--offline { color: #57606a; font-weight: 600; }
+.analyst-capacity__alert { color: #9b1c12; font-weight: 600; }
+.analyst-capacity__form { display: inline; }

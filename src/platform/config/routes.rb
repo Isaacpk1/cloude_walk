@@ -26,4 +26,6 @@ Rails.application.routes.draw do
   resources :dead_letters, path: "dlq", only: %i[index show]
   # Bloco 10 (RF-42, RF-45, RN-29): casos em aguardando_humano. ?marca=<slug> restringe à marca.
   get "fila" => "human_queue#index", as: :human_queue
+  # Bloco 13 (RF-27): disponibilidade do analista (online, pausa, offline). ?marca=<slug> exige que o analista seja da marca.
+  patch "analistas/:id/disponibilidade" => "analyst_availabilities#update", as: :analyst_availability
 end

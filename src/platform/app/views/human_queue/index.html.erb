@@ -7,12 +7,34 @@
 <div class="page-header">
   <div>
     <h1>Fila humana</h1>
-    <p class="page-header__subtitle">Casos em <code>aguardando_humano</code>, na ordem da RN-29: prioridade, depois o mais antigo na fila (o SLA entra no bloco 13)<% if marca %> · marca <code><%= marca %></code><% end %></p>
+    <p class="page-header__subtitle">Casos em <code>aguardando_humano</code> e <code>com_analista</code>, na ordem da RN-29: quem espera primeiro, depois prioridade, prazo do SLA e o mais antigo na fila<% if marca %> · marca <code><%= marca %></code><% end %></p>
   </div>
   <div class="page-header__actions">
     <span class="badge badge--source badge--system" title="Atualiza sozinha quando um caso entra na fila ou o resumo chega">Tempo real</span>
   </div>
 </div>
+
+<section class="analyst-capacity" aria-label="Analistas">
+  <h2>Analistas</h2>
+  <% if @capacity.unattended? %><p class="analyst-capacity__alert">Há casos esperando e nenhum analista online com vaga.</p><% end %>
+  <% if @capacity.rows.empty? %>
+    <p class="muted">Nenhum analista cadastrado<%= " nesta marca" if marca %>.</p>
+  <% else %>
+    <ul class="analyst-capacity__list">
+      <% @capacity.rows.each do |row| %>
+        <li class="analyst-capacity__row">
+          <span class="analyst-capacity__name"><%= row.name %></span>
+          <span class="muted"><%= row.brand_names.join(", ") %></span>
+          <span class="analyst-capacity__status analyst-capacity__status--<%= row.status %>"><%= row.status %></span>
+          <span class="analyst-capacity__load"><%= row.load_text %></span>
+          <% (User::STATUSES - [ row.status ]).each do |status| %>
+            <%= button_to status, analyst_availability_path(row.user_id, marca: marca), method: :patch, params: { status: }, class: "analyst-capacity__button", form_class: "analyst-capacity__form" %>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>
 
 <section class="human-queue" aria-label="Fila humana">
   <% if @entries.empty? %>
@@ -26,7 +48,9 @@
           <th scope="col">Categoria</th>
           <th scope="col">Fila e versão</th>
           <th scope="col">Motivo e origem</th>
+          <th scope="col">Responsável</th>
           <th scope="col">Prioridade</th>
+          <th scope="col">SLA</th>
           <th scope="col">Na fila há</th>
           <th scope="col">Resumo</th>
         </tr>
@@ -46,10 +70,12 @@
               <div class="human-queue__reason"><%= entry.reason_label || "motivo não registrado" %></div>
               <div class="muted"><%= entry.source_label %></div>
             </td>
+            <td class="human-queue__assignee"><%= entry.assigned? ? entry.assignee_name : "na fila" %></td>
             <td>
               <span class="badge badge--priority badge--priority-<%= entry.priority || 'media' %>"><%= entry.priority_label %></span>
               <% if entry.priority_raise_label %><div class="human-queue__raised"><%= entry.priority_raise_label %></div><% end %>
             </td>
+            <td class="human-queue__sla human-queue__sla--<%= entry.sla_status(@now) %>"><%= entry.sla_text(@now) %><% if entry.sla_status(@now) == :alert %> · alerta de 80%<% end %></td>
             <td>
               <%= entry.waiting_text(@now) %>
               <div class="muted">desde <time datetime="<%= entry.escalated_at.iso8601(3) %>"><%= panel_time(entry.escalated_at) %></time></div>

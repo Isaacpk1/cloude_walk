@@ -103,6 +103,7 @@ module Handoff
                             assignment_version: from + 1, first_pending_seq: nil, first_pending_at: nil,
                             dispatch_due_at: nil, progress_due_at: nil, ai_deadline_at: nil, ai_turns_count: 0,
                             priority: priority_to, updated_at: now)
+      Sla::Start.call(ticket:, now:) # RN-23: o SLA de assunção começa na entrada da fila humana e não reinicia
       audit("ticket.priority_raised", from: priority_from, to: priority_to, reason: payload["reason"]) if priority_to != priority_from
       expire_turns
       cancel_deliveries
