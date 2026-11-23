@@ -77,7 +77,8 @@ RSpec.describe "RF-12, RF-24, RN-28, RN-34: triagem de ponta a ponta" do
     perform_enqueued_jobs { post_chat("quero falar com um atendente") }
 
     ticket = Ticket.sole
-    expect(ticket).to have_attributes(state: "aguardando_humano", queue_id: config[:escalation].id, category: nil)
+    # RN-11: classificado (outros) mesmo sem roteamento; a fila é a do handoff.
+    expect(ticket).to have_attributes(state: "aguardando_humano", queue_id: config[:escalation].id, category: "outros")
     expect(audits(ticket, "triage.skipped").sole.data["reason"]).to be_in(%w[handoff_pedido fora_de_novo])
     expect(audits(ticket, "routing.decided")).to be_empty
     expect(audits(ticket, "ticket.escalated").sole.data).to include("reason" => "pedido_do_cliente")

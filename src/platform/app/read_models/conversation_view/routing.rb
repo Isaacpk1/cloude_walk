@@ -7,7 +7,7 @@ class ConversationView::Routing < Data.define(:queue_id, :queue_name, :queue_ver
                                               :rule_name, :group_index, :conditions, :default, :skipped_rules,
                                               :decided_at, :trace_id)
   SkippedRule = Data.define(:rule_index, :rule_name, :queue_name, :reason) do
-    REASONS = { "fila_inativa" => "inativa (RN-15)" }.freeze
+    REASONS = { "fila_inativa" => "inativa (RN-15)", "fila_fora_da_marca" => "fora da marca ou inexistente (RN-15)" }.freeze
 
     def label
       "regra #{rule_index.to_i + 1} «#{rule_name}» pulada: fila #{queue_name} #{REASONS.fetch(reason.to_s, "#{reason} (RN-15)")}"

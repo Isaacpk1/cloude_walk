@@ -59,13 +59,13 @@ RSpec.describe Triage::Run, "RF-12, RF-24, RN-28: triagem e atribuição do caso
 
     it "RN-15: grava as regras puladas e o nome da fila como o avaliador devolve" do
       skipped = [ { "rule_index" => 0, "rule_name" => "Crédito alto", "queue_id" => 99, "reason" => "fila_inativa" } ]
-      decision = routing_decision(config[:default], default: true).with(skipped_rules: skipped, queue_name: "Geral v1")
+      decision = routing_decision(config[:default], default: true).with(skipped_rules: skipped)
       received = ingest("meu repasse não caiu")
 
       run_triage(received.ticket, evaluator: fixed_evaluator(decision))
 
       expect(audits(received.ticket, "routing.decided").sole.data).to include("skipped_rules" => skipped,
-                                                                              "queue_name" => "Geral v1")
+                                                                              "queue_name" => decision.queue_name)
     end
 
     it "RN-55: classifica todas as mensagens do cliente gravadas até a triagem (rajada antes do worker)" do
@@ -181,17 +181,18 @@ RSpec.describe Triage::Run, "RF-12, RF-24, RN-28: triagem e atribuição do caso
   end
 
   describe "RN-34 (ordem): pedido de humano antes da triagem" do
-    it "pula a triagem com handoff_pedido e não mexe no caso; o Escalate do bloco 10 faz o resto" do
-      received = ingest("quero falar com um atendente")
+    it "RN-11: classifica (categoria, prioridade, tags) mas pula roteamento e atribuição com handoff_pedido" do
+      received = ingest("minha maquininha nao liga, quero falar com um atendente")
       evaluator = fixed_evaluator(routing_decision(config[:default]))
 
       result = run_triage(received.ticket, evaluator:)
 
       expect(result).to have_attributes(status: :skipped, reason: "handoff_pedido")
-      expect(received.ticket.reload).to have_attributes(state: "novo", category: nil, queue_id: nil)
+      expect(received.ticket.reload).to have_attributes(state: "novo", category: "maquininha", priority: "critica", queue_id: nil)
       expect(evaluator.calls).to be_empty
       expect(audits(received.ticket, "triage.skipped").sole.data).to eq("reason" => "handoff_pedido", "state" => "novo")
-      expect(audits(received.ticket, "triage.classified")).to be_empty
+      expect(audits(received.ticket, "triage.classified").sole.data).to include("category" => "maquininha")
+      expect(audits(received.ticket, "routing.decided")).to be_empty
     end
   end
 
@@ -232,6 +233,9 @@ RSpec.describe Triage::Run, "RF-12, RF-24, RN-28: triagem e atribuição do caso
       expect(result).to have_attributes(status: :skipped, reason: "fora_de_novo")
       expect(audits(received.ticket, "triage.skipped").sole.data).to eq("reason" => "fora_de_novo",
                                                                          "state" => "aguardando_humano")
+      # RN-11: o caso escalado antes da triagem também recebe categoria; a fila e o estado não mudam.
+      expect(received.ticket.reload).to have_attributes(category: "repasses", priority: "alta", state: "aguardando_humano")
+      expect(audits(received.ticket, "routing.decided")).to be_empty
     end
   end
 

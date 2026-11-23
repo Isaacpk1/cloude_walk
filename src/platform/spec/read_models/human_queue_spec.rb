@@ -22,6 +22,32 @@ RSpec.describe HumanQueue do
 
   def entries(slug = nil) = at(t0 + 1.minute) { described_class.new(brand_slug: slug).entries }
 
+  describe "bloco 11: caso que a triagem mandou direto para a fila humana" do
+    it "RF-24, RN-28: aparece com o motivo da triagem, a origem e a hora da atribuição" do
+      queue = routing_queue_for(infinitepay, name: "Crédito", ai_first: false)
+      ticket = at(t0) do
+        ingest("quero renegociar meu credito", identity: "acc_tri").ticket.tap do |t|
+          t.update_columns(state: "aguardando_humano", queue_id: queue.id, queue_version: queue.current_version.version)
+          record_ticket_assigned(t, to: "fila_humana", reason: "fila_sem_ia", queue:)
+        end
+      end
+
+      entry = entries.sole
+      expect(entry).to have_attributes(ticket_id: ticket.id, reason: "fila_sem_ia", source: "triagem", escalated_at: t0)
+      expect(entry.reason_label).to eq("Triagem: a fila decidida não tem IA primeiro (RF-24)")
+      expect(entry.source_label).to eq("Triagem do caso novo (bloco 11)")
+    end
+
+    it "um escalado depois (handoff) vale como a entrada mais recente na fila" do
+      queue = routing_queue_for(infinitepay, name: "Crédito", ai_first: false)
+      ticket = at(t0) { ingest("meu repasse não caiu", identity: "acc_tri2").ticket }
+      at(t0) { record_ticket_assigned(ticket, to: "fila_humana", reason: "categoria_somente_humana", queue:) }
+      at(t0 + 5.seconds) { record_full_escalation(ticket, record_handoff_requested(ticket, reason: "pedido_do_cliente", source: "ingestion")) }
+
+      expect(entries.sole).to have_attributes(reason: "pedido_do_cliente", escalated_at: t0 + 5.seconds)
+    end
+  end
+
   describe "RN-29: ordem da fila" do
     it "prioridade primeiro (crítica, alta, média, baixa; sem triagem conta como média), depois o mais antigo na fila" do
       baixa = escalated(t0, identity: "acc_1", priority: "baixa")

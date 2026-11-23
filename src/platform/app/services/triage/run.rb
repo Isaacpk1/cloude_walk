@@ -47,13 +47,13 @@ module Triage
 
     def call
       if ticket.state == "novo"
-        return skip("handoff_pedido") if Handoff::Request.pending?(ticket)
+        return classify_only("handoff_pedido") if Handoff::Request.pending?(ticket)
 
         return triage
       end
 
       return skip("ja_triado") if @seq && classified_seq && @seq <= classified_seq
-      return skip("fora_de_novo") if @seq && classified_seq.nil? && @seq == first_customer_seq
+      return classify_only("fora_de_novo") if @seq && classified_seq.nil? && @seq == first_customer_seq
 
       Result.new(status: :not_applicable, reason: nil)
     end
@@ -61,6 +61,17 @@ module Triage
     private
 
     attr_reader :ticket
+
+    # RN-11: todo atendimento recebe uma categoria, mesmo o que chegou pedindo humano (o handoff do bloco 10 já decidiu
+    # a fila). Classifica e grava categoria, prioridade (só sobe, RN-14) e tags; não roteia nem atribui.
+    def classify_only(reason)
+      messages = customer_messages
+      classification = Classify.call(brand: ticket.brand, text: messages.map(&:body).join("\n"))
+      priority = policy.highest([ ticket.priority, classification.priority ])
+      audit_classified(classification, priority, messages)
+      ticket.update_columns(category: classification.category, priority:, tags: classification.tags, updated_at: Time.current)
+      skip(reason)
+    end
 
     def triage
       messages = customer_messages

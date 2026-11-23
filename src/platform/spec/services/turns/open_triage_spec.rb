@@ -63,7 +63,7 @@ RSpec.describe Turns::Open, "RF-12, RF-24, RN-28: triagem antes do primeiro turn
 
     expect(result.status).to eq(:handoff_requested)
     expect(audits(received.ticket, "triage.skipped").sole.data).to include("reason" => "handoff_pedido")
-    expect(received.ticket.reload).to have_attributes(state: "novo", category: nil)
+    expect(received.ticket.reload).to have_attributes(state: "novo", category: "outros", queue_id: nil) # RN-11: classifica, não roteia
     expect(AiTurn.count).to eq(0)
   end
 

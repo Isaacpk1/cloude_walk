@@ -12,6 +12,7 @@ class ConversationView::Triage < Data.define(:category, :priority, :tags, :match
       when "ia_primeiro" then "IA primeiro: com a IA (RF-24)#{", fila #{queue_name}" if queue_name}"
       when "fila_sem_ia" then "fila sem IA: aguardando humano na fila #{queue_name || 'sem nome'}"
       when "categoria_somente_humana" then "categoria somente humana (RN-28): fila de escalas #{queue_name || 'sem nome'}"
+      when "sem_fila" then "com a IA, sem fila: a marca não tem fila padrão nem regras (RF-15)"
       else "#{to == 'ia' ? 'com a IA' : 'na fila humana'} (#{reason})"
       end
     end
