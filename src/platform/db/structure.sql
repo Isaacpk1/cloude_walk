@@ -616,7 +616,10 @@ CREATE TABLE public.provider_accounts (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     evaluation boolean DEFAULT false NOT NULL,
+    email_address character varying,
+    history_id bigint,
     CONSTRAINT provider_accounts_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
+    CONSTRAINT provider_accounts_email_address_check CHECK ((((channel)::text <> 'email'::text) OR (email_address IS NOT NULL))),
     CONSTRAINT provider_accounts_whatsapp_phone_check CHECK ((((channel)::text <> 'whatsapp'::text) OR (phone_number_id IS NOT NULL)))
 );
 
@@ -689,7 +692,8 @@ CREATE TABLE public.queues (
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    escalation boolean DEFAULT false NOT NULL
+    escalation boolean DEFAULT false NOT NULL,
+    archived_at timestamp(6) without time zone
 );
 
 
@@ -2191,6 +2195,8 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261124050000'),
+('20261124040000'),
 ('20261124030000'),
 ('20261124020000'),
 ('20261124010000'),

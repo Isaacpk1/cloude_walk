@@ -5,6 +5,7 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
 
   let!(:infinitepay) { create(:brand, :infinitepay) }
   let!(:account) { create(:provider_account, brand: infinitepay, slug: "infinitepay-chat-mock") }
+  let!(:whatsapp_account) { create(:provider_account, brand: infinitepay, channel: "whatsapp", slug: "infinitepay-whatsapp-mock") }
   let(:start) { Time.zone.parse("2026-11-20T13:40:00Z") }
   let(:trace_id) { "4bf92f3577b34da6a3ce929d0e0e4736" }
   let(:jitter) { -> { 0.0 } }
@@ -380,7 +381,7 @@ RSpec.describe Deliveries::Send, "RF-06, RNF-15: envio ordenado da saída ao pro
       expect(audits("delivery.sending")).to be_empty
     end
 
-    { "canal_sem_adaptador" => ->(d) { d.update_columns(channel: "whatsapp") },
+    { "whatsapp_sem_destino" => ->(d) { d.update_columns(channel: "whatsapp", provider_account: "infinitepay-whatsapp-mock") },
       "conta_inexistente" => ->(d) { d.update_columns(provider_account: "conta-que-nao-existe") } }.each do |platform_error, change|
       it "erro da própria plataforma (#{platform_error}) falha com reason plataforma, sem chamar o provedor" do
         delivery = requested_delivery(ticket).tap { change.call(_1) }

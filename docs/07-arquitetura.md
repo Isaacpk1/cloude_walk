@@ -302,6 +302,15 @@ Proposta do bloco 13 (RN-29 a RN-32, RF-19, RF-25, RF-27, RF-45). Só o Postgres
 
 **Ordem dos locks.** Atendimento, depois usuário (igual à seção 3.5).
 
+### 3.7 Configuração pelo supervisor (bloco 12)
+
+Só o supervisor (RN-53), dentro das marcas das equipes dele (RNF-24), em `/configuracao`. Cada alteração roda numa transação, valida em texto o que a tela mostra e grava `audit_events` sem atendimento (RF-54): `queue.created`, `queue.version_published` (com o que mudou), `queue.deactivated`, `queue.activated`, `queue.deleted`, `team.created`, `analyst.created` (sem a senha) e `routing_ruleset.published`.
+
+- **Filas (RF-13, RF-18).** Editar nome, IA primeiro ou SLA publica uma versão nova sob a trava da fila (RN-20); a antiga não muda. A fila padrão e a de escalas da marca não são desativadas nem excluídas, e nenhuma fila usada pelas regras atuais também não (RF-17). **Excluir arquiva** (`queues.archived_at`): as versões são imutáveis no banco e os atendimentos antigos continuam apontando para a fila. Só vale sem atendimento aberto.
+- **Regras (RF-14, RF-15, RF-17).** O formulário manda a lista inteira (grupos OU, condições E) e a fila padrão; vira o JSON do ADR-003 e `RoutingRuleset.publish!` valida esquema, categorias e filas ativas da marca. A versão nova vale para o atendimento seguinte, porque o cache do avaliador confere a versão a cada roteamento (RF-16, RNF-07). A decisão fica no `routing.decided` do atendimento, com a versão do conjunto.
+- **Equipes e atendentes (RF-22, RF-58).** Equipe com nome único na marca; atendente humano com senha (bcrypt, 10 caracteres ou mais), perfil analista ou supervisor, capacidade de 1 a 50 e uma equipe da marca.
+- **Fora deste bloco:** cadastro de marcas (as marcas vêm do seed), tempos da IA por marca versionados em `Turns::Policy.for(brand)` e SLA por horário de atendimento da fila.
+
 ## 4. Modelo de dados
 
 ```mermaid
@@ -405,6 +414,8 @@ O corpo identifica **quem enviou**, isto é, o cliente: `from` no WhatsApp, `Fro
 - **Tipos de mensagem fora de texto (WhatsApp):** imagem, áudio, reação e outros passam no contrato, porque são formatos válidos do provedor e podem vir no mesmo lote de mensagens de texto. O adaptador grava a mensagem com o webhook cru e registra na auditoria que o tipo não é suportado, sem processá-la (seção 9). Assim uma imagem não leva o lote inteiro para a DLQ.
 - **Status de entrega:** os três canais normalizam o status em `deliveries.status` (seção 3.2), pela `provider_message_id`.
 - **Identidade da entrega no provedor (bloco 05).** O corpo segue o formato do provedor; a idempotência e a ordem vão em cabeçalhos: `Idempotency-Key` com o `delivery_id`, `X-Conversation-Id` e `X-Conversation-Seq`, além do `traceparent` e da assinatura HMAC do corpo com o segredo da conta (ADR-019). O provedor responde a mesma confirmação para o mesmo `Idempotency-Key`, com `Idempotent-Replayed: true`. No chat, a resposta do `POST /messages` aceito já vale como entregue (`delivered`, com `provider_message_id`); o callback de status só muda a entrega quando traz `failed`, e todo callback aceito vira `delivery.status_received` na auditoria. Callback de uma mensagem que a plataforma ainda não registrou recebe `503`, para o provedor repetir depois do commit da confirmação. O destino da resposta (`customer_ref`) é lido do webhook cru da mensagem respondida, e o `reply_to` é o `external_id` da mensagem do cliente com `seq = context_until_seq` do turno.
+
+- **Como o bloco 15 implementa (WhatsApp e e-mail).** O adaptador do WhatsApp aceita lote: cada mensagem de texto vira uma ingestão, com o pedaço cru (`messages[]`) em `provider_payload`; um `metadata.phone_number_id` que não é da conta da URL dá `422`; um webhook só de status dá `200` sem gravar nada. No e-mail, a plataforma guarda por conta a caixa (`email_address`) e o cursor `history_id`; o push só avisa, o adaptador lista o histórico desde o cursor, busca cada mensagem e só avança o cursor depois de gravar todas. Se a API do provedor cair ao buscar, a resposta é `503` com `Retry-After` e nada é gravado, porque o push é reenviado e a deduplicação por `Message-ID` absorve o que já entrou. Na saída, o corpo é montado a partir do `provider_payload` da mensagem respondida: `from` (WhatsApp) e `threadId`, `Message-ID` e assunto (e-mail). O id da confirmação é `messages[0].id` no WhatsApp e `id` no e-mail. Resposta ao WhatsApp fora da janela de 24 h falha na hora, sem chamar o provedor (`whatsapp_janela_24h`, falha definitiva): resolver com template é a decisão em aberto da seção 9.
 
 **Por quê.** Normalizar na entrada e desnormalizar na saída mantém as regras de negócio, turnos e handoff iguais para todos os canais. Simular o formato real, em vez de um formato inventado, testa o adaptador contra o que um provedor de verdade envia.
 

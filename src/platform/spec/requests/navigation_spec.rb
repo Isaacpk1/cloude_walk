@@ -16,12 +16,21 @@ RSpec.describe "ROADMAP 01: navegação inicial do painel" do
     expect(response.body).to include(%(href="#{timelines_path}"))
   end
 
-  it "reserva Filas e Configuração, desabilitados e sem link (Evals vira link no bloco 07)" do
+  it "supervisor vê Evals, DLQ e Configuração como links; não há itens reservados" do
     get "/"
 
-    expect(response.body).to include(%(href="#{evals_path}"))
-    %w[Filas Configuração].each do |item|
-      expect(response.body).to match(%r{<span[^>]*aria-disabled="true"[^>]*>\s*#{item}})
-    end
+    [ evals_path, dead_letters_path, configuration_path ].each { expect(response.body).to include(%(href="#{_1}")) }
+    expect(response.body).not_to include("nav__item--disabled")
+  end
+
+  it "analista não vê Evals, DLQ nem Configuração no menu", :anonymous do
+    infinitepay = create(:brand, :infinitepay)
+    ana = analyst_in(distribution_setup(infinitepay)[:team])
+    sign_in(ana)
+
+    get "/"
+
+    [ evals_path, dead_letters_path, configuration_path ].each { expect(response.body).not_to include(%(href="#{_1}")) }
+    expect(response.body).to include("Sair")
   end
 end

@@ -34,6 +34,50 @@
   </form>
 </section>
 
+<section class="card" id="canais">
+  <h2>WhatsApp e e-mail</h2>
+  <p class="muted">O WhatsApp entra como webhook da Cloud API (<code>/webhooks/whatsapp/&lt;conta&gt;</code>). O e-mail entra como
+    notificação push do Gmail (<code>/webhooks/email/&lt;conta&gt;</code>): a plataforma busca o histórico e a mensagem nesta
+    caixa simulada. As respostas da plataforma aparecem abaixo.</p>
+  <form method="post" action="/whatsapp/messages">
+    <h3>WhatsApp</h3>
+    <div class="row">
+      <div><label for="wa_account">Conta (define a marca)</label>
+        <select id="wa_account" name="account"><% whatsapp_accounts.each do |a| %><option><%= a %></option><% end %></select></div>
+      <div><label for="wa_from">Telefone do cliente (wa_id)</label><input id="wa_from" name="from" value="5511900000021"></div>
+      <div><label for="wa_id">Id da mensagem (vazio gera)</label><input id="wa_id" name="message_id" placeholder="wamid...."></div>
+    </div>
+    <label for="wa_text">Mensagem</label>
+    <textarea id="wa_text" name="text" rows="2">meu repasse não caiu</textarea>
+    <label class="inline"><input type="checkbox" name="tamper_signature" value="1"> Assinatura inválida (401)</label>
+    <button type="submit">Enviar pelo WhatsApp</button>
+  </form>
+  <form method="post" action="/email/messages">
+    <h3>E-mail</h3>
+    <div class="row">
+      <div><label for="em_account">Conta (define a marca)</label>
+        <select id="em_account" name="account"><% email_accounts.each do |a| %><option><%= a %></option><% end %></select></div>
+      <div><label for="em_from">De</label><input id="em_from" name="from" value="Loja Exemplo &lt;loja.exemplo@example.com&gt;"></div>
+      <div><label for="em_subject">Assunto</label><input id="em_subject" name="subject" value="Repasse não recebido"></div>
+      <div><label for="em_thread">threadId (vazio abre uma conversa nova)</label><input id="em_thread" name="thread_id"></div>
+      <div><label for="em_att">Anexo (nome do arquivo)</label><input id="em_att" name="attachment" placeholder="comprovante.pdf"></div>
+    </div>
+    <label for="em_text">Mensagem</label>
+    <textarea id="em_text" name="text" rows="3">Meu repasse de ontem não caiu.</textarea>
+    <label class="inline"><input type="checkbox" name="tamper_signature" value="1"> Assinatura inválida (401)</label>
+    <button type="submit">Enviar por e-mail</button>
+  </form>
+  <h3>Respostas recebidas da plataforma</h3>
+  <% if whatsapp_sent.empty? && email_sent.empty? %>
+    <p class="muted">Nenhuma resposta ainda.</p>
+  <% else %>
+    <ul>
+      <% whatsapp_sent.each do |m| %><li>WhatsApp para <code><%= m.to %></code> (<%= m.account %>): <%= m.text %></li><% end %>
+      <% email_sent.each do |m| %><li>E-mail para <code><%= m.to %></code> (<%= m.account %>), <%= m.subject %>, thread <code><%= m.thread_id %></code>: <%= m.text %></li><% end %>
+    </ul>
+  <% end %>
+</section>
+
 <section class="card" id="agente">
   <h2>Perfil do agente mock</h2>
   <p class="muted">Troca o perfil do agente sem reiniciar (RF-38). O simulador grava a escolha no Redis de controle e o

@@ -30,7 +30,7 @@ module Deliveries
     EVENT_TYPE = "delivery.requested".freeze
     EVAL_REASON = "eval".freeze
     Result = Data.define(:status, :next_attempt_at)
-    Attempt = Data.define(:delivery, :item, :number, :body, :secret, :headers)
+    Attempt = Data.define(:delivery, :item, :number, :body, :secret, :headers, :path)
 
     def self.call(...) = new(...).call
 
@@ -48,7 +48,7 @@ module Deliveries
       started = Time.current
       response = begin
         @client.deliver(provider_account: outcome.delivery.provider_account, body: outcome.body, secret: outcome.secret,
-                        headers: outcome.headers)
+                        headers: outcome.headers, path: outcome.path)
       rescue ChatClient::Unreachable => e
         e
       end
@@ -106,7 +106,7 @@ module Deliveries
       item.update!(attempts: item.attempts + 1, next_attempt_at: lease, lease_until: lease)
       audit(delivery, "delivery.sending", seq: delivery.seq, attempt: number)
       log(:info, "delivery.sending", delivery, attempt: number)
-      Attempt.new(delivery:, item:, number:, body: prepared.body, secret: prepared.secret, headers: headers(delivery))
+      Attempt.new(delivery:, item:, number:, body: prepared.body, secret: prepared.secret, headers: headers(delivery), path: prepared.path)
     end
 
     def headers(delivery)
@@ -143,7 +143,7 @@ module Deliveries
         return transient(item, delivery, number, error: response.message, no_effect: response.no_effect, http_status: nil)
       end
 
-      message_id = response.body["message_id"]
+      message_id = provider_message_id(delivery.channel, response.body)
       case response.status
       when 200..299
         unless message_id.is_a?(String) && message_id.present?
@@ -159,6 +159,15 @@ module Deliveries
         failed(item, delivery, attempt: number, reason: rejection_reason(response.status, provider_error), http_status: response.status,
                                provider_error:)
       else transient(item, delivery, number, error: "http #{response.status}", no_effect: false, http_status: response.status)
+      end
+    end
+
+    # Onde cada provedor devolve o id da mensagem aceita (07, seção 5.0).
+    def provider_message_id(channel, body)
+      case channel
+      when "whatsapp" then body.dig("messages", 0, "id")
+      when "email" then body["id"]
+      else body["message_id"]
       end
     end
 

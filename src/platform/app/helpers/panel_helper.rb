@@ -1,14 +1,9 @@
 # Apresentação do painel: selos, rótulos e formatação de tempo. Sem regra de negócio.
 module PanelHelper
   DISPLAY_TIME_ZONE = PanelClock::TIME_ZONE
-  RESERVED_SECTIONS = %w[Filas Configuração].freeze
 
   def nav_link(label, path, active:)
     link_to label, path, class: class_names("nav__item", "nav__item--active" => active), aria: { current: (active ? "page" : nil) }
-  end
-
-  def reserved_nav_item(label)
-    tag.span(label, class: "nav__item nav__item--disabled", aria: { disabled: true }, title: "Chega nos próximos blocos do roadmap")
   end
 
   def source_badge(source)

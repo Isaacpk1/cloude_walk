@@ -293,3 +293,14 @@ a.message__turn { text-decoration: none; }
 .flash--alert { background: #ffebe9; color: #9b1c12; }
 .login { max-width: 22rem; }
 .login__error { color: #9b1c12; font-weight: 600; }
+
+/* Bloco 12: configuração do supervisor e menu com usuário */
+.config-section { margin-bottom: 1.5rem; }
+.config-form { display: grid; gap: .4rem; max-width: 46rem; margin-bottom: 1rem; }
+.config-queue { border-top: 1px solid #d0d7de; padding-top: .75rem; }
+.config-queue__actions { display: flex; gap: .5rem; }
+.config-rule { border: 1px solid #d0d7de; padding: .5rem; margin-bottom: .5rem; }
+.config-group { margin: .25rem 0; display: flex; gap: .25rem; flex-wrap: wrap; align-items: center; }
+.topbar__user { margin-left: auto; font-size: .85rem; }
+.topbar__logout { display: inline; }
+.button--active { font-weight: 700; }

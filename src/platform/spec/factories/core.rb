@@ -67,6 +67,7 @@ FactoryBot.define do
     slug { "#{brand.slug}-#{channel}-mock" }
     secret { "dev-secret-#{slug}" }
     phone_number_id { channel == "whatsapp" ? "1000000000#{brand.id.to_s.rjust(5, '0')}" : nil }
+    email_address { channel == "email" ? "suporte@#{brand.slug}.example" : nil }
     active { true }
   end
 end
