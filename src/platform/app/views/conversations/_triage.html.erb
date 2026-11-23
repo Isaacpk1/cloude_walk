@@ -1,0 +1,32 @@
+<%# Bloco 11 (RF-10, RF-12, RF-15, RF-18, RF-24, RN-11 a RN-16, RN-20, RN-28): triagem e roteamento (ConversationView::Triage). Nome de regra, tags e palavras vêm de fora: só com o escape padrão do ERB. %>
+<section class="card triage" aria-label="Triagem e roteamento">
+  <h2>Triagem e roteamento</h2>
+  <% if triage.nil? %>
+    <p class="muted">Aguardando a triagem: o caso ainda não tem categoria, prioridade nem fila decidida.</p>
+  <% else %>
+    <dl class="turn__facts">
+      <dt>categoria</dt><dd><strong class="triage__category"><%= triage.category_label || "sem categoria" %></strong></dd>
+      <dt>prioridade</dt><dd><span class="badge badge--priority badge--priority-<%= triage.priority || 'media' %>"><%= triage.priority_label %></span></dd>
+      <dt>tags</dt><dd><% if triage.tags.any? %><% triage.tags.each do |tag| %><span class="chip triage__tag"><%= tag %></span> <% end %><% else %><span class="muted">sem tags</span><% end %></dd>
+      <% if triage.classified? %>
+        <dt>decidido por</dt><dd><% if triage.matched.any? %>palavras que decidiram <%= triage.matched.join(", ") %><% else %><span class="muted">nenhuma palavra-chave</span><% end %><% if triage.classified_seq %> · <a href="#seq-<%= triage.classified_seq %>">seq <%= triage.classified_seq %></a><% end %></dd>
+      <% end %>
+    </dl>
+    <% if triage.unclassified %><p class="triage__unclassified"><%= triage.unclassified_label %></p><% end %>
+    <% if triage.skipped %><p class="triage__skipped"><%= triage.skipped.label %></p><% end %>
+    <% if (routing = triage.routing) %>
+      <h3>Roteamento</h3>
+      <p class="triage__explanation"><%= routing.explanation %></p>
+      <% if routing.skipped_rules.any? %>
+        <ul class="triage__skipped-rules">
+          <% routing.skipped_rule_labels.each do |label| %><li class="triage__skipped-rule"><%= label %></li><% end %>
+        </ul>
+      <% end %>
+      <p class="muted">decidido às <time datetime="<%= routing.decided_at.iso8601(3) %>"><%= panel_time(routing.decided_at, precise: true) %></time> · trace <%= routing.trace_id %></p>
+    <% end %>
+    <% if triage.assignment %>
+      <h3>Atribuição</h3>
+      <p class="triage__assignment"><%= triage.assignment.label %></p>
+    <% end %>
+  <% end %>
+</section>

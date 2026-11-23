@@ -7,15 +7,17 @@
 # Bloco 08: `deadlines` (ConversationView::Deadlines) são os prazos do ciclo com a IA e o aviso de progresso;
 # `handoff` (ConversationView::Handoff) é o último pedido de handoff e o seu desfecho; nil fora deles.
 # `reconciliations` (ConversationView::Reconciliation) são as entregas em conciliação, em destaque (bloco 09).
+# Bloco 11: `triage` (ConversationView::Triage) é a categoria, a prioridade, as tags, a explicação do roteamento e a
+# atribuição; nil antes da triagem e nos exemplos sintéticos.
 class ConversationView < Data.define(
   :id, :ticket_id, :brand_slug, :brand_name, :customer_name, :channel, :state, :title,
   :assignee, :assignment_version, :latest_customer_seq, :messages, :turns, :escalations, :source, :grouping,
-  :turn_refusal, :deadlines, :handoff, :reconciliations
+  :turn_refusal, :deadlines, :handoff, :reconciliations, :triage
 )
   def initialize(messages:, turns:, escalations:, grouping: nil, turn_refusal: nil, deadlines: nil, handoff: nil,
-                 reconciliations: [], **rest)
+                 reconciliations: [], triage: nil, **rest)
     super(
-      grouping:, turn_refusal:, deadlines:, handoff:, reconciliations: reconciliations.freeze,
+      grouping:, triage:, turn_refusal:, deadlines:, handoff:, reconciliations: reconciliations.freeze,
       messages: messages.sort_by(&:seq).freeze,
       turns: turns.sort_by(&:number).freeze,
       escalations: escalations.sort_by(&:occurred_at).freeze,

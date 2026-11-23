@@ -42,6 +42,10 @@ class TimelineView::Event < Data.define(:kind, :started_at, :finished_at, :ticke
     priority_raised: "Prioridade subiu",
     summary_available: "Resumo disponível",
     summary_missing: "Sem resumo",
+    triage_classified: "Triagem",
+    routing_decided: "Roteamento",
+    triage_assigned: "Atribuição pela triagem",
+    triage_skipped: "Triagem pulada",
     outbox_item: "Tentativas e desfecho",
     dead_letter: "DLQ"
   }.freeze
