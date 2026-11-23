@@ -115,6 +115,7 @@ module Triage
     def to_humans(queue, queue_version, reason)
       state_from = ticket.state
       ticket.update_columns(state: "aguardando_humano", assignee_id: nil, queue_id: queue.id, queue_version:, **CYCLE_RESET)
+      Sla::Start.call(ticket:) # RN-23: o SLA de assunção começa na entrada da fila humana
       # RN-33 (item 3), RN-42: ir para a fila humana é uma escalação; o cliente recebe o aviso de transferência.
       notice = Handoff::TransferNotice.call(ticket:, trace_id: @trace_id)
       audit("ticket.assigned", to: "fila_humana", reason:, queue_id: queue.id, assignee_id: nil, state_from:,
