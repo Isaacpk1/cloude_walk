@@ -52,7 +52,7 @@ As filas e regras são **dados**, não código. Toda alteração vale para os no
 
 | ID | Requisito | Prior. | Ator |
 | --- | --- | --- | --- |
-| RF-12 | O sistema deve fazer a **triagem automática** do atendimento, definindo categoria e prioridade (por regras de palavras-chave ou pela classificação do agente). | M | Sistema |
+| RF-12 | O sistema deve fazer a **triagem automática** do atendimento, definindo categoria e prioridade (por regras de palavras-chave ou pela classificação do agente). No bloco 11 só as palavras-chave (pt-BR e inglês, com e sem contração); a classificação do agente ainda não refina a triagem. | M | Sistema |
 | RF-13 | O supervisor deve poder **criar, editar, desativar e excluir filas**, definindo nome, marca, equipe, prioridade, SLA e se a IA atende primeiro. | M | Supervisor |
 | RF-14 | O supervisor deve poder **criar, editar e excluir regras de roteamento** com condições combináveis (E/OU) sobre marca, canal, categoria, prioridade e tags. | M | Supervisor |
 | RF-15 | O sistema deve avaliar as regras **em ordem definida pelo supervisor** e usar uma **fila padrão** quando nenhuma regra casar. | M | Sistema |

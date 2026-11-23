@@ -54,7 +54,7 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | RN-11 | Todo atendimento recebe **uma categoria** de uma lista configurável por marca. Lista inicial: transações e pagamentos, repasses, Pix, crédito, conta digital, maquininha, cadastro, outros. | "Minha maquininha não liga" → maquininha. | RF-10, RF-12 |
 | RN-12 | A prioridade tem **quatro níveis**, definidos pelo impacto no negócio do lojista: **crítica** (impedido de vender ou receber), **alta** (dinheiro pendente ou divergente), **média** (dúvida financeira), **baixa** (cadastro ou informação geral). | Maquininha parada → crítica. Repasse não recebido → alta. Dúvida sobre taxa → média. Troca de e-mail → baixa. | RF-10, RF-12 |
-| RN-13 | Quando a triagem não consegue classificar, o atendimento recebe categoria **"outros"**, prioridade **média** e vai para a fila padrão da marca. | Mensagem "oi" sem contexto → fila Triagem da marca. | RF-12, RF-15 |
+| RN-13 | Quando a triagem não consegue classificar, o atendimento recebe categoria **"outros"**, prioridade **média** e vai para a fila padrão da marca. | Mensagem "oi" sem contexto → fila padrão do conjunto de regras da marca (Geral no seed). | RF-12, RF-15 |
 | RN-14 | A prioridade **só sobe automaticamente**, nunca desce. Analistas e supervisores podem alterá-la manualmente, em qualquer direção, com motivo registrado na auditoria. | O SLA chegou a 80%: a prioridade sobe de média para alta (RN-25). | RF-10, RF-54 |
 
 ## 4. Filas e roteamento
@@ -108,7 +108,7 @@ stateDiagram-v2
 | RN-39 | O resumo do handoff tem **cinco campos obrigatórios**: problema relatado, dados relevantes do cliente, ações já tomadas e seus resultados, motivo da escalação e o que está pendente. | "Repasse de R$ 1.200 do dia 28 não recebido · IA consultou: status pendente · cliente pediu humano · pendente: verificar retenção." | RF-40 |
 | RN-40 | O handoff **nunca é bloqueado** pela falta de resumo. Se o resumo não puder ser gerado, o caso escala mesmo assim, com o histórico completo e a marcação "sem resumo". | O agente caiu: o caso chega ao analista com o histórico, sem resumo. | RF-40, RF-41 |
 | RN-41 | O caso escalado mantém a prioridade. Escalações por **tempo limite ou falha de integração** sobem um nível, porque o cliente já esperou mais que o normal. | Um caso médio escalado por timeout chega como alto. | RF-42, RF-36 |
-| RN-42 | O cliente recebe uma **mensagem padrão de transferência**, configurável por marca e idioma (pt-BR na InfinitePay, inglês na JIM). Ela precede as respostas seguintes do analista e respeita a conciliação de entregas da RN-38. | "Estou te transferindo para um especialista. Ele já recebeu o histórico da nossa conversa." | RF-43 |
+| RN-42 | O cliente recebe uma **mensagem padrão de transferência**, configurável por marca e idioma (pt-BR na InfinitePay, inglês na JIM). Ela precede as respostas seguintes do analista e respeita a conciliação de entregas da RN-38. Vale também quando a triagem manda o caso direto para a fila humana (RN-28, fila sem IA). | "Estou te transferindo para um especialista. Ele já recebeu o histórico da nossa conversa." | RF-43 |
 
 ## 9. Falhas de integração
 
