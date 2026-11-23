@@ -59,7 +59,8 @@ RSpec.describe Outbox::Recover, "RNF-14: recuperação dos itens abertos do outb
     older = item(next_attempt_at: now - 60.seconds)
 
     expect(described_class.call(limit: 1)).to eq([ older.id ])
-    expect(described_class.call(limit: 5)).to eq([ older.id, newer.id ])
+    # O reoferecido ganha o despertador no agora: a volta seguinte não o repete antes da carência.
+    expect(described_class.call(limit: 5)).to eq([ newer.id ])
   end
 
   it "falha de dependência: Redis fora do ar não interrompe a varredura com exceção" do

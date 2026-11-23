@@ -221,3 +221,23 @@ a.message__turn { text-decoration: none; }
 .handoff { border-left: 4px solid #6b3fa0; }
 .handoff--discarded { border-left-color: #888; }
 .badge--progress-cancelled, .badge--progress-discarded { background: #eee; color: #555; }
+
+/* Bloco 09: tentativas e desfecho, falhas por etapa, conciliação e DLQ */
+.outbox-attempts { margin-top: .35rem; font-size: .8rem; }
+.outbox-attempts__summary { margin: 0; }
+.outbox-attempts__list { margin: .2rem 0 0; padding-left: 1.1rem; display: grid; gap: .15rem; }
+.outbox-attempts__error { color: var(--danger); }
+.badge--outbox-published, .badge--outbox-delivered, .badge--outbox-completed { background: #e3f4ea; color: var(--ok); }
+.badge--outbox-failed, .badge--outbox-reconciliation { background: #fdecea; color: var(--danger); }
+.badge--outbox-discarded, .badge--outbox-cancelled, .badge--outbox-closed_obsolete, .badge--outbox-recovered,
+.badge--outbox-retrying, .badge--outbox-in_progress, .badge--outbox-pending { background: var(--system-bg); color: var(--system); }
+.stage-failures { margin-bottom: 1rem; }
+.stage-failures__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .5rem 1rem; margin: 0; }
+.stage-failures__list dt { font-weight: 600; }
+.stage-failures__list dd { margin: 0; font-size: .85rem; }
+.stage-failures__list ul { margin: 0; padding-left: 1rem; }
+.stage-failures__stage--failed dt { color: var(--danger); }
+.reconciliation { border-color: var(--danger); background: #fff8f7; }
+.timeline__row--delivery_reconciliation td, .timeline__row--dead_letter td { background: #fff8f7; }
+.dead-letter pre { white-space: pre-wrap; word-break: break-word; font-size: .8rem; background: var(--system-bg); padding: .5rem; }
+.dead-letters__row--escalated td:last-child { color: var(--danger); font-weight: 600; }

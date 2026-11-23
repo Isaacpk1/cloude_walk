@@ -1,0 +1,10 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+sem_dlq_reason.json: { pointer: "/headers/dlq_reason", type: required }
+sem_traceparent.json: { pointer: "/headers/traceparent", type: required }
+sem_payload.json: { pointer: "/payload", type: required }
+fonte_desconhecida.json: { pointer: "/headers/dlq_source", type: enum }
+motivo_de_outra_fonte.json: { pointer: "/headers/dlq_reason", type: enum }
+contrato_sem_violacoes.json: { pointer: "/headers/dlq_violations", type: minItems }
+violacoes_como_texto.json: { pointer: "/headers/dlq_violations", type: array }
+violacao_sem_pointer.json: { pointer: "/headers/dlq_violations/0/pointer", type: required }
+payload_como_objeto.json: { pointer: "/payload", type: string }

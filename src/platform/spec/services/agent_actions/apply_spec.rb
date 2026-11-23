@@ -180,6 +180,23 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
       expect_rejected(agent_action_for(turn), "fora_da_ia")
     end
 
+    it "RN-45, RN-46: com o handoff pedido na atribuição atual, a resposta não é aplicada (uma ação final por turno)" do
+      request_handoff(ticket.reload, reason: "falha_de_integracao", source: "dlq", turn: turn.turn)
+      expect(turn.reload.status).to eq("expired") # o pedido expira os turnos eligible
+      turn.update_columns(status: "eligible") # defesa: mesmo com um turno ainda eligible, o pedido decide
+
+      expect_rejected(agent_action_for(turn), "handoff_pedido")
+      expect(ticket.messages.where(direction: "outbound")).to be_empty
+    end
+
+    it "handoff pedido numa atribuição anterior não bloqueia a resposta da atribuição atual" do
+      request_handoff(ticket.reload, reason: "falha_de_integracao", source: "dlq", turn: turn.turn)
+      OutboxEvent.where(event_type: "handoff.requested").update_all(dedup_key: "handoff:#{ticket.id}:99")
+      turn.update_columns(status: "eligible")
+
+      expect(apply(agent_action_for(turn))).to have_attributes(status: :applied)
+    end
+
     it "3: context_until_seq devolvido diferente do turno persistido" do
       expect_rejected(agent_action_for(turn, context_until_seq: 9), "contexto_divergente")
     end
@@ -435,6 +452,30 @@ RSpec.describe AgentActions::Apply, "RF-31: aplicação da ação do agente no a
 
       expect { apply(agent_action_for(turn, action: "refund")) }.to raise_error(WaterDrop::Errors::ProduceError)
       expect(lines.map(&:to_s).join).not_to include("agent_action.dead_lettered")
+    end
+  end
+
+  describe "RN-44, RN-45: a mensagem da plataforma na DLQ segue o contrato dead_letter" do
+    def dead_letter_errors(message)
+      view = HelpdeskContracts::DeadLetter.view(headers: message[:headers], payload: message[:payload], key: message[:key])
+      HelpdeskContracts.errors(:dead_letter, view).map(&:to_s)
+    end
+
+    {
+      "contrato" => -> { agent_action_for(turn, action: "refund") },
+      "JSON malformado" => -> { "{nao é json" },
+      "conteudo_invalido" => -> { agent_action_for(turn, reply: { "text" => "oi\u0000" }) },
+      "marca_divergente" => -> { agent_action_for(turn, brand: "jim") },
+      "turno_inexistente" => -> { agent_action_for(turn, conversation_id: "tkt_999999999") },
+      "conversation_id que não é texto" => -> { agent_action_for(turn, conversation_id: 42) },
+      "conversation_id vazio" => -> { agent_action_for(turn, conversation_id: "") }
+    }.each do |name, build|
+      it "#{name}: dlq_source platform e cabeçalhos válidos no esquema" do
+        described_class.call(instance_exec(&build), traceparent: nil)
+
+        expect(dead_letters.sole[:headers]).to include("dlq_source" => "platform")
+        expect(dead_letter_errors(dead_letters.sole)).to eq([])
+      end
     end
   end
 

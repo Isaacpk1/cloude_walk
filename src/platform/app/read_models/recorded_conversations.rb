@@ -7,6 +7,8 @@
 # delivery.* (bloco 05). Bloco 08: os prazos do ciclo e o aviso de progresso (DeadlinesPhase), o pedido de handoff e
 # a fila humana (HandoffPhase, que também monta o histórico de escalação) e, na linha do tempo, os registros do
 # scheduler, o turno expirado, o handoff e o aviso (DeadlineEvents). Atribuição a analista: bloco 10.
+# delivery.* (bloco 05). As tentativas e o desfecho de cada item do outbox (OutboxAttempts) e o evento da DLQ
+# (DeadLetterEvents) vêm do bloco 09. Escalações entram aqui quando suas tabelas existirem (bloco 10).
 class RecordedConversations
   LIMIT = 50
   WAITING = ConversationView::Participant.new(name: "Aguardando triagem", kind: "queue")
@@ -31,6 +33,8 @@ class RecordedConversations
     events += AgentActionEvents.new(ticket).events
     events += DeliveryEvents.new(ticket).events
     events += DeadlineEvents.new(ticket).events
+    events += OutboxAttempts.new(ticket).events
+    events += DeadLetterEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
   end
 
@@ -54,7 +58,7 @@ class RecordedConversations
       assignment_version: ticket.assignment_version, latest_customer_seq: ticket.latest_customer_seq,
       messages: ticket.messages.map { message(ticket, _1, deliveries) }, turns: turns(ticket, deliveries),
       escalations: handoff.escalations, source: DataSource::SYSTEM, deadlines: DeadlinesPhase.new(ticket).view,
-      handoff: handoff.view, **phase(ticket)
+      handoff: handoff.view, reconciliations: deliveries.reconciliations, **phase(ticket)
     )
   end
 

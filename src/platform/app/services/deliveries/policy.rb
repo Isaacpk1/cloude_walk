@@ -7,11 +7,12 @@ module Deliveries
     LEASE = 15.seconds
     OPEN_TIMEOUT = 2
     READ_TIMEOUT = 5
-    # RN-43: 5 retentativas depois da primeira tentativa, com 1, 2, 4, 8 e 16 s mais até 25% de jitter.
-    MAX_RETRIES = 5
-    MAX_ATTEMPTS = MAX_RETRIES + 1
-    MAX_JITTER = 0.25
-    DEFAULT_JITTER = -> { rand }
+    # RN-43: a mesma política da publicação (Outbox::RetryPolicy): 5 retentativas depois da primeira
+    # tentativa, com 1, 2, 4, 8 e 16 s mais até 25% de jitter.
+    MAX_RETRIES = Outbox::RetryPolicy::MAX_RETRIES
+    MAX_ATTEMPTS = Outbox::RetryPolicy::MAX_ATTEMPTS
+    MAX_JITTER = Outbox::RetryPolicy::MAX_JITTER
+    DEFAULT_JITTER = Outbox::RetryPolicy::DEFAULT_JITTER
     # Despertador de uma saída que espera a anterior. Quem acorda de verdade é a conclusão da anterior;
     # este prazo só cobre um aviso perdido (a recuperação reoferece o item).
     ORDER_RECHECK = 30.seconds
@@ -19,8 +20,6 @@ module Deliveries
     module_function
 
     # Espera depois da tentativa `attempt` (1, 2, 4, 8, 16 s), com jitter só para cima.
-    def backoff(attempt, jitter: DEFAULT_JITTER)
-      (2**(attempt - 1) * (1 + (MAX_JITTER * jitter.call))).seconds
-    end
+    def backoff(attempt, jitter: DEFAULT_JITTER) = Outbox::RetryPolicy.backoff(attempt, jitter:)
   end
 end

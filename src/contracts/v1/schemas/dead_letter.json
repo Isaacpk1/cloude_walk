@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/dead_letter.json",
+  "title": "Mensagem em helpdesk.agent.dlq.v1",
+  "description": "Vista da mensagem da DLQ (07, seções 5.2 e 6; RN-44, RN-45; bloco 09). A mensagem do Kafka não tem envelope: o corpo original vai como chegou (pode não ser JSON) e o motivo vai nos cabeçalhos. Valida-se o objeto { key, headers, payload } montado a partir dela, com dlq_violations já decodificado do JSON do cabeçalho.",
+  "type": "object",
+  "required": ["headers", "payload"],
+  "properties": {
+    "key": {
+      "description": "Chave da mensagem: conversation_id quando o corpo o tem, senão o event_id do cabeçalho.",
+      "type": ["string", "null"]
+    },
+    "headers": { "$ref": "#/$defs/headers" },
+    "payload": {
+      "description": "Corpo original, como texto. Pode ser JSON fora do contrato, JSON malformado ou outro texto.",
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "headers": {
+      "type": "object",
+      "required": ["dlq_reason", "dlq_source", "dlq_violations", "event_id", "traceparent"],
+      "properties": {
+        "dlq_source": { "enum": ["broker", "agent-mock", "platform"] },
+        "dlq_reason": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "dlq_violations": {
+          "description": "No Kafka, JSON de um array. Vazio quando o motivo não é de contrato.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/violation" }
+        },
+        "event_id": {
+          "description": "event_id do corpo ou, sem ele, o do cabeçalho de entrada. Texto vazio quando nenhum existe. Não é confiável sozinho: o corpo pode divergir.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "traceparent": {
+          "description": "O traceparent recebido, como veio. Texto vazio quando ausente (RF-56).",
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "dlq_source": { "const": "broker" } }, "required": ["dlq_source"] },
+          "then": { "properties": { "dlq_reason": { "enum": ["contrato", "event_id_divergente", "traceparent_invalido"] } } }
+        },
+        {
+          "if": { "properties": { "dlq_source": { "const": "agent-mock" } }, "required": ["dlq_source"] },
+          "then": { "properties": { "dlq_reason": { "enum": ["contrato", "acao_invalida"] } } }
+        },
+        {
+          "if": { "properties": { "dlq_source": { "const": "platform" } }, "required": ["dlq_source"] },
+          "then": { "properties": { "dlq_reason": { "enum": ["contrato", "marca_divergente", "turno_inexistente"] } } }
+        },
+        {
+          "if": { "properties": { "dlq_reason": { "enum": ["contrato", "acao_invalida"] } }, "required": ["dlq_reason"] },
+          "then": { "properties": { "dlq_violations": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "violation": {
+      "description": "Violação no formato de HelpdeskContracts::Violation: JSON Pointer do dado, tipo e mensagem.",
+      "type": "object",
+      "required": ["pointer", "type", "message"],
+      "properties": {
+        "pointer": { "type": "string" },
+        "type": { "type": "string", "minLength": 1 },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

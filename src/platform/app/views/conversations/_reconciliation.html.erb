@@ -1,0 +1,19 @@
+<%# ROADMAP 09 (07, seções 3.2 e 6): entrega em conciliação, em destaque. Texto do provedor só com o escape do ERB. %>
+<section class="card reconciliation" aria-label="Entrega em conciliação">
+  <h2><span class="badge badge--error">Conciliação</span> Entrega em conciliação</h2>
+  <p>A saída <a href="#seq-<%= reconciliation.seq %>">seq <%= reconciliation.seq %></a><% if reconciliation.turn %> (resposta do turno <%= reconciliation.turn %>)<% end %>
+    ficou com o resultado do provedor incerto depois de <%= reconciliation.attempts %> tentativas, desde <%= panel_time(reconciliation.since) %>.
+    Conferir no provedor antes de reenviar.</p>
+  <dl class="turn__facts">
+    <dt>delivery_id</dt><dd><code><%= reconciliation.delivery_id %></code></dd>
+    <dt>tentativas</dt><dd><%= reconciliation.attempts %> tentativas</dd>
+    <dt>último erro</dt><dd><%= reconciliation.last_error || "não registrado" %></dd>
+  </dl>
+  <p class="reconciliation__order"><strong>
+    <% if reconciliation.waiting? %>
+      Saídas seguintes aguardam a conciliação: <%= reconciliation.waiting_seqs.map { "seq #{_1}" }.join(", ") %>
+    <% else %>
+      A próxima saída deste atendimento vai aguardar a conciliação
+    <% end %>
+  </strong> (07, seção 3.2).</p>
+</section>
