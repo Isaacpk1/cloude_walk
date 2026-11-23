@@ -62,12 +62,42 @@ RSpec.describe HumanQueue do
       expect(entries.map(&:ticket_id)).to eq([ critica, alta, sem_triagem_antiga, media_nova, baixa ].map(&:id))
     end
 
-    it "só casos em aguardando_humano: o caso ainda com a IA e o já com analista não entram" do
+    it "bloco 13: o caso ainda com a IA fica de fora; o já com analista entra depois dos que esperam, com o responsável" do
       waiting = escalated(t0, identity: "acc_1")
       at(t0) { ingest("meu repasse não caiu", identity: "acc_2") }
-      escalated(t0, identity: "acc_3").update_columns(state: "com_analista")
+      assigned = escalated(t0 - 1.minute, identity: "acc_3", priority: "critica")
+      ana = create(:user, name: "Ana Souza")
+      assigned.update_columns(state: "com_analista", assignee_id: ana.id)
 
-      expect(entries.map(&:ticket_id)).to eq([ waiting.id ])
+      list = entries
+      expect(list.map(&:ticket_id)).to eq([ waiting.id, assigned.id ])
+      expect(list.map(&:assignee_name)).to eq([ nil, "Ana Souza" ])
+    end
+
+    it "RN-29, RN-23: com a mesma prioridade, o prazo de SLA mais curto vem primeiro e sem prazo vai por último" do
+      late = escalated(t0, identity: "acc_1", priority: "media")
+      soon = escalated(t0 + 5.seconds, identity: "acc_2", priority: "media")
+      none = escalated(t0 - 5.seconds, identity: "acc_3", priority: "media")
+      late.update_columns(sla_started_at: t0, sla_due_at: t0 + 1.hour)
+      soon.update_columns(sla_started_at: t0, sla_due_at: t0 + 10.minutes)
+
+      expect(entries.map(&:ticket_id)).to eq([ soon, late, none ].map(&:id))
+    end
+
+    it "RN-25, RN-26: situação do SLA: dentro do prazo, alerta de 80%, estourado, sem prazo" do
+      ok, alerted, breached, none = %w[acc_1 acc_2 acc_3 acc_4].map { escalated(t0, identity: _1, priority: "media") }
+      ok.update_columns(sla_started_at: t0, sla_due_at: t0 + 10.minutes)
+      alerted.update_columns(sla_started_at: t0, sla_due_at: t0 + 10.minutes, sla_alerted_at: t0 + 8.minutes)
+      breached.update_columns(sla_started_at: t0, sla_due_at: t0 + 10.minutes, sla_alerted_at: t0 + 8.minutes, sla_breached: true)
+
+      by_id = entries.index_by(&:ticket_id)
+      now = t0 + 9.minutes
+      expect(by_id[ok.id].sla_status(now)).to eq(:ok)
+      expect(by_id[alerted.id].sla_status(now)).to eq(:alert)
+      expect(by_id[breached.id].sla_status(now)).to eq(:breached)
+      expect(by_id[none.id].sla_status(now)).to eq(:none)
+      expect(by_id[ok.id].sla_text(now)).to eq("faltam 1 min 0 s")
+      expect(by_id[breached.id].sla_text(t0 + 11.minutes)).to eq("estourado há 1 min 0 s")
     end
 
     it "tempo na fila: desde o ticket.escalated da atribuição atual" do

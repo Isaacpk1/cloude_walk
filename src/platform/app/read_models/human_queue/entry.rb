@@ -5,7 +5,7 @@
 class HumanQueue::Entry < Data.define(:ticket_id, :brand_slug, :brand_name, :customer_name, :title, :state, :queue_id,
                                       :queue_name, :queue_version, :queue_kind, :reason, :source, :priority,
                                       :priority_from, :priority_to, :escalated_at, :summary, :trace_id,
-                                      :category)
+                                      :category, :assignee_name, :sla_due_at, :sla_alerted_at, :sla_breached)
   QUEUE_KINDS = {
     "escalation" => "fila de escalas",
     "default" => "fila padrão: a marca não tem fila de escalas"
@@ -18,6 +18,23 @@ class HumanQueue::Entry < Data.define(:ticket_id, :brand_slug, :brand_name, :cus
   # Bloco 11 (RF-10, RN-11): a categoria da triagem; caso escalado antes da triagem aparece como "sem triagem".
   def category_label = ConversationView::Category.label(category) || "sem triagem"
   def priority_raise_label = priority_to && ConversationView::Priority.raise_label(priority_from, priority_to)
+
+  # Bloco 13 (RN-25, RN-26, RN-29): :breached (flag permanente), :alert (passou dos 80%), :ok, :none (sem prazo).
+  def sla_status(now = Time.current)
+    return :none unless sla_due_at
+    return :breached if sla_breached || sla_due_at <= now
+
+    sla_alerted_at ? :alert : :ok
+  end
+
+  def sla_text(now = Time.current)
+    return "sem prazo" unless sla_due_at
+
+    left_ms = TimelineView::Event.ms_between(now, sla_due_at)
+    left_ms.positive? ? "faltam #{self.class.duration_text(left_ms)}" : "estourado há #{self.class.duration_text(-left_ms)}"
+  end
+
+  def assigned? = !assignee_name.nil?
 
   def queue_label = self.class.queue_label(queue_name, queue_version, queue_kind)
 

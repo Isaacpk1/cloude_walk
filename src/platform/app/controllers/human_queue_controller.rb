@@ -7,6 +7,7 @@ class HumanQueueController < PanelController
   def index
     @queue = HumanQueue.new(brand_slug: params[:marca])
     @entries = @queue.entries
+    @capacity = AnalystCapacity.new(brand: @queue.brand)
     @now = Time.current
   end
 end
