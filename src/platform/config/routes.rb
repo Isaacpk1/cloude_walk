@@ -17,6 +17,10 @@ Rails.application.routes.draw do
        constraints: { channel: /chat|whatsapp|email/ }
 
   # Painel (bloco 01): telas de conversa e linha do tempo, alimentadas pelo ConversationReader.
+  # Bloco 14 (ADR-024): login do painel.
+  get "entrar" => "sessions#new", as: :login
+  post "entrar" => "sessions#create"
+  delete "sair" => "sessions#destroy", as: :logout
   root "conversations#index"
   resources :conversations, path: "conversas", only: %i[index show]
   resources :timelines, path: "linha-do-tempo", only: %i[index show]

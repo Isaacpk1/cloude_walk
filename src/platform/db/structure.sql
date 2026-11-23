@@ -905,6 +905,7 @@ CREATE TABLE public.users (
     updated_at timestamp(6) without time zone NOT NULL,
     status_changed_at timestamp(6) without time zone,
     last_assigned_at timestamp(6) without time zone,
+    password_digest character varying,
     CONSTRAINT users_capacity_check CHECK (((active_count >= 0) AND (active_count <= capacity))),
     CONSTRAINT users_kind_check CHECK (((kind)::text = ANY (ARRAY[('human'::character varying)::text, ('bot'::character varying)::text]))),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('supervisor'::character varying)::text, ('analyst'::character varying)::text, ('agent'::character varying)::text]))),
@@ -2190,6 +2191,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261124030000'),
 ('20261124020000'),
 ('20261124010000'),
 ('20261123020000'),

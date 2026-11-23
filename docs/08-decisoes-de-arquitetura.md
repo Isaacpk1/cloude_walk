@@ -645,3 +645,21 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 - [WhatsApp Cloud API: mensagens de serviço e janela de 24 h](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)
 - [Gmail API: notificações push via Pub/Sub](https://developers.google.com/gmail/api/guides/push)
 - [Gmail API: recurso `users.messages` (thread, `In-Reply-To`, `References`)](https://developers.google.com/workspace/gmail/api/v1/reference/users/messages)
+
+## ADR-024 — Login do painel e escopo por marca
+
+**Status:** proposta, bloco 14.
+
+**Contexto.** O painel mostra dados de várias marcas e o analista não pode ver a marca que não é dele (RN-52, RNF-24). Até o bloco 13 o painel era aberto. RNF-26 pede senha com hash e sessão com expiração, no nível ASVS 1.
+
+**Decisão.**
+
+1. Login por e-mail e senha com `has_secure_password` (bcrypt) e sessão de cookie do Rails que expira em 8 h sem uso.
+2. Escopo de marcas = marcas das equipes do usuário. Toda leitura do painel parte desse conjunto (invariante 6). Fora dele, `404`.
+3. Perfis: `analyst` atende e vê as marcas da equipe; `supervisor` faz o mesmo e acessa DLQ e evals.
+4. ActionCable só aceita conexão com sessão válida.
+5. Os webhooks de entrada continuam fora do login: eles têm a assinatura do ADR-019.
+
+**Alternativas.** Row-Level Security no Postgres (já descartada acima: exige contexto de sessão em cada job); gem Devise (mais peças do que o projeto precisa); SSO (fora do escopo, sem sistema da CloudWalk).
+
+**Consequências.** Os seeds criam usuários com senha sintética conhecida (só dados sintéticos, RN-51). Tentativas de login erradas não revelam se o e-mail existe.

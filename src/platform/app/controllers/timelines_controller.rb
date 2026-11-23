@@ -1,10 +1,10 @@
 class TimelinesController < PanelController
   def index
-    @conversations = ConversationReader.all
+    @conversations = visible_conversations
   end
 
   def show
-    @conversation = ConversationReader.find(params[:id])
+    @conversation = find_visible_conversation(params[:id])
     @timeline = ConversationReader.timeline(params[:id])
     # ROADMAP 03: o evento escolhido (1, 2, ...) mostra a origem do erro, quando houver.
     index = params[:evento].to_s

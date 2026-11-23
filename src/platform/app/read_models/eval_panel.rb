@@ -12,8 +12,11 @@ class EvalPanel
     def never_run? = runs.empty?
   end
 
-  def initialize(brand_slug: nil)
-    @brand = brand_slug.presence && (Brand.find_by(slug: brand_slug) || raise(NotFound, "marca #{brand_slug} não encontrada"))
+  # `brand_ids`: o escopo de marcas do usuário (RN-52, RNF-24); sem ele, todas.
+  def initialize(brand_slug: nil, brand_ids: nil)
+    @brand_ids = brand_ids
+    visible = brand_ids ? Brand.where(id: brand_ids) : Brand
+    @brand = brand_slug.presence && (visible.find_by(slug: brand_slug) || raise(NotFound, "marca #{brand_slug} não encontrada"))
   end
 
   def scenarios
@@ -34,6 +37,8 @@ class EvalPanel
 
   def scope
     runs = EvalRun.includes(:brand)
-    @brand ? runs.where(brand_id: @brand.id) : runs
+    return runs.where(brand_id: @brand.id) if @brand
+
+    @brand_ids ? runs.where(brand_id: @brand_ids) : runs
   end
 end

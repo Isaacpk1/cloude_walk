@@ -6,13 +6,14 @@ class AnalystCapacity
     def load_text = "#{active_count} / #{capacity}"
   end
 
-  def initialize(brand: nil)
+  def initialize(brand: nil, brand_ids: nil)
     @brand = brand
+    @brand_ids = brand_ids
   end
 
   def rows
     @rows ||= analysts.map do |user|
-      brands = user.teams.map(&:brand).uniq.select { !@brand || _1.id == @brand.id }
+      brands = user.teams.map(&:brand).uniq.select { (!@brand || _1.id == @brand.id) && (!@brand_ids || @brand_ids.include?(_1.id)) }
       Row.new(user_id: user.id, name: user.name, status: user.status, active_count: user.active_count,
               capacity: user.capacity, brand_names: brands.map(&:name).sort)
     end
@@ -22,6 +23,7 @@ class AnalystCapacity
   def unattended?
     waiting = Ticket.where(state: HumanQueue::STATE)
     waiting = waiting.where(brand_id: @brand.id) if @brand
+    waiting = waiting.where(brand_id: @brand_ids) if @brand_ids
     waiting.exists? && rows.none? { _1.status == "online" && _1.active_count < _1.capacity }
   end
 
@@ -30,6 +32,7 @@ class AnalystCapacity
   def analysts
     scope = User.where(kind: "human", role: "analyst").includes(teams: :brand)
     scope = scope.where(id: TeamMembership.joins(:team).where(teams: { brand_id: @brand.id }).select(:user_id)) if @brand
+    scope = scope.where(id: TeamMembership.joins(:team).where(teams: { brand_id: @brand_ids }).select(:user_id)) if @brand_ids
     scope.order(:name, :id).to_a
   end
 end

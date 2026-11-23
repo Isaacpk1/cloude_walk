@@ -1,9 +1,9 @@
 class ConversationsController < PanelController
   def index
-    @conversations = ConversationReader.all
+    @conversations = visible_conversations
   end
 
   def show
-    @conversation = ConversationReader.find(params[:id])
+    @conversation = find_visible_conversation(params[:id])
   end
 end

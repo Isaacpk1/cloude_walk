@@ -41,8 +41,11 @@ class HumanQueue
 
   attr_reader :brand
 
-  def initialize(brand_slug: nil)
-    @brand = brand_slug.presence && (Brand.find_by(slug: brand_slug) || raise(NotFound, "marca #{brand_slug} não encontrada"))
+  # `brand_ids`: o escopo de marcas do usuário (RN-52, RNF-24). Sem ele, todas (uso interno e testes de leitura).
+  def initialize(brand_slug: nil, brand_ids: nil)
+    @brand_ids = brand_ids
+    visible = brand_ids ? Brand.where(id: brand_ids) : Brand
+    @brand = brand_slug.presence && (visible.find_by(slug: brand_slug) || raise(NotFound, "marca #{brand_slug} não encontrada"))
   end
 
   # Streams do Turbo da página: o da marca com ?marca=, o geral sem ela.
@@ -67,6 +70,7 @@ class HumanQueue
   def scope
     records = Ticket.includes(:brand, :customer).includes(:assignee).joins(LAST_ESCALATION).where(state: STATES)
     records = records.where(brand_id: brand.id) if brand
+    records = records.where(brand_id: @brand_ids) if @brand_ids
     records.select("tickets.*", "escalation.id AS escalation_audit_id")
            .order(Arel.sql(ORDER))
            .limit(LIMIT)

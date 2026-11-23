@@ -7,8 +7,11 @@ class DeadLetterPanel
   NotFound = Class.new(StandardError)
   LIMIT = 100
 
-  def initialize(brand_slug: nil)
-    @brand = brand_slug.presence && (Brand.find_by(slug: brand_slug) || raise(NotFound, "marca #{brand_slug} não encontrada"))
+  # `brand_ids`: o escopo de marcas do usuário (RN-52, RNF-24); sem ele, todas.
+  def initialize(brand_slug: nil, brand_ids: nil)
+    @brand_ids = brand_ids
+    visible = brand_ids ? Brand.where(id: brand_ids) : Brand
+    @brand = brand_slug.presence && (visible.find_by(slug: brand_slug) || raise(NotFound, "marca #{brand_slug} não encontrada"))
   end
 
   def all = scope.order(created_at: :desc, id: :desc).limit(LIMIT).map { DeadLetterView.from(_1) }
@@ -22,6 +25,9 @@ class DeadLetterPanel
 
   def scope
     records = DeadLetter.includes(:brand)
-    @brand ? records.where(brand_id: @brand.id) : records
+    return records.where(brand_id: @brand.id) if @brand
+
+    # Sem correlação (brand_id nulo, ADR-014) só o supervisor vê; com escopo, as marcas dele mais as sem correlação.
+    @brand_ids ? records.where(brand_id: [ *@brand_ids, nil ]) : records
   end
 end
