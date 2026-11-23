@@ -100,7 +100,7 @@ RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
       result = escalate(id)
 
       expect(result).to have_attributes(status: :discarded, reason: "atribuicao_mudou")
-      expect(ticket.reload).to have_attributes(state: "novo", assignment_version: 3)
+      expect(ticket.reload).to have_attributes(state: "com_ia", assignment_version: 3) # triado no Open (bloco 11)
       # Formato combinado com o painel (A3): o data do pedido, o motivo do descarte e o motivo pedido.
       expect(audits(ticket, "handoff.discarded").sole.data).to include(
         OutboxEvent.find(id).payload.merge("reason" => "atribuicao_mudou", "handoff_reason" => "prazo_do_turno",
@@ -141,7 +141,7 @@ RSpec.describe Handoff::Escalate, "RF-36: handoff mínimo pelo outbox" do
       result = escalate(item.id)
 
       expect(result).to have_attributes(status: :discarded, reason: "atendimento_inexistente")
-      expect(ticket.reload).to have_attributes(state: "novo", assignment_version: 0)
+      expect(ticket.reload).to have_attributes(state: "com_ia", assignment_version: 0) # triado no Open (bloco 11)
       expect(AuditEvent.where(event_type: "handoff.discarded", brand_id: jim.id).sole.ticket_id).to be_nil
     end
 

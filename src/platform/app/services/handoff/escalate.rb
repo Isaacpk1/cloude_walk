@@ -136,33 +136,18 @@ module Handoff
     # RN-42, RF-43: o aviso entra como saída comum, com o próximo seq; o Deliveries::Send só o autoriza depois de
     # toda saída anterior encerrada (RN-38). Sem ai_assignment_version: nenhum cancelamento da IA o alcança.
     def request_transfer_notice
-      origin = last_customer_message
-      unless origin
+      notice = TransferNotice.call(ticket:, trace_id: item.trace_id, now:)
+      unless notice
         audit("handoff.notice_skipped", reason: "sem_mensagem_do_cliente")
         return
       end
 
-      seq = Message.where(brand_id: ticket.brand_id, ticket_id: ticket.id).maximum(:seq).to_i + 1
-      message = Message.create!(brand_id: ticket.brand_id, ticket:, direction: "outbound", author_type: "system",
-                                body: policy.transfer_notice_text(ticket.brand.locale), seq:, channel: origin.channel,
-                                provider_account: origin.provider_account, external_id: nil, trace_id: item.trace_id,
-                                received_at: now)
-      context_version = ticket.bump_context_version! # ADR-022: saída visível ao cliente
-      delivery = Delivery.create!(brand_id: ticket.brand_id, ticket:, message:, seq:, channel: message.channel,
-                                  provider_account: message.provider_account, kind: "handoff_notice", status: "pending",
-                                  trace_id: item.trace_id).reload # delivery_id vem do padrão do banco
-      @delivery_event_id = OutboxEvent.create!(
-        brand_id: ticket.brand_id, ticket:, event_type: DELIVERY_EVENT, dedup_key: "delivery:#{delivery.delivery_id}",
-        payload: { delivery_id: delivery.delivery_id, ticket_id: ticket.id, seq: }, trace_id: item.trace_id, next_attempt_at: now
-      ).id
-      audit(DELIVERY_EVENT, delivery_id: delivery.delivery_id, message_id: message.id, seq:, kind: "handoff_notice",
-                            turn: nil, context_until_seq: origin.seq, context_version:)
+      @delivery_event_id = notice.outbox_event_id
+      delivery = notice.delivery
+      audit(DELIVERY_EVENT, delivery_id: delivery.delivery_id, message_id: delivery.message_id, seq: delivery.seq,
+                            kind: "handoff_notice", turn: nil, context_until_seq: notice.context_until_seq,
+                            context_version: notice.context_version)
       delivery
-    end
-
-    def last_customer_message
-      Message.where(brand_id: ticket.brand_id, ticket_id: ticket.id, direction: "inbound", author_type: "customer")
-             .order(seq: :desc).first
     end
 
     # RN-39, RN-40: o resumo do agente vale na hora; sem ele, a plataforma monta depois (item handoff.summary).

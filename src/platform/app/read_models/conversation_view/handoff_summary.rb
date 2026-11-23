@@ -17,6 +17,7 @@ class ConversationView::HandoffSummary < Data.define(:status, :source, :fields, 
   SOURCE_LABELS = { "agent" => "do agente", "platform" => "da plataforma" }.freeze
 
   MISSING_REASONS = {
+    "sem_conversa_com_ia" => "a triagem mandou o caso direto para a fila humana, sem conversa com a IA",
     "historico_vazio" => "histórico vazio, nada a resumir",
     "erro_ao_montar" => "erro ao montar o resumo"
   }.freeze

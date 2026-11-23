@@ -15,15 +15,16 @@
 #   saída do aviso; o envio é o delivery.requested seguinte. Relógio do banco antes do prazo: volta no prazo.
 # - "handoff.summary": resumo do handoff montado pela plataforma quando o agente não mandou o dele (RN-39, RN-40;
 #   Handoff::Summarize). Grava o resumo ou o "sem resumo" e conclui o item; nunca mexe no handoff.
-# - "message.received": aviso da ingestão. Não abre turno; fica para a triagem (bloco 11). Até lá, o
-#   worker só o encerra, para a recuperação não reoferecê-lo para sempre.
+# - "message.received": aviso da ingestão. Triage::OnMessage trava o atendimento, faz a triagem do caso novo
+#   (RF-12, RF-24, RN-28; 07, seção 3.1, passo 2) e conclui o item na mesma transação. Não abre turno: o turno sai
+#   pelo scheduler, quando dispatch_due_at vence. Erro na triagem deixa o item aberto para a recuperação.
 #
 # A espera de uma retentativa é só um despertador: o horário que vale é outbox_events.next_attempt_at,
 # no Postgres. Se o Redis perder o job, a recuperação (Outbox::Recover) reoferece o item.
 class OutboxJob < ApplicationJob
   queue_as :critical
 
-  MESSAGE_RECEIVED = "message.received".freeze
+  MESSAGE_RECEIVED = Triage::OnMessage::EVENT_TYPE
   TIMEOUTS = [ Deadlines::TurnTimeout::EVENT_TYPE, Deadlines::CycleTimeout::EVENT_TYPE ].freeze
   HANDLED = [ MESSAGE_RECEIVED, Turns::Open::DISPATCH_TYPE, Turns::Open::EVENT_TYPE, Deliveries::Send::EVENT_TYPE,
               *TIMEOUTS, Handoff::Request::EVENT_TYPE,
@@ -38,6 +39,7 @@ class OutboxJob < ApplicationJob
       result = Turns::Open.call(item.id)
       self.class.perform_later(result.turn.event_id) if result.status == :opened
       wake(result.handoff_event_id)
+      result.wake_ids.each { wake(_1) }
     when Turns::Open::EVENT_TYPE
       result = Outbox::Publish.call(item.id)
       self.class.set(wait_until: result.next_attempt_at).perform_later(item.id) if result.next_attempt_at
@@ -57,7 +59,7 @@ class OutboxJob < ApplicationJob
     when Handoff::Summarize::EVENT_TYPE
       Handoff::Summarize.call(item.id)
     when MESSAGE_RECEIVED
-      OutboxEvent.where(id: item.id, completed_at: nil).update_all(completed_at: Time.current, lease_until: nil)
+      Triage::OnMessage.call(item.id).wake_ids.each { wake(_1) }
     end
   end
 

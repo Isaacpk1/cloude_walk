@@ -128,6 +128,8 @@ Estimativa para validar no primeiro `docker compose up`. Os números do Rails e 
 | --- | --- |
 | Árvore booleana com aninhamento livre | Mais expressiva na forma, não no poder: toda expressão booleana tem equivalente em forma normal disjuntiva. Custa um editor recursivo. |
 | Regras em código (Ruby, DSL) | Viola o RF-16 e o TAPI: a operação precisa editar sem desenvolvimento. |
+
+**Formato implementado (bloco 11).** O conjunto da marca é `{ "schema_version": 1, "rules": [ { "name", "queue_id", "any": [ { "all": [condição] } ] } ] }` (`src/contracts/v1/schemas/routing_rules.json`). Campos: `brand`, `channel`, `category`, `priority` com `eq` e `neq` (texto) e `in` e `not_in` (lista não vazia); `tags` só com `contains` (um texto). Regra que casa mas aponta para fila inativa é pulada e registrada em `skipped_rules` na auditoria do roteamento (RN-15).
 | Motor de regras externo | Mais um componente para operar, sem ganho neste volume. |
 
 **Consequências.**
@@ -334,6 +336,7 @@ Estimativa para validar no primeiro `docker compose up`. Os números do Rails e 
 - (+) Toda decisão aponta para um estado completo e reproduzível da configuração. O E3 só precisa comparar números de versão.
 - (+) A troca é atômica: um atendimento usa a versão antiga ou a nova, nunca uma mistura.
 - (+) Simular uma regra antes de salvar (RF-20) é avaliar um conjunto ainda não salvo.
+- (+) O cache do processo confere `(id, version, created_at)` da versão atual pelo índice único `(brand_id, version)` a cada roteamento. A versão nova vale no roteamento seguinte ao commit (RNF-07). As filas são lidas a cada roteamento, então desativar uma fila também vale na hora.
 - (−) Cada edição grava o conjunto inteiro, o que é irrelevante para dezenas de regras por marca.
 
 ---

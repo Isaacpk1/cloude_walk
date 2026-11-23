@@ -15,12 +15,16 @@
 # O evento fica pronto e imutável: as retentativas reenviam o mesmo conteúdo com o mesmo event_id
 # (invariante 3). A publicação acontece depois, fora da transação.
 #
-# A atribuição ao bot entra com a triagem (bloco 11): até lá, todo caso que não está com um humano vai
-# para a IA.
+# Triagem antes do primeiro turno (bloco 11; 07, seção 3.1, passo 2): se o caso ainda estiver `novo` (o worker do
+# message.received não rodou), o Triage::Run roda aqui, sob o mesmo lock, antes de qualquer outra conferência.
+# Triado para humano (fila sem IA ou categoria somente humana, RN-28), o turno não abre (`triaged_to_human`) e o
+# ciclo já saiu encerrado pela triagem. Erro na triagem sobe: nada é gravado e a ação fica aberta para a nova
+# tentativa; nenhum turno abre sem triagem, e o teto do ciclo (RN-46) leva o caso a um humano se a falha persistir.
 module Turns
   class Open
-    Result = Data.define(:status, :turn, :handoff_event_id) do
-      def initialize(handoff_event_id: nil, **) = super
+    # `wake_ids`: outros itens gravados aqui (o aviso de transferência da triagem, RN-42), acordados depois do commit.
+    Result = Data.define(:status, :turn, :handoff_event_id, :wake_ids) do
+      def initialize(handoff_event_id: nil, wake_ids: [], **) = super
     end
     # Recusas que pedem o handoff na hora (RN-46, RN-49; ADR-020 item 3), com o motivo do pedido. As demais
     # recusas terminais (sem_prazo, prazo_vencido) ficam para o teto do ciclo (Deadlines::CycleTimeout).
@@ -56,6 +60,7 @@ module Turns
     attr_reader :ticket, :item
 
     def decide
+      return settled(:triaged_to_human, reason: "triado_para_humano", state: ticket.state) if triaged_to_human?
       return settled(:skipped, reason: "fora_da_ia", state: ticket.state) unless ticket.with_ai?
 
       expected = item.payload["assignment_version"]
@@ -71,6 +76,14 @@ module Turns
       return settled(:covered, reason: "coberto", covered_by_turn: covering.turn) if covering
 
       window_closed? ? check_deadline : window_still_open
+    end
+
+    def triaged_to_human?
+      return false unless ticket.state == "novo"
+
+      triage = Triage::Run.call(ticket:, trace_id: item.trace_id)
+      @wake_ids = triage.wake_ids
+      triage.status == :triaged_to_human
     end
 
     def now = @now ||= Time.current
@@ -163,7 +176,7 @@ module Turns
     def not_opened(status, **data)
       complete_item
       audit("ai_turn.not_opened", **data)
-      Result.new(status:, turn: nil, handoff_event_id: @handoff_event_id)
+      Result.new(status:, turn: nil, handoff_event_id: @handoff_event_id, wake_ids: @wake_ids || [])
     end
 
     def complete_item = item.update!(completed_at: now, lease_until: nil)

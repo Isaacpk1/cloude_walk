@@ -11,6 +11,9 @@
       </div>
       <div class="conversation-list__meta">
         <span class="badge badge--state"><%= conversation.state %></span>
+        <% if (triage = conversation.triage) %>
+          <span class="conversation-list__triage"><span class="conversation-list__category"><%= triage.category_label || "sem categoria" %></span> <span class="badge badge--priority badge--priority-<%= triage.priority || 'media' %>"><%= triage.priority_label %></span></span>
+        <% end %>
         <span class="muted"><%= conversation.assignee.kind_label %>: <%= conversation.assignee.name %></span>
         <%= source_badge(conversation.source) %>
       </div>

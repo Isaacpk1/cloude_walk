@@ -20,11 +20,13 @@ class HumanQueue
   PRIORITY_ORDER = <<~SQL.squish.freeze
     CASE tickets.priority WHEN 'critica' THEN 0 WHEN 'alta' THEN 1 WHEN 'baixa' THEN 3 ELSE 2 END
   SQL
-  # O ticket.escalated mais novo do caso, na marca do caso (invariante 6).
+  # A entrada mais nova do caso na fila humana, na marca do caso (invariante 6): o ticket.escalated do handoff ou o
+  # ticket.assigned da triagem para a fila humana (bloco 11: fila sem IA ou categoria somente humana).
   LAST_ESCALATION = <<~SQL.squish.freeze
     LEFT JOIN LATERAL (
       SELECT a.id, a.occurred_at FROM audit_events a
-      WHERE a.brand_id = tickets.brand_id AND a.ticket_id = tickets.id AND a.event_type = 'ticket.escalated'
+      WHERE a.brand_id = tickets.brand_id AND a.ticket_id = tickets.id
+        AND (a.event_type = 'ticket.escalated' OR (a.event_type = 'ticket.assigned' AND a.data->>'to' = 'fila_humana'))
       ORDER BY a.id DESC LIMIT 1
     ) escalation ON true
   SQL
@@ -62,7 +64,7 @@ class HumanQueue
            .limit(LIMIT)
   end
 
-  AUDITS = %w[ticket.escalated ticket.priority_raised handoff.summary_available handoff.summary_missing].freeze
+  AUDITS = %w[ticket.escalated ticket.assigned ticket.priority_raised handoff.summary_available handoff.summary_missing].freeze
 
   def audits_for(tickets)
     pairs = tickets.map { [ _1.brand_id, _1.id ] }
@@ -94,6 +96,7 @@ class HumanQueue
   def entry(ticket, audits, summaries, versions)
     escalated = audits.find { _1.id == ticket.escalation_audit_id }
     data = escalated&.data || {}
+    data = data.merge("source" => "triagem") if escalated&.event_type == "ticket.assigned"
     raised = HandoffPhase.priority_raised(audits, escalated)
     version = versions[[ ticket.brand_id, ticket.queue_id, ticket.queue_version ]]
     HumanQueue::Entry.new(
@@ -103,8 +106,18 @@ class HumanQueue
       queue_kind: data["queue_kind"] || queue_kind(version), reason: data["reason"], source: data["source"],
       priority: ticket.priority, priority_from: raised&.data&.dig("from"), priority_to: raised&.data&.dig("to"),
       escalated_at: escalated&.occurred_at || ticket.updated_at,
-      summary: summary(summaries[ticket.id], audits, data["from_assignment_version"]), trace_id: escalated&.trace_id
+      summary: entry_summary(escalated, summaries[ticket.id], audits, data), trace_id: escalated&.trace_id,
+      category: ticket.category
     )
+  end
+
+  # Caso que a triagem mandou direto para a fila humana (ticket.assigned): sem handoff, não há resumo a esperar.
+  def entry_summary(entrance, record, audits, data)
+    if entrance&.event_type == "ticket.assigned"
+      return ConversationView::HandoffSummary.new(status: :missing, missing_reason: "sem_conversa_com_ia")
+    end
+
+    summary(record, audits, data["from_assignment_version"])
   end
 
   def summary(record, audits, from_version)

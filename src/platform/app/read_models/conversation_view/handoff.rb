@@ -15,6 +15,9 @@ class ConversationView::Handoff < Data.define(:state, :reason, :source, :turn, :
   CancelledDelivery = Data.define(:delivery_id, :seq, :kind)
 
   REASONS = {
+    # Bloco 11: a triagem mandou o caso novo direto para a fila humana (ticket.assigned).
+    "fila_sem_ia" => "Triagem: a fila decidida não tem IA primeiro (RF-24)",
+    "categoria_somente_humana" => "Triagem: categoria somente humana, fila de escalas (RN-28)",
     "prazo_do_turno" => "Prazo do turno vencido (20 s desde a abertura, RN-46)",
     "teto_do_ciclo" => "Teto do ciclo vencido (60 s desde a primeira mensagem pendente, RN-46)",
     "publicacao_falhou" => "Publicação do turno falhou de forma definitiva (RN-46)",
@@ -26,6 +29,7 @@ class ConversationView::Handoff < Data.define(:state, :reason, :source, :turn, :
   }.freeze
 
   SOURCES = {
+    "triagem" => "Triagem do caso novo (bloco 11)",
     "scheduler" => "Scheduler: prazo vencido no Postgres (ADR-016)",
     "outbox" => "Outbox: publicação para o agente",
     "turns" => "Abertura do turno",

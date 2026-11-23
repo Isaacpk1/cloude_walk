@@ -1,0 +1,1 @@
+{ "schema_version": 1, "rules": [ { "name": "VIP", "queue_id": 7, "any": [ { "all": [ { "field": "tags", "op": "eq", "value": "vip" } ] } ] } ] }

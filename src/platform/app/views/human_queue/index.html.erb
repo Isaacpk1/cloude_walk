@@ -23,6 +23,7 @@
         <tr>
           <th scope="col">#</th>
           <th scope="col">Atendimento</th>
+          <th scope="col">Categoria</th>
           <th scope="col">Fila e versão</th>
           <th scope="col">Motivo e origem</th>
           <th scope="col">Prioridade</th>
@@ -39,6 +40,7 @@
               <div><%= entry.title %></div>
               <div class="muted"><%= entry.customer_name %> · <%= link_to "linha do tempo", timeline_path(entry.ticket_id) %></div>
             </td>
+            <td><span class="human-queue__category"><%= entry.category_label %></span></td>
             <td><%= entry.queue_label %></td>
             <td>
               <div class="human-queue__reason"><%= entry.reason_label || "motivo não registrado" %></div>

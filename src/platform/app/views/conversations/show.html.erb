@@ -50,6 +50,7 @@
   </section>
 
   <aside class="conversation__side">
+    <% if c.triage || !c.source.synthetic? %><%= render "conversations/triage", triage: c.triage %><% end %>
     <% if c.grouping %><%= render "conversations/grouping", grouping: c.grouping %><% end %>
     <% if c.turn_refusal %><%= render "conversations/turn_refusal", refusal: c.turn_refusal %><% end %>
     <% if c.handoff %><%= render "conversations/handoff", handoff: c.handoff %><% end %>
