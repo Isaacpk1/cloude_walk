@@ -20,6 +20,14 @@ module DistributionHelpers
                             priority:, assignee_id: nil, sla_started_at: started_at, sla_due_at:)
     end
   end
+
+  # Um caso com o analista (com_analista ou aguardando_cliente), com a vaga dele ocupada (RN-30).
+  def case_with(analyst, brand:, queue:, identity:, state: "com_analista", assignment_version: 1, **sla)
+    waiting_case(brand:, queue:, identity:, **sla).tap do |ticket|
+      ticket.update_columns(state:, assignee_id: analyst.id, assignment_version:)
+      analyst.update_columns(active_count: analyst.active_count + 1)
+    end
+  end
 end
 
 RSpec.configure { |c| c.include DistributionHelpers }
