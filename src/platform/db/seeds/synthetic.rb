@@ -21,6 +21,16 @@ module Seeds
     # marca. A da InfinitePay é a que o simulador (channels-mock) traz preenchida; a da JIM segue o mesmo
     # formato. Sem ela, quem entra pelo chat chega como cliente não verificado e a IA pede identificação.
     CHAT_ACCOUNT_IDS = { "infinitepay" => "acc_infinitepay_000021", "jim" => "acc_jim_000021" }.freeze
+    # Bloco 11 (RF-13): filas temáticas além da Geral e da Escalas N1. Crédito é só humana (sem IA primeiro).
+    ROUTING_QUEUES = { "Repasses" => true, "Crédito" => false, "Maquininha" => true }.freeze
+    # Bloco 11: conjunto v1 de cada marca (ADR-003, RN-16). Cada regra: [nome, fila, [[campo, op, valor], ...] por
+    # grupo]. A primeira exercita o E, a segunda o OU; o resto cai na fila padrão Geral.
+    ROUTING_RULES = [
+      [ "Crédito com prioridade alta ou crítica", "Crédito",
+        [ [ %w[category eq credito], [ "priority", "in", %w[alta critica] ] ] ] ],
+      [ "Maquininha ou urgente", "Maquininha", [ [ %w[category eq maquininha] ], [ %w[tags contains urgente] ] ] ],
+      [ "Repasses", "Repasses", [ [ %w[category eq repasses] ] ] ]
+    ].freeze
 
     def self.call(...) = new(...).call
 
@@ -42,8 +52,9 @@ module Seeds
           brand = Brand.find_or_create_by!(slug: attrs[:slug]) { _1.assign_attributes(attrs) }
           team = Team.find_or_create_by!(brand:, name: "Suporte N1")
           [ bot, supervisor, *analysts_for(brand) ].each { |user| TeamMembership.find_or_create_by!(user:, team:) }
-          default_queue_for(brand, team, created_by: supervisor)
+          default_queue = default_queue_for(brand, team, created_by: supervisor)
           escalation_queue_for(brand, team, created_by: supervisor)
+          routing_for(brand, team, default_queue, created_by: supervisor)
           provider_accounts_for(brand)
           ProviderAccount.evaluation_for!(brand, "chat") # ADR-023, item 5: conta do eval, inativa
           customers_for(brand)
@@ -90,6 +101,23 @@ module Seeds
       queue = HelpdeskQueue.find_or_create_by!(brand:, escalation: true, active: true) { _1.team = team }
       queue.publish_version!(name: "Escalas N1", ai_first: false, created_by:) if queue.current_version.nil?
       queue
+    end
+
+    # Bloco 11: filas por nome da versão e a versão 1 do conjunto, só se a marca ainda não tem conjunto. Rodar de
+    # novo não cria fila nem versão; um conjunto que o supervisor já publicou não é tocado (RN-20).
+    def routing_for(brand, team, default_queue, created_by:)
+      queues = ROUTING_QUEUES.to_h do |name, ai_first|
+        queue = HelpdeskQueue.joins(:current_version).find_by(brand:, queue_versions: { name: })
+        queue ||= HelpdeskQueue.create!(brand:, team:).tap { _1.publish_version!(name:, ai_first:, created_by:) }
+        [ name, queue ]
+      end
+      return if RoutingRuleset.exists?(brand_id: brand.id)
+
+      rules = ROUTING_RULES.map do |name, queue, groups|
+        { "name" => name, "queue_id" => queues.fetch(queue).id,
+          "any" => groups.map { |conds| { "all" => conds.map { |f, op, v| { "field" => f, "op" => op, "value" => v } } } } }
+      end
+      RoutingRuleset.publish!(brand:, rules: { "schema_version" => 1, "rules" => rules }, default_queue:, created_by:)
     end
 
     def customers_for(brand)

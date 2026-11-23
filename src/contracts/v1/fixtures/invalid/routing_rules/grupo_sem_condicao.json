@@ -1,0 +1,1 @@
+{ "schema_version": 1, "rules": [ { "name": "Pix", "queue_id": 7, "any": [ { "all": [] } ] } ] }

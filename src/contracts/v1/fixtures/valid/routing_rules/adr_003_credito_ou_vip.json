@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {
+      "name": "Crédito alto ou VIP",
+      "queue_id": 12,
+      "any": [
+        { "all": [ { "field": "category", "op": "eq", "value": "credito" },
+                   { "field": "priority", "op": "in", "value": ["alta", "critica"] } ] },
+        { "all": [ { "field": "tags", "op": "contains", "value": "vip" } ] }
+      ]
+    }
+  ]
+}

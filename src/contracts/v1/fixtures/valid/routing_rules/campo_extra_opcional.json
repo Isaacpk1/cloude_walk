@@ -1,0 +1,3 @@
+{ "schema_version": 1, "comment": "campo novo opcional não quebra (07, seção 5.4)",
+  "rules": [ { "name": "Pix", "queue_id": 7, "description": "extra",
+               "any": [ { "all": [ { "field": "category", "op": "eq", "value": "pix" } ] } ] } ] }

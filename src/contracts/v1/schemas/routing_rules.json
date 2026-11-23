@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.helpdesk.cloudwalk.local/v1/routing_rules.json",
+  "title": "Conjunto de regras de roteamento de uma marca (routing_rulesets.rules)",
+  "description": "Lista ordenada de regras em forma normal disjuntiva (ADR-003): cada regra é uma disjunção de grupos (any) e cada grupo uma conjunção de condições (all). A primeira regra que casa decide (RN-16). O conjunto inteiro é versionado (ADR-013). Que queue_id seja fila ativa da mesma marca é validado pela plataforma ao publicar (RF-17, RN-15), não pelo esquema.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rules"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "rules": {
+      "type": "array",
+      "description": "Ordem definida pelo supervisor (RF-15). Lista vazia: tudo vai para a fila padrão.",
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": [
+        "name",
+        "queue_id",
+        "any"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "\\S"
+        },
+        "queue_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "any": {
+          "type": "array",
+          "description": "OU entre grupos.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/group"
+          }
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "required": [
+        "all"
+      ],
+      "properties": {
+        "all": {
+          "type": "array",
+          "description": "E entre condições.",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "description": "brand, channel, category e priority aceitam eq, neq (valor texto), in e not_in (lista não vazia de textos). tags aceita só contains (um texto): o caso casa se tiver a tag.",
+      "required": [
+        "field",
+        "op",
+        "value"
+      ],
+      "properties": {
+        "field": {
+          "enum": [
+            "brand",
+            "channel",
+            "category",
+            "priority",
+            "tags"
+          ]
+        },
+        "op": {
+          "enum": [
+            "eq",
+            "neq",
+            "in",
+            "not_in",
+            "contains"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["field"],
+            "properties": { "field": { "const": "tags" } }
+          },
+          "then": {
+            "properties": { "op": { "const": "contains" } }
+          },
+          "else": {
+            "properties": { "op": { "not": { "const": "contains" } } }
+          }
+        },
+        {
+          "if": {
+            "required": ["op"],
+            "properties": { "op": { "enum": ["in", "not_in"] } }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "$ref": "#/$defs/text" }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": { "$ref": "#/$defs/text" }
+            }
+          }
+        }
+      ]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "\\S"
+    }
+  }
+}

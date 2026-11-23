@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "rules": [
+    { "name": "Maquininha fora do e-mail", "queue_id": 3,
+      "any": [ { "all": [ { "field": "category", "op": "eq", "value": "maquininha" },
+                          { "field": "channel", "op": "neq", "value": "email" } ] } ] },
+    { "name": "Repasses da marca", "queue_id": 4,
+      "any": [ { "all": [ { "field": "brand", "op": "eq", "value": "infinitepay" },
+                          { "field": "category", "op": "in", "value": ["repasses", "pix"] },
+                          { "field": "priority", "op": "not_in", "value": ["baixa"] } ] } ] },
+    { "name": "Urgente", "queue_id": 5,
+      "any": [ { "all": [ { "field": "tags", "op": "contains", "value": "urgente" } ] } ] }
+  ]
+}

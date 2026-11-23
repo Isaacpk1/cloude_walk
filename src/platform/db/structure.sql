@@ -76,6 +76,46 @@ $$;
 
 
 --
+-- Name: routing_rulesets_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.routing_rulesets_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'routing_rulesets é só inserção (RN-20): publique uma versão nova';
+END;
+$$;
+
+
+--
+-- Name: routing_rulesets_queues_of_brand(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.routing_rulesets_queues_of_brand() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  bad text;
+BEGIN
+  SELECT rule ->> 'queue_id' INTO bad
+    FROM jsonb_array_elements(NEW.rules -> 'rules') AS rule
+   WHERE NOT EXISTS (
+           SELECT 1 FROM queues q
+            WHERE q.id::text = rule ->> 'queue_id' AND q.brand_id = NEW.brand_id AND q.active)
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'regra aponta para fila % que não é ativa da marca % (RN-15)', bad, NEW.brand_id;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM queues q WHERE q.id = NEW.default_queue_id AND q.active) THEN
+    RAISE EXCEPTION 'fila padrão % inativa (RF-17)', NEW.default_queue_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: tickets_evaluation_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -658,6 +698,42 @@ ALTER SEQUENCE public.queues_id_seq OWNED BY public.queues.id;
 
 
 --
+-- Name: routing_rulesets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.routing_rulesets (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    version integer NOT NULL,
+    rules jsonb NOT NULL,
+    default_queue_id bigint NOT NULL,
+    created_by_id bigint NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT routing_rulesets_rules_check CHECK ((jsonb_typeof((rules -> 'rules'::text)) = 'array'::text)),
+    CONSTRAINT routing_rulesets_version_check CHECK ((version >= 1))
+);
+
+
+--
+-- Name: routing_rulesets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.routing_rulesets_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: routing_rulesets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.routing_rulesets_id_seq OWNED BY public.routing_rulesets.id;
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -917,6 +993,13 @@ ALTER TABLE ONLY public.queues ALTER COLUMN id SET DEFAULT nextval('public.queue
 
 
 --
+-- Name: routing_rulesets id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets ALTER COLUMN id SET DEFAULT nextval('public.routing_rulesets_id_seq'::regclass);
+
+
+--
 -- Name: team_memberships id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1070,6 +1153,14 @@ ALTER TABLE ONLY public.queue_versions
 
 ALTER TABLE ONLY public.queues
     ADD CONSTRAINT queues_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: routing_rulesets routing_rulesets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT routing_rulesets_pkey PRIMARY KEY (id);
 
 
 --
@@ -1449,6 +1540,13 @@ CREATE INDEX index_queues_on_brand_id ON public.queues USING btree (brand_id);
 
 
 --
+-- Name: index_queues_on_id_and_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_queues_on_id_and_brand_id ON public.queues USING btree (id, brand_id);
+
+
+--
 -- Name: index_queues_on_team_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1467,6 +1565,20 @@ CREATE UNIQUE INDEX index_queues_one_default_per_brand ON public.queues USING bt
 --
 
 CREATE UNIQUE INDEX index_queues_one_escalation_per_brand ON public.queues USING btree (brand_id) WHERE (escalation AND active);
+
+
+--
+-- Name: index_routing_rulesets_on_brand_id_and_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_routing_rulesets_on_brand_id_and_version ON public.routing_rulesets USING btree (brand_id, version);
+
+
+--
+-- Name: index_routing_rulesets_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_routing_rulesets_on_created_by_id ON public.routing_rulesets USING btree (created_by_id);
 
 
 --
@@ -1621,6 +1733,20 @@ CREATE TRIGGER eval_runs_no_update BEFORE DELETE OR UPDATE ON public.eval_runs F
 --
 
 CREATE TRIGGER queue_versions_immutable BEFORE DELETE OR UPDATE ON public.queue_versions FOR EACH ROW EXECUTE FUNCTION public.queue_versions_immutable();
+
+
+--
+-- Name: routing_rulesets routing_rulesets_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER routing_rulesets_immutable BEFORE DELETE OR UPDATE ON public.routing_rulesets FOR EACH ROW EXECUTE FUNCTION public.routing_rulesets_immutable();
+
+
+--
+-- Name: routing_rulesets routing_rulesets_queues_of_brand; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER routing_rulesets_queues_of_brand BEFORE INSERT ON public.routing_rulesets FOR EACH ROW EXECUTE FUNCTION public.routing_rulesets_queues_of_brand();
 
 
 --
@@ -1911,6 +2037,22 @@ ALTER TABLE ONLY public.audit_events
 
 
 --
+-- Name: routing_rulesets fk_rails_b886984cf3; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT fk_rails_b886984cf3 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: routing_rulesets fk_rails_bc6d57a4e7; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT fk_rails_bc6d57a4e7 FOREIGN KEY (created_by_id) REFERENCES public.users(id);
+
+
+--
 -- Name: tickets fk_rails_c6ad1a6fa1; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1975,6 +2117,14 @@ ALTER TABLE ONLY public.queue_versions
 
 
 --
+-- Name: routing_rulesets fk_routing_rulesets_default_queue_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT fk_routing_rulesets_default_queue_same_brand FOREIGN KEY (default_queue_id, brand_id) REFERENCES public.queues(id, brand_id);
+
+
+--
 -- Name: tickets fk_tickets_customer_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1989,6 +2139,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261123010000'),
 ('20261123000000'),
 ('20261122030000'),
 ('20261122015000'),
