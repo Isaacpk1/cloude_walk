@@ -157,16 +157,10 @@ module Triage
     def audit_decided(decision, queue)
       audit("routing.decided", applied_ruleset: decision.ruleset_version,
                                moment: "criacao", queue_id: queue&.id, queue_version: decision.queue_version,
-                               queue_name: queue_name(queue, decision.queue_version), ruleset_version: decision.ruleset_version,
+                               queue_name: decision.queue_name, ruleset_version: decision.ruleset_version,
                                rule_index: decision.rule_index, rule_name: decision.rule_name,
                                group_index: decision.group_index, conditions: decision.conditions,
                                default: decision.default, skipped_rules: decision.skipped_rules)
-    end
-
-    def queue_name(queue, queue_version)
-      return if queue.nil?
-
-      (QueueVersion.find_by(queue_id: queue.id, version: queue_version) || queue.current_version)&.name
     end
 
     def skip(reason)

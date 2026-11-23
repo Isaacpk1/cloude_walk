@@ -4,7 +4,7 @@
 # no `defined?`), este arquivo não define nada.
 unless defined?(Routing::Evaluate)
   module Routing
-    Decision = Data.define(:queue, :queue_version, :ruleset_version, :rule_index, :rule_name, :group_index, :conditions,
+    Decision = Data.define(:queue, :queue_version, :queue_name, :ruleset_version, :rule_index, :rule_name, :group_index, :conditions,
                            :default, :skipped_rules) do
       def initialize(rule_index: nil, rule_name: nil, group_index: nil, conditions: [], skipped_rules: [], **) = super
     end
@@ -12,7 +12,8 @@ unless defined?(Routing::Evaluate)
     class Evaluate
       def self.call(brand:, attributes:) # rubocop:disable Lint/UnusedMethodArgument
         queue = HelpdeskQueue.where(brand_id: brand.id, active: true, is_default: true).order(:id).first
-        Decision.new(queue:, queue_version: queue&.current_version&.version, ruleset_version: nil, default: true)
+        version = queue&.current_version
+        Decision.new(queue:, queue_version: version&.version, queue_name: version&.name, ruleset_version: nil, default: true)
       end
     end
   end

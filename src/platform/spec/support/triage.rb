@@ -17,7 +17,8 @@ module TriageHelpers
   # Decisão de uma regra que casou (ou da padrão, com `default: true`), com todos os campos da interface.
   def routing_decision(queue, default: false, ruleset_version: 3, rule_index: 0, rule_name: "Regra de teste")
     conditions = default ? [] : [ { "field" => "category", "op" => "eq", "value" => "repasses" } ]
-    Routing::Decision.new(queue:, queue_version: queue&.current_version&.version, ruleset_version:,
+    Routing::Decision.new(queue:, queue_version: queue&.current_version&.version,
+                          queue_name: queue&.current_version&.name, ruleset_version:,
                           rule_index: (rule_index unless default), rule_name: (rule_name unless default),
                           group_index: (0 unless default), conditions:, default:, skipped_rules: [])
   end

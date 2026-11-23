@@ -57,6 +57,17 @@ RSpec.describe Triage::Run, "RF-12, RF-24, RN-28: triagem e atribuição do caso
       expect(decided.id).to be < assigned.id
     end
 
+    it "RN-15: grava as regras puladas e o nome da fila como o avaliador devolve" do
+      skipped = [ { "rule_index" => 0, "rule_name" => "Crédito alto", "queue_id" => 99, "reason" => "fila_inativa" } ]
+      decision = routing_decision(config[:default], default: true).with(skipped_rules: skipped, queue_name: "Geral v1")
+      received = ingest("meu repasse não caiu")
+
+      run_triage(received.ticket, evaluator: fixed_evaluator(decision))
+
+      expect(audits(received.ticket, "routing.decided").sole.data).to include("skipped_rules" => skipped,
+                                                                              "queue_name" => "Geral v1")
+    end
+
     it "RN-55: classifica todas as mensagens do cliente gravadas até a triagem (rajada antes do worker)" do
       ingest("oi")
       received = ingest("minha maquininha não liga")
