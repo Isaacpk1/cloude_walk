@@ -41,6 +41,9 @@
   </section>
 
   <aside class="conversation__side">
+    <% if c.grouping %><%= render "conversations/grouping", grouping: c.grouping %><% end %>
+    <% if c.turn_refusal %><%= render "conversations/turn_refusal", refusal: c.turn_refusal %><% end %>
+
     <section class="card">
       <h2>Responsável atual</h2>
       <p><strong><%= c.assignee.name %></strong> <span class="badge badge--assignee-<%= c.assignee.kind %>"><%= c.assignee.kind_label %></span></p>
@@ -71,17 +74,21 @@
       <% end %>
       <ol class="turns">
         <% c.turns.each do |turn| %>
-          <li class="turn turn--<%= turn.status %>">
+          <li class="turn turn--<%= turn.status %>" id="turn-<%= turn.number %>">
             <div class="turn__header">
               <strong>Turno <%= turn.number %></strong>
               <%= turn_status_badge(turn) %>
               <span><%= covered_seqs_text(turn) %></span>
             </div>
-            <ul class="turn__messages">
-              <% c.messages_in(turn).each do |message| %>
-                <li><a href="#seq-<%= message.seq %>">seq <%= message.seq %></a>: <%= message.body %></li>
-              <% end %>
-            </ul>
+            <% if turn.context %>
+              <%= render "conversations/turn_context", context: turn.context %>
+            <% else %>
+              <ul class="turn__messages">
+                <% c.messages_in(turn).each do |message| %>
+                  <li><a href="#seq-<%= message.seq %>">seq <%= message.seq %></a>: <%= message.body %></li>
+                <% end %>
+              </ul>
+            <% end %>
             <dl class="turn__facts">
               <dt>context_until_seq</dt><dd><%= turn.context_until_seq %><%= " (não cobre a última mensagem)" unless c.covers_latest_customer_seq?(turn) %></dd>
               <dt>ação</dt><dd><code><%= turn.action %></code></dd>
@@ -95,7 +102,7 @@
             <% elsif !c.source.synthetic? %>
               <p class="turn__response-state"><strong><%= turn.response_state_label %></strong></p>
             <% end %>
-          </li>
+          </li><!-- /turn -->
         <% end %>
       </ol>
     </section>

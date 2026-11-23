@@ -165,8 +165,8 @@ Todos são configuráveis. Os de origem *proposta* são escolhas deste projeto, 
 | Teto do ciclo com a IA | 60 s desde a primeira mensagem pendente, sem reiniciar. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) | RN-46 |
 | Retentativas | 5, com backoff 1, 2, 4, 8, 16 s e jitter | RNF-16 | RN-43 |
 | Retenção mínima da DLQ | 7 dias | RNF-16 (prazo de reentrega do WhatsApp) | RN-48 |
-| Contexto do atendente | Todas as mensagens pendentes + 20 de histórico + 3 atendimentos em 90 dias | Proposta | RN-49 |
-| Janela de agrupamento de mensagens | 1,5 s (chat e WhatsApp), 0 (e-mail), no máximo 4 s após a primeira mensagem pendente. Com janela 0, `dispatch_due_at` é o horário da gravação e o turno sai na volta seguinte do `scheduler` (até 250 ms) | Proposta | RN-55 |
+| Contexto do atendente | Todas as mensagens pendentes + 20 de histórico + 3 atendimentos em 90 dias. Limite de 16 000 caracteres nas pendentes e 32 000 no contexto inteiro (os resumos de atendimentos anteriores contam no limite) | Proposta | RN-49 |
+| Janela de agrupamento de mensagens | 1,5 s (chat e WhatsApp), 0 (e-mail), no máximo 4 s após a primeira mensagem pendente. Com janela 0, `dispatch_due_at` é o horário da gravação e o turno sai na volta seguinte do `scheduler` (até 250 ms). Canal sem janela definida na política da marca é erro na ingestão: nada é gravado | Proposta | RN-55 |
 | Aviso de progresso ao cliente | 15 s após a primeira mensagem pendente | Proposta | RN-57 |
 | Horário de contagem do SLA | 24/7 | Suporte 24 h da InfinitePay | RN-24 |
 

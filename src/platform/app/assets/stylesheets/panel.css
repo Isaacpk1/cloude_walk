@@ -84,6 +84,10 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .badge--pending, .badge--sending, .badge--eligible { background: #fff4d6; color: var(--warn); }
 .badge--cancelled, .badge--superseded, .badge--expired, .badge--failed { background: #fdecea; color: var(--danger); }
 .badge--rejected { background: #fdecea; color: var(--danger); }
+/* Bloco 06: conferência do contexto do turno. */
+.badge--context-verified { background: #e3f4ea; color: var(--ok); }
+.badge--context-diverged { background: #fdecea; color: var(--danger); }
+.badge--context-missing { background: var(--system-bg); color: var(--system); }
 .badge--state { background: var(--system-bg); color: var(--system); }
 .badge--assignee-bot { background: var(--bot-bg); color: var(--bot); }
 .badge--assignee-human { background: var(--analyst-bg); color: var(--analyst); }
@@ -129,6 +133,9 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .turn--superseded, .turn--expired { background: #fff8f7; }
 .turn__header { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .turn__messages { margin: .4rem 0; padding-left: 1.1rem; font-size: .9rem; }
+.turn-context h4 { margin: .5rem 0 .2rem; font-size: .85rem; }
+.grouping { border-left: 4px solid #c99a1e; }
+.turn-refusal { border-left: 4px solid #b3261e; }
 .turn__facts { display: grid; grid-template-columns: max-content 1fr; gap: .1rem .75rem; margin: 0; font-size: .85rem; }
 .turn__facts dt { color: var(--muted); }
 .turn__facts dd { margin: 0; }
@@ -152,6 +159,8 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   background: var(--accent); border-radius: 3px;
 }
 .bar__fill--intentional_wait { background: #c99a1e; }
+.bar__fill--turn_opened { background: var(--bot); }
+.bar__fill--turn_not_opened { background: var(--danger); }
 .bar__fill--agent_run { background: var(--bot); }
 .bar__fill--discarded { background: var(--danger); }
 .bar__fill--delivered, .bar__fill--applied { background: var(--ok); }

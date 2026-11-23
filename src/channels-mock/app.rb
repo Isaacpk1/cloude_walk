@@ -3,12 +3,15 @@ require "helpdesk_contracts"
 require_relative "lib/channels_mock/providers/chat"
 require_relative "lib/channels_mock/platform_client"
 require_relative "lib/channels_mock/inbox"
+require_relative "lib/channels_mock/chat_sender"
 require_relative "lib/channels_mock/clock"
 require_relative "lib/channels_mock/faults"
 require_relative "lib/channels_mock/chat_deliveries"
 require_relative "lib/channels_mock/status_callbacks"
 require_relative "lib/channels_mock/providers/chat_api"
 require_relative "lib/channels_mock/conversation_view"
+require_relative "lib/channels_mock/scenarios"
+require_relative "lib/channels_mock/scenario_view"
 
 module ChannelsMock
   # Provedores simulados e simulador do cliente (RF-04, ADR-012). Bloco 02: só o chat do app, na entrada.
@@ -54,7 +57,8 @@ module ChannelsMock
         items, orphans = ConversationView.build(entries:, records: ChatDeliveries.all)
         refresh = r.params["atualizar"].to_s[/\A[1-9]\d?\z/]
         view("index", locals: { items:, orphans:, accounts: Providers::Chat::ACCOUNTS, platform_url: PLATFORM_PUBLIC_URL,
-                                last: entries.first, fault: Faults.state, refresh: },
+                                last: entries.first, fault: Faults.state, refresh:,
+                                scenarios: Scenarios.catalog, runs: Scenarios.runs.map(&:snapshot) },
                       layout_opts: { locals: { refresh: } })
       end
 
@@ -64,6 +68,31 @@ module ChannelsMock
         r.redirect "/"
       rescue ArgumentError, TypeError => e
         r.halt(422, e.message)
+      end
+
+      # Cenários de rajada (bloco 06; RN-55, RN-56): pela tela (formulário) ou por script (JSON).
+      r.on "simulador", "cenarios" do
+        r.get Integer do |id|
+          run = Scenarios.find(id) || r.halt(404, { "Content-Type" => "application/json" }, JSON.generate("error" => "execucao_nao_encontrada"))
+          json_reply(200, run.snapshot)
+        end
+
+        r.post String do |name|
+          json = r.content_type.to_s.start_with?("application/json")
+          params = json ? JSON.parse(r.body.read.then { _1.empty? ? "{}" : _1 }) : r.params
+          run = Scenarios.start(name, account: params["account"].to_s, account_id: params["account_id"].to_s,
+                                      customer_ref: params["customer_ref"].to_s)
+          next r.redirect("/?atualizar=1#cenarios") unless json
+
+          json_reply(202, { "run_id" => run.id, "scenario" => run.scenario.name, "status" => run.snapshot["status"],
+                            "status_url" => "/simulador/cenarios/#{run.id}" })
+        rescue Scenarios::UnknownScenario => e
+          json_reply(404, { "error" => "cenario_desconhecido", "details" => e.message })
+        rescue HelpdeskContracts::InvalidPayload => e
+          json_reply(422, { "error" => "contrato_invalido", "details" => e.message })
+        rescue ArgumentError, JSON::ParserError => e
+          json_reply(422, { "error" => "pedido_invalido", "details" => e.message })
+        end
       end
 
       r.on "chat", "messages" do
@@ -102,17 +131,9 @@ module ChannelsMock
     end
 
     def send_chat(account, params)
-      payload = Providers::Chat.webhook(account_id: params["account_id"].to_s, customer_ref: params["customer_ref"].to_s,
-                                        text: params["text"].to_s, message_id: params["message_id"].to_s)
-      deliver(account, payload, tamper_signature: params["tamper_signature"] == "1")
-    rescue HelpdeskContracts::InvalidPayload => e
-      Inbox.add(channel: "chat", account:, payload: params.slice("account_id", "customer_ref", "text", "message_id"),
-                response: nil, error: e.message)
+      ChatSender.call(client: CLIENT, account:, fields: params, tamper_signature: params["tamper_signature"] == "1")
     end
 
-    def deliver(account, payload, tamper_signature: false)
-      response = CLIENT.deliver(channel: "chat", account:, payload:, tamper_signature:)
-      Inbox.add(channel: "chat", account:, payload:, response:, error: nil, tampered: tamper_signature)
-    end
+    def deliver(account, payload) = ChatSender.deliver(client: CLIENT, account:, payload:)
   end
 end

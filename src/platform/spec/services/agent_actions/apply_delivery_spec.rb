@@ -81,7 +81,8 @@ RSpec.describe AgentActions::Apply, "RF-31, RF-06: saída gravada na aplicação
       expect(audit).to have_attributes(brand_id: infinitepay.id, actor_type: "system",
                                        trace_id: AgentActionHelpers::TRACE_ID)
       expect(audit.data).to eq("delivery_id" => delivery.delivery_id, "message_id" => outbound.sole.id, "seq" => 2,
-                               "kind" => "reply", "turn" => 1, "context_until_seq" => 1)
+                               "kind" => "reply", "turn" => 1, "context_until_seq" => 1,
+                               "context_version" => 2)
       applied = AuditEvent.where(ticket_id: ticket.id, event_type: "agent_action.applied").sole
       expect(audit.id).to be > applied.id
     end
@@ -239,6 +240,58 @@ RSpec.describe AgentActions::Apply, "RF-31, RF-06: saída gravada na aplicação
       expect(apply(agent_action_for(turn2, reply: { "text" => "O de hoje cai amanhã." })).status).to eq(:applied)
       expect(outbound.order(:seq).pluck(:seq)).to eq([ 2, 4 ])
       expect(Delivery.where(ticket_id: ticket.id).order(:seq).pluck(:seq, :kind)).to eq([ [ 2, "reply" ], [ 4, "reply" ] ])
+    end
+  end
+
+  describe "RN-55, RF-33: versão do contexto na saída (07, seção 3.4)" do
+    def version = ticket.reload.context_version
+
+    it "a saída visível gravada sobe context_version em 1, na transação do applied" do
+      expect(version).to eq(1)
+
+      apply(agent_action_for(turn))
+
+      expect(version).to eq(2)
+    end
+
+    it "resolve com texto sobe; resolve sem texto e escalate (sem saída) não sobem" do
+      apply(resolve_action(turn))
+      expect(version).to eq(1)
+
+      other = opened_turn("outra conversa", identity: "acc_infinitepay_versao_esc")
+      apply(escalate_action(other))
+      expect(other.ticket.reload.context_version).to eq(1)
+
+      third = opened_turn("terceira", identity: "acc_infinitepay_versao_res")
+      apply(resolve_action(third, text: "Resolvido."))
+      expect(third.ticket.reload.context_version).to eq(2)
+    end
+
+    it "RN-56: rejeição, segunda ação final e duplicata não sobem (repetição)" do
+      action = agent_action_for(turn)
+      expect(apply(agent_action_for(turn, assignment_version: 9)).reason).to eq("atribuicao_mudou")
+      expect(version).to eq(1)
+
+      apply(action)
+      apply(action)
+      apply(agent_action_for(turn, reply: { "text" => "Outra resposta" }))
+
+      expect(version).to eq(2)
+    end
+
+    it "RN-44: ação inválida (DLQ) e de outra marca não sobem (marca errada)" do
+      apply(agent_action_for(turn, reply: { "text" => " " }))
+      apply(agent_action_for(turn, brand: "jim"))
+
+      expect(version).to eq(1)
+    end
+
+    it "RN-56: turno superado não sobe; só a mensagem nova do cliente sobe" do
+      expect(turn.context_until_seq).to eq(1)
+      ingest("é o de ontem, R$ 1.200")
+      expect(apply(agent_action_for(turn)).reason).to eq("turno_superado")
+
+      expect(version).to eq(2)
     end
   end
 end
