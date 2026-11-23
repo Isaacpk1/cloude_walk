@@ -837,6 +837,10 @@ CREATE TABLE public.tickets (
     evaluation boolean DEFAULT false NOT NULL,
     progress_due_at timestamp(6) without time zone,
     ai_turns_count integer DEFAULT 0 NOT NULL,
+    sla_started_at timestamp(6) without time zone,
+    sla_due_at timestamp(6) without time zone,
+    sla_alerted_at timestamp(6) without time zone,
+    sla_breached boolean DEFAULT false NOT NULL,
     CONSTRAINT tickets_ai_turns_count_check CHECK ((ai_turns_count >= 0)),
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
@@ -844,6 +848,8 @@ CREATE TABLE public.tickets (
     CONSTRAINT tickets_first_pending_pair_check CHECK (((first_pending_seq IS NULL) = (first_pending_at IS NULL))),
     CONSTRAINT tickets_first_pending_seq_check CHECK (((first_pending_seq IS NULL) OR (first_pending_seq >= 1))),
     CONSTRAINT tickets_progress_requires_cycle_check CHECK (((progress_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
+    CONSTRAINT tickets_sla_alert_requires_start_check CHECK (((sla_alerted_at IS NULL) OR (sla_started_at IS NOT NULL))),
+    CONSTRAINT tickets_sla_due_after_start_check CHECK (((sla_due_at IS NULL) OR ((sla_started_at IS NOT NULL) AND (sla_due_at >= sla_started_at)))),
     CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text])))
 );
 
@@ -882,6 +888,8 @@ CREATE TABLE public.users (
     active_count integer DEFAULT 0 NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    status_changed_at timestamp(6) without time zone,
+    last_assigned_at timestamp(6) without time zone,
     CONSTRAINT users_capacity_check CHECK (((active_count >= 0) AND (active_count <= capacity))),
     CONSTRAINT users_kind_check CHECK (((kind)::text = ANY (ARRAY[('human'::character varying)::text, ('bot'::character varying)::text]))),
     CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('supervisor'::character varying)::text, ('analyst'::character varying)::text, ('agent'::character varying)::text]))),
@@ -1687,6 +1695,27 @@ CREATE INDEX index_tickets_on_queue_id ON public.tickets USING btree (queue_id);
 
 
 --
+-- Name: index_tickets_analyst_cases; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_analyst_cases ON public.tickets USING btree (brand_id, assignee_id) WHERE (((state)::text = ANY ((ARRAY['com_analista'::character varying, 'aguardando_cliente'::character varying])::text[])) AND (assignee_id IS NOT NULL));
+
+
+--
+-- Name: index_tickets_human_queue_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_human_queue_order ON public.tickets USING btree (brand_id, queue_id, priority, sla_due_at, id) WHERE ((state)::text = 'aguardando_humano'::text);
+
+
+--
+-- Name: index_users_distribution; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_users_distribution ON public.users USING btree (status, active_count, last_assigned_at) WHERE (((kind)::text = 'human'::text) AND ((role)::text = 'analyst'::text));
+
+
+--
 -- Name: index_tickets_one_open_per_customer_channel; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2139,6 +2168,7 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261124010000'),
 ('20261123020000'),
 ('20261123010000'),
 ('20261123000000'),

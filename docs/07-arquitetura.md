@@ -272,6 +272,22 @@ Tempos ideais do exemplo com o mock em 2 s. O envio e a entrega observados tamb�
 
 **Custos.** A janela é espera **intencional** e é medida separada do overhead da plataforma (RNF-03). A latência percebida pelo cliente (RNF-05) inclui a janela, os turnos superados e a entrega no canal. Turnos superados gastam o agente: com um LLM real isso custa dinheiro, então a taxa de turnos superados vira métrica do painel.
 
+### 3.5 Distribuição para analistas e SLA da fila
+
+Proposta do bloco 13 (RN-29 a RN-32, RF-19, RF-25, RF-27, RF-45). Só o Postgres decide; nenhuma chamada externa entra em transação.
+
+**Distribuição (RN-30).** O `scheduler` chama `Distribution::Run` a cada volta. Para cada marca, ele percorre os casos em `aguardando_humano` na ordem da RN-29 e tenta atribuir cada um com `Distribution::Assign`, sob o lock do atendimento. Candidatos: usuários `kind = human`, `role = analyst`, `status = online`, da equipe da fila do caso (mesma marca) e com `active_count < capacity`. Escolha: menor `active_count`; em empate, o `last_assigned_at` mais antigo (nulo primeiro). A vaga é reservada por **atualização condicional** (`UPDATE users SET active_count = active_count + 1 WHERE id = ? AND status = 'online' AND active_count < capacity`), e a restrição `users_capacity_check` é a última barreira: dois casos nunca ocupam a mesma última vaga. Quem perde a corrida tenta o próximo candidato. Com a vaga, o caso vai a `com_analista` com `assignee_id` e `assignment_version + 1` (invalida resposta tardia da IA, seção 3.4), e grava `ticket.assigned` (`to: analista`, `reason: distribuicao_automatica`). Sem candidato, o caso espera, sob responsabilidade da fila (RN-27). Ordem dos locks: atendimento, depois usuário. O analista **assumir manualmente** (RF-26) e responder entram no bloco 14.
+
+**Disponibilidade (RF-27).** `Availability::Set` muda `users.status` (`online`, `pausa`, `offline`) e grava `status_changed_at`. Pausa e offline não recebem casos novos. Casos já atribuídos continuam com o analista, e só a RN-31 os devolve.
+
+**Devolução por analista offline (RN-31).** O prazo é do Postgres (ADR-016): o `scheduler` encontra analistas com `status = offline` e `status_changed_at + 10 min` vencido que tenham casos em `com_analista` ou `aguardando_cliente` e registra, sob o lock do atendimento, uma ação no outbox com chave única `analyst.offline:<ticket>:<assignment_version>`. O worker revalida sob o lock (mesmo responsável e mesma atribuição, ainda offline pelo prazo) e, na mesma transação em que conclui o item: o caso volta a `aguardando_humano`, `assignee_id` fica nulo, `assignment_version + 1`, a vaga é liberada (`active_count - 1`, nunca abaixo de 0) e grava `ticket.returned_to_queue`. Se o analista voltou antes, a revalidação descarta a ação e o caso continua com ele. O SLA já consumido é preservado: `sla_started_at` e `sla_due_at` não mudam (RN-23, RN-31, RN-32).
+
+**SLA de assunção após escalação (RN-21, RN-22, RN-29).** Quando o caso entra em `aguardando_humano` pela primeira vez (handoff ou triagem), `Sla::Start` grava `sla_started_at = agora` e `sla_due_at = sla_started_at + assunção` da política da fila para a prioridade (`queue_versions.sla_policy`, formato abaixo; sem política na fila vale o padrão do 06). O relógio **não reinicia** em devolução, transferência ou nova escalação. Se a prioridade subir (RN-14, RN-25), `sla_due_at` é recalculado a partir de `sla_started_at` com o prazo da prioridade nova, nunca para depois do que já valia. O SLA conta 24/7 (RN-24); o horário próprio da fila fica para o bloco 12. `sla_policy` por prioridade: `{ "critica": { "first_response_s": 60, "assume_s": 300, "resolve_s": 14400 }, ... }`.
+
+**Alertas (RN-25, RN-26).** Aos 80% de `sla_started_at → sla_due_at`, o `scheduler` registra a ação `sla.alert:<ticket>`; o worker sobe a prioridade um nível (RN-14, auditoria `ticket.priority_raised`, `reason: sla_80`) e grava `sla_alerted_at`. No vencimento, a ação `sla.breach:<ticket>` marca `sla_breached = true`, de forma permanente, e grava `sla.breached`; o aviso ao supervisor aparece no painel. Em `com_analista` o prazo de assunção está cumprido e as duas ações são descartadas.
+
+**Ordem da fila (RN-29, RF-19, RF-45).** `prioridade` (crítica, alta, média, baixa), depois `sla_due_at` (menor primeiro, nulo por último), depois a entrada mais antiga na fila, depois o id. O índice parcial `index_tickets_human_queue_order` cobre a leitura (RNF-08).
+
 ## 4. Modelo de dados
 
 ```mermaid
