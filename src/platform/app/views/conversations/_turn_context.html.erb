@@ -1,0 +1,20 @@
+<%# Bloco 06, RN-49, RN-55: o contexto que a IA recebeu no turno e a sua conferência (ConversationView::TurnContext). %>
+<div class="turn-context">
+  <h4>Mensagens que entraram no turno</h4>
+  <ol class="turn__messages">
+    <% context.pending_messages.each do |entry| %>
+      <li><a href="#seq-<%= entry.seq %>">seq <%= entry.seq %></a>: <%= entry.text %></li>
+    <% end %>
+  </ol>
+  <h4>Histórico enviado <span class="muted">(<%= context.history.size %>)</span></h4>
+  <ol class="turn__messages turn__messages--history">
+    <% context.history.each do |entry| %>
+      <li class="muted">seq <%= entry.seq %> · <%= entry.author %>: <%= entry.text %></li>
+    <% end %>
+  </ol>
+  <dl class="turn__facts">
+    <dt>context_version</dt><dd><%= context.context_version.nil? ? "—" : context.context_version %></dd>
+    <dt>contexto</dt><dd><span class="badge badge--context-<%= context.check %>"><%= context.check_label %></span>
+      <% if context.short_digest %><code class="muted" title="<%= context.recorded_digest %>"><%= context.short_digest %></code><% end %></dd>
+  </dl>
+</div>

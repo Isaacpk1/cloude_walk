@@ -54,7 +54,7 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | RN-11 | Todo atendimento recebe **uma categoria** de uma lista configurável por marca. Lista inicial: transações e pagamentos, repasses, Pix, crédito, conta digital, maquininha, cadastro, outros. | "Minha maquininha não liga" → maquininha. | RF-10, RF-12 |
 | RN-12 | A prioridade tem **quatro níveis**, definidos pelo impacto no negócio do lojista: **crítica** (impedido de vender ou receber), **alta** (dinheiro pendente ou divergente), **média** (dúvida financeira), **baixa** (cadastro ou informação geral). | Maquininha parada → crítica. Repasse não recebido → alta. Dúvida sobre taxa → média. Troca de e-mail → baixa. | RF-10, RF-12 |
-| RN-13 | Quando a triagem não consegue classificar, o atendimento recebe categoria **"outros"**, prioridade **média** e vai para a fila padrão da marca. | Mensagem "oi" sem contexto → fila Triagem da marca. | RF-12, RF-15 |
+| RN-13 | Quando a triagem não consegue classificar, o atendimento recebe categoria **"outros"**, prioridade **média** e vai para a fila padrão da marca. | Mensagem "oi" sem contexto → fila padrão do conjunto de regras da marca (Geral no seed). | RF-12, RF-15 |
 | RN-14 | A prioridade **só sobe automaticamente**, nunca desce. Analistas e supervisores podem alterá-la manualmente, em qualquer direção, com motivo registrado na auditoria. | O SLA chegou a 80%: a prioridade sobe de média para alta (RN-25). | RF-10, RF-54 |
 
 ## 4. Filas e roteamento
@@ -99,7 +99,7 @@ stateDiagram-v2
 | RN-35 | A IA só executa ações do **catálogo**: responder, consultar dados (simulado), escalar e encerrar. Ações que **movimentam dinheiro ou alteram cadastro** (estorno, limite, troca de conta bancária) são **exclusivas de humanos**. | Um pedido de estorno é escalado; a IA não o executa. | RF-32 |
 | RN-36 | A IA só **resolve** um atendimento com confirmação do cliente ("resolveu, obrigado") ou pela regra de inatividade (RN-07). | A IA explica a taxa e pergunta se ajudou; só resolve após o "sim". | RF-32, RF-48 |
 | RN-37 | Toda resposta e decisão da IA registra **modelo, versão e configuração** do agente. | Auditoria: "mock-deterministico v0.3, latência 2 s, regras v5". | RF-38, RF-54 |
-| RN-38 | A escalação encerra a atribuição à IA e cancela suas entregas que ainda não começaram. Se uma chamada ao canal já começou, a plataforma apura o resultado antes de enviar o aviso de transferência. Mensagens seguintes vão para o atendimento humano. Uma devolução explícita do analista abre uma nova atribuição à IA. | Se o cliente pedir humano com uma resposta do bot ainda na fila, recebe o aviso de transferência sem aquela resposta. | RF-39, RF-43, RF-44 |
+| RN-38 | A escalação encerra a atribuição à IA e cancela suas entregas que ainda não começaram, já no commit do pedido de handoff (não só quando o worker executa a escalação). Se uma chamada ao canal já começou, a plataforma apura o resultado antes de enviar o aviso de transferência. Exceção: no limite de trocas (RN-33, item 6), as respostas já aplicadas saem antes do aviso; um pedido explícito de humano gravado antes da escalação as cancela mesmo assim. Mensagens seguintes vão para o atendimento humano. Uma devolução explícita do analista abre uma nova atribuição à IA. | Se o cliente pedir humano com uma resposta do bot ainda na fila, recebe o aviso de transferência sem aquela resposta. | RF-39, RF-43, RF-44 |
 
 ## 8. Handoff
 
@@ -108,7 +108,7 @@ stateDiagram-v2
 | RN-39 | O resumo do handoff tem **cinco campos obrigatórios**: problema relatado, dados relevantes do cliente, ações já tomadas e seus resultados, motivo da escalação e o que está pendente. | "Repasse de R$ 1.200 do dia 28 não recebido · IA consultou: status pendente · cliente pediu humano · pendente: verificar retenção." | RF-40 |
 | RN-40 | O handoff **nunca é bloqueado** pela falta de resumo. Se o resumo não puder ser gerado, o caso escala mesmo assim, com o histórico completo e a marcação "sem resumo". | O agente caiu: o caso chega ao analista com o histórico, sem resumo. | RF-40, RF-41 |
 | RN-41 | O caso escalado mantém a prioridade. Escalações por **tempo limite ou falha de integração** sobem um nível, porque o cliente já esperou mais que o normal. | Um caso médio escalado por timeout chega como alto. | RF-42, RF-36 |
-| RN-42 | O cliente recebe uma **mensagem padrão de transferência**, configurável por marca e idioma (pt-BR na InfinitePay, inglês na JIM). Ela precede as respostas seguintes do analista e respeita a conciliação de entregas da RN-38. | "Estou te transferindo para um especialista. Ele já recebeu o histórico da nossa conversa." | RF-43 |
+| RN-42 | O cliente recebe uma **mensagem padrão de transferência**, configurável por marca e idioma (pt-BR na InfinitePay, inglês na JIM). Ela precede as respostas seguintes do analista e respeita a conciliação de entregas da RN-38. Vale também quando a triagem manda o caso direto para a fila humana (RN-28, fila sem IA). | "Estou te transferindo para um especialista. Ele já recebeu o histórico da nossa conversa." | RF-43 |
 
 ## 9. Falhas de integração
 
@@ -160,14 +160,20 @@ Todos são configuráveis. Os de origem *proposta* são escolhas deste projeto, 
 | Capacidade por analista | 5 atendimentos simultâneos | Proposta | RN-30 |
 | Capacidade do agente de IA (bot) | 1.000 atendimentos simultâneos, configurável pelo supervisor | Proposta | RN-30 |
 | Offline antes de devolver casos à fila | 10 min | Proposta | RN-31 |
-| Trocas da IA sem resolução antes de escalar | 10 mensagens | Proposta | RN-33 |
+| Trocas da IA sem resolução antes de escalar | 10 trocas. Uma troca é um turno com `reply` aplicado na atribuição atual da IA; `escalate`, `resolve` e ações rejeitadas não contam, e a `resolve` e o handoff zeram a contagem. Parâmetro em `Handoff::Policy#exchanges_limit` | Proposta, implementada no bloco 10 | RN-33 |
+| Aviso de transferência ao cliente | pt-BR: "Estou te transferindo para um especialista. Ele já recebeu o histórico da nossa conversa." Inglês: "I'm transferring you to a specialist. They already have the history of our conversation." Em `Handoff::Policy`, configurável por marca no bloco 12 | Proposta, implementada no bloco 10 | RN-42 |
+| Expressões de pedido de humano | Por idioma em `Handoff::Policy`, sem acento nem maiúsculas, trecho a trecho da mensagem. O pedido precisa citar um humano ("quero falar com um atendente", "me passa pra uma pessoa", "atendimento humano", "atendente", "talk to a human", "human please"); trecho negado não conta ("não quero falar com atendente"), e vontade de conversar não basta ("quero conversar sobre a taxa", "preciso de atendimento"). Configuráveis por marca no bloco 12 | Proposta, implementada no bloco 10 | RN-34 |
+| Prioridade sem triagem na escalação | Vale a média da RN-13; a escalação por tempo ou falha de integração a leva a alta. Com a triagem (bloco 11), vale a prioridade definida por ela | Proposta, implementada no bloco 10 | RN-41 |
+| Palavras da triagem | Por idioma em `Triage::Policy` (pt-BR e inglês), sem acento nem maiúsculas, palavra inteira. Vence a categoria com mais palavras no texto e, no empate, a mais específica. Prioridade = a mais alta entre a base da categoria (cadastro baixa, demais média) e as palavras de impacto da RN-12 ("não liga", "parada", "não consigo vender" → crítica; "não caiu", "não recebido" → alta). Configuráveis por marca no bloco 12 | Proposta, implementada no bloco 11 | RN-11, RN-12 |
+| Tags da triagem | `urgente`, `reclamacao`, `fraude`, por palavra-chave e idioma | Proposta, implementada no bloco 11 | RF-10 |
+| Categorias somente humanas | `cadastro` (RN-35: alterar cadastro é só de humano). Configurável por marca no bloco 12 | Proposta, implementada no bloco 11 | RN-28 |
 | Tempo limite do agente por turno | 20 s desde a abertura do turno, limitado ao teto do ciclo. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)); calibrar com o p95 do agente real | RN-46 |
 | Teto do ciclo com a IA | 60 s desde a primeira mensagem pendente, sem reiniciar. Configurável por marca (bloco 12) | Proposta ([ADR-020](08-decisoes-de-arquitetura.md#adr-020--prazo-da-ia-por-turno-com-teto-do-ciclo)) | RN-46 |
 | Retentativas | 5, com backoff 1, 2, 4, 8, 16 s e jitter | RNF-16 | RN-43 |
 | Retenção mínima da DLQ | 7 dias | RNF-16 (prazo de reentrega do WhatsApp) | RN-48 |
-| Contexto do atendente | Todas as mensagens pendentes + 20 de histórico + 3 atendimentos em 90 dias | Proposta | RN-49 |
-| Janela de agrupamento de mensagens | 1,5 s (chat e WhatsApp), 0 (e-mail), no máximo 4 s após a primeira mensagem pendente. Com janela 0, `dispatch_due_at` é o horário da gravação e o turno sai na volta seguinte do `scheduler` (até 250 ms) | Proposta | RN-55 |
-| Aviso de progresso ao cliente | 15 s após a primeira mensagem pendente | Proposta | RN-57 |
+| Contexto do atendente | Todas as mensagens pendentes + 20 de histórico + 3 atendimentos em 90 dias. Limite de 16 000 caracteres nas pendentes e 32 000 no contexto inteiro (os resumos de atendimentos anteriores contam no limite) | Proposta | RN-49 |
+| Janela de agrupamento de mensagens | 1,5 s (chat e WhatsApp), 0 (e-mail), no máximo 4 s após a primeira mensagem pendente. Com janela 0, `dispatch_due_at` é o horário da gravação e o turno sai na volta seguinte do `scheduler` (até 250 ms). Canal sem janela definida na política da marca é erro na ingestão: nada é gravado | Proposta | RN-55 |
+| Aviso de progresso ao cliente | 15 s após a primeira mensagem pendente, um por ciclo. Texto padrão por idioma em `Turns::Policy` (pt-BR: "Ainda estou verificando as informações para te responder. Só mais um instante."), configurável por marca no bloco 12 | Proposta, implementada no bloco 08 | RN-57 |
 | Horário de contagem do SLA | 24/7 | Suporte 24 h da InfinitePay | RN-24 |
 
 ### SLA padrão por prioridade (proposta)

@@ -10,8 +10,16 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
       customers: Customer.joins(:brand).order("brands.slug", :display_name).pluck("brands.slug", :display_name, :verified),
       identities: CustomerIdentity.order(:external_id).pluck(:channel, :external_id),
       queues: QueueVersion.order(:name).pluck(:name, :version, :ai_first),
-      accounts: ProviderAccount.order(:slug).pluck(:slug, :channel, :phone_number_id)
+      accounts: ProviderAccount.order(:slug).pluck(:slug, :channel, :phone_number_id),
+      rulesets: RoutingRuleset.joins(:brand).order("brands.slug", :version).map { ruleset_by_names(_1) }
     }
+  end
+
+  # O conjunto com os nomes das filas no lugar dos ids, para comparar entre execuções.
+  def ruleset_by_names(ruleset)
+    names = HelpdeskQueue.where(brand_id: ruleset.brand_id).to_h { [ _1.id, _1.current_version.name ] }
+    rules = ruleset.rules["rules"].map { _1.merge("queue_id" => names.fetch(_1["queue_id"])) }
+    [ ruleset.brand.slug, ruleset.version, names.fetch(ruleset.default_queue_id), rules ]
   end
 
   it "cria marca, fila, cliente sintético e usuário bot (bloco 01)" do
@@ -24,15 +32,75 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
     expect(HelpdeskQueue.all).to all(have_attributes(current_version: be_present))
   end
 
+  it "RF-42, bloco 10: cada marca tem uma fila humana de escalas (Escalas N1), sem IA primeiro, na mesma equipe" do
+    Seeds::Synthetic.call(seed: 42)
+
+    Brand.find_each do |brand|
+      queue = HelpdeskQueue.find_by!(brand:, escalation: true, active: true)
+      expect(queue).to have_attributes(is_default: false)
+      expect(queue.current_version).to have_attributes(name: "Escalas N1", ai_first: false)
+      expect(queue.team).to eq(HelpdeskQueue.find_by!(brand:, is_default: true).team)
+    end
+  end
+
+  describe "bloco 11: filas e conjunto de regras v1 de cada marca (RF-13 a RF-15, RN-16, ADR-003)" do
+    before { Seeds::Synthetic.call(seed: 42) }
+
+    def queue_named(brand, name)
+      HelpdeskQueue.joins(:current_version).find_by!(brand:, queue_versions: { name: })
+    end
+
+    it "cria Repasses e Maquininha com IA primeiro e Crédito sem IA, ativas, na equipe da marca" do
+      Brand.find_each do |brand|
+        expect(queue_named(brand, "Repasses").current_version).to have_attributes(version: 1, ai_first: true)
+        expect(queue_named(brand, "Maquininha").current_version).to have_attributes(version: 1, ai_first: true)
+        expect(queue_named(brand, "Crédito").current_version).to have_attributes(version: 1, ai_first: false)
+        expect(HelpdeskQueue.where(brand:)).to all(have_attributes(active: true))
+      end
+    end
+
+    it "publica a versão 1 do conjunto, com fila padrão Geral e regras que exercitam E e OU" do
+      Brand.find_each do |brand|
+        ruleset = RoutingRuleset.current_for(brand)
+        expect(ruleset).to have_attributes(version: 1, default_queue: queue_named(brand, "Geral"),
+                                           created_by: User.find_by!(email: "supervisora@helpdesk.test"))
+        expect(ruleset.rules["rules"].size).to be_between(3, 4)
+        expect(ruleset.rules["rules"].map { _1["any"].size }.max).to be >= 2
+        expect(ruleset.rules["rules"].flat_map { _1["any"] }.map { _1["all"].size }.max).to be >= 2
+      end
+    end
+
+    it "roteia pelas regras do seed e cai na Geral quando nada casa, nas duas marcas" do
+      Brand.find_each do |brand|
+        route = ->(**attrs) { Routing::Evaluate.call(brand:, attributes: { "channel" => "whatsapp", "tags" => [], **attrs.stringify_keys }) }
+
+        expect(route.call(category: "credito", priority: "critica").queue_name).to eq("Crédito")
+        expect(route.call(category: "credito", priority: "baixa").queue_name).to eq("Geral")
+        expect(route.call(category: "maquininha", priority: "media").queue_name).to eq("Maquininha")
+        expect(route.call(category: "pix", priority: "media", tags: %w[urgente]).queue_name).to eq("Maquininha")
+        expect(route.call(category: "repasses", priority: "media").queue_name).to eq("Repasses")
+        expect(route.call(category: "outros", priority: "media")).to have_attributes(queue_name: "Geral", default: true)
+      end
+    end
+  end
+
   it "ADR-019: cria uma conta de provedor por marca e canal, com o segredo local do simulador" do
     Seeds::Synthetic.call(seed: 42)
 
-    expect(ProviderAccount.order(:slug).pluck(:slug)).to eq(%w[
+    expect(ProviderAccount.where(evaluation: false).order(:slug).pluck(:slug)).to eq(%w[
       infinitepay-chat-mock infinitepay-email-mock infinitepay-whatsapp-mock jim-chat-mock jim-email-mock jim-whatsapp-mock
     ])
     expect(ProviderAccount.find_by!(slug: "jim-chat-mock")).to have_attributes(brand: Brand.find_by!(slug: "jim"),
                                                                               secret: "dev-secret-jim-chat-mock")
     expect(ProviderAccount.where(channel: "whatsapp").pluck(:phone_number_id)).to all(be_present)
+  end
+
+  it "ADR-023, item 5: cria a conta de chat de eval de cada marca, inativa e marcada como eval" do
+    Seeds::Synthetic.call(seed: 42)
+
+    evals = ProviderAccount.where(evaluation: true).order(:slug)
+    expect(evals.pluck(:slug, :channel, :active)).to eq([ [ "infinitepay-chat-eval", "chat", false ], [ "jim-chat-eval", "chat", false ] ])
+    expect(evals.map { _1.brand.slug }).to eq(%w[infinitepay jim])
   end
 
   it "a mesma semente produz os mesmos dados" do
@@ -48,12 +116,12 @@ RSpec.describe "RF-61: seed sintético reprodutível" do
   it "rodar duas vezes não duplica nada (repetição)" do
     Seeds::Synthetic.call(seed: 42)
     counts = [ Brand.count, Team.count, User.count, Customer.count, CustomerIdentity.count, QueueVersion.count,
-               ProviderAccount.count ]
+               ProviderAccount.count, HelpdeskQueue.count, RoutingRuleset.count ]
 
     Seeds::Synthetic.call(seed: 42)
 
     expect([ Brand.count, Team.count, User.count, Customer.count, CustomerIdentity.count, QueueVersion.count,
-             ProviderAccount.count ]).to eq(counts)
+             ProviderAccount.count, HelpdeskQueue.count, RoutingRuleset.count ]).to eq(counts)
   end
 
   it "sementes diferentes produzem clientes diferentes" do

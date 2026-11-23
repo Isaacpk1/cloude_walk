@@ -84,6 +84,10 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .badge--pending, .badge--sending, .badge--eligible { background: #fff4d6; color: var(--warn); }
 .badge--cancelled, .badge--superseded, .badge--expired, .badge--failed { background: #fdecea; color: var(--danger); }
 .badge--rejected { background: #fdecea; color: var(--danger); }
+/* Bloco 06: conferência do contexto do turno. */
+.badge--context-verified { background: #e3f4ea; color: var(--ok); }
+.badge--context-diverged { background: #fdecea; color: var(--danger); }
+.badge--context-missing { background: var(--system-bg); color: var(--system); }
 .badge--state { background: var(--system-bg); color: var(--system); }
 .badge--assignee-bot { background: var(--bot-bg); color: var(--bot); }
 .badge--assignee-human { background: var(--analyst-bg); color: var(--analyst); }
@@ -129,6 +133,9 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .turn--superseded, .turn--expired { background: #fff8f7; }
 .turn__header { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .turn__messages { margin: .4rem 0; padding-left: 1.1rem; font-size: .9rem; }
+.turn-context h4 { margin: .5rem 0 .2rem; font-size: .85rem; }
+.grouping { border-left: 4px solid #c99a1e; }
+.turn-refusal { border-left: 4px solid #b3261e; }
 .turn__facts { display: grid; grid-template-columns: max-content 1fr; gap: .1rem .75rem; margin: 0; font-size: .85rem; }
 .turn__facts dt { color: var(--muted); }
 .turn__facts dd { margin: 0; }
@@ -152,6 +159,8 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
   background: var(--accent); border-radius: 3px;
 }
 .bar__fill--intentional_wait { background: #c99a1e; }
+.bar__fill--turn_opened { background: var(--bot); }
+.bar__fill--turn_not_opened { background: var(--danger); }
 .bar__fill--agent_run { background: var(--bot); }
 .bar__fill--discarded { background: var(--danger); }
 .bar__fill--delivered, .bar__fill--applied { background: var(--ok); }
@@ -187,3 +196,75 @@ code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monosp
 .turn-stages h4 { margin: .25rem 0; }
 .turn-stages__list { margin: 0; padding-left: 1.2rem; }
 .turn-stages__total { margin: .35rem 0 0; }
+
+/* Bloco 07: turno superado e links entre mensagens e turnos (RN-56) */
+.message__turns { display: inline-flex; gap: .3rem; align-items: center; font-size: .8rem; color: var(--muted); }
+a.message__turn { text-decoration: none; }
+.turn__superseded { margin: .35rem 0; color: var(--danger); font-size: .9rem; }
+.timeline__row--turn_superseded td { background: #fff8f7; }
+
+/* Bloco 07: aba de evals (ADR-023) */
+.eval-scenarios { display: grid; gap: 1rem; }
+.eval-history { margin: .25rem 0 0; padding-left: 1.1rem; display: grid; gap: .2rem; }
+.badge--eval-passed { background: #e3f4ea; color: var(--ok); }
+.badge--eval-failed, .badge--eval-error { background: #fdecea; color: var(--danger); }
+.badge--eval-never { background: var(--system-bg); color: var(--system); }
+.eval-facts { margin-bottom: 1.25rem; }
+.eval-checks tr.check--failed td { background: #fdecea; font-weight: 600; }
+.eval-data { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+.eval-data pre, .eval-error { white-space: pre-wrap; word-break: break-word; font-size: .8rem; margin: 0; }
+
+/* Bloco 08: prazos do atendimento, aviso de progresso e handoff */
+.deadlines { border-left: 4px solid #1e6fc9; }
+.deadline { margin-left: 0.25rem; }
+.deadline--overdue { color: #b3261e; }
+.handoff { border-left: 4px solid #6b3fa0; }
+.handoff--discarded { border-left-color: #888; }
+.badge--progress-cancelled, .badge--progress-discarded { background: #eee; color: #555; }
+
+/* Bloco 09: tentativas e desfecho, falhas por etapa, conciliação e DLQ */
+.outbox-attempts { margin-top: .35rem; font-size: .8rem; }
+.outbox-attempts__summary { margin: 0; }
+.outbox-attempts__list { margin: .2rem 0 0; padding-left: 1.1rem; display: grid; gap: .15rem; }
+.outbox-attempts__error { color: var(--danger); }
+.badge--outbox-published, .badge--outbox-delivered, .badge--outbox-completed { background: #e3f4ea; color: var(--ok); }
+.badge--outbox-failed, .badge--outbox-reconciliation { background: #fdecea; color: var(--danger); }
+.badge--outbox-discarded, .badge--outbox-cancelled, .badge--outbox-closed_obsolete, .badge--outbox-recovered,
+.badge--outbox-retrying, .badge--outbox-in_progress, .badge--outbox-pending { background: var(--system-bg); color: var(--system); }
+.stage-failures { margin-bottom: 1rem; }
+.stage-failures__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .5rem 1rem; margin: 0; }
+.stage-failures__list dt { font-weight: 600; }
+.stage-failures__list dd { margin: 0; font-size: .85rem; }
+.stage-failures__list ul { margin: 0; padding-left: 1rem; }
+.stage-failures__stage--failed dt { color: var(--danger); }
+.reconciliation { border-color: var(--danger); background: #fff8f7; }
+.timeline__row--delivery_reconciliation td, .timeline__row--dead_letter td { background: #fff8f7; }
+.dead-letter pre { white-space: pre-wrap; word-break: break-word; font-size: .8rem; background: var(--system-bg); padding: .5rem; }
+.dead-letters__row--escalated td:last-child { color: var(--danger); font-weight: 600; }
+
+/* Bloco 10: fila humana, resumo do handoff e aviso de transferência (RF-42, RF-45, RN-39 a RN-42). */
+.badge--priority { background: #eef1f5; color: #344054; }
+.badge--priority-critica { background: #fde8e6; color: #9b1c12; }
+.badge--priority-alta { background: #fff1db; color: #8a4b00; }
+.badge--priority-baixa { background: #f2f4f7; color: #667085; }
+.human-queue__raised { font-size: .8rem; color: #8a4b00; font-weight: 600; margin-top: .25rem; }
+.human-queue__position { font-weight: 700; }
+.human-queue__summary { font-size: .85rem; font-weight: 600; }
+.human-queue__summary--available { color: #116329; }
+.human-queue__summary--pending { color: #8a4b00; }
+.human-queue__summary--missing { color: #9b1c12; }
+.handoff-summary__fields { display: grid; grid-template-columns: max-content 1fr; gap: .25rem .75rem; margin: 0; }
+.handoff-summary__fields dt { font-weight: 600; }
+.transfer-notice__status { font-weight: 600; }
+.message--system { border-left: 3px solid #8a4b00; }
+
+/* Bloco 11: triagem e roteamento na conversa, na lista e na fila. */
+.triage { border-left: 4px solid #1f6f8b; }
+.triage h3 { margin: .75rem 0 .25rem; font-size: .9rem; }
+.triage__explanation { margin: 0; font-weight: 600; }
+.triage__unclassified, .triage__skipped { margin: .5rem 0 0; color: #8a4b00; }
+.triage__skipped-rules { margin: .25rem 0; padding-left: 1.1rem; font-size: .85rem; color: var(--muted); }
+.triage__tag { font-size: .8rem; }
+.conversation-list__triage { display: flex; gap: .35rem; align-items: center; font-size: .85rem; }
+.bar__fill--triage_classified, .bar__fill--routing_decided, .bar__fill--triage_assigned { background: #1f6f8b; }
+.bar__fill--triage_skipped { background: #888; }

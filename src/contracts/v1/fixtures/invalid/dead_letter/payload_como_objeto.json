@@ -1,0 +1,19 @@
+{
+  "key": "tkt_48213",
+  "headers": {
+    "dlq_source": "broker",
+    "dlq_reason": "contrato",
+    "dlq_violations": [
+      {
+        "pointer": "/turn",
+        "type": "required",
+        "message": "campo obrigatório ausente: turn em /"
+      }
+    ],
+    "event_id": "0b7e4c1e-6a0e-4f0e-9a51-7c1d2f1e9a10",
+    "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+  },
+  "payload": {
+    "a": 1
+  }
+}

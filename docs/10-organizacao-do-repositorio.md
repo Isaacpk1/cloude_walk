@@ -65,7 +65,7 @@ src/platform/
 │   │   ├── deadlines/          # consulta de prazos e laço do scheduler (ADR-016)
 │   │   └── rate_limit/         # limite por marca e canal (RNF-33)
 │   ├── jobs/                   # Sidekiq: recebem só o ID e chamam um service
-│   ├── consumers/              # Karafka: helpdesk.agent.outbound.v1
+│   ├── consumers/              # Karafka: helpdesk.agent.outbound.v1 e helpdesk.agent.dlq.v1 (grupo platform-dlq)
 │   ├── controllers/            # ingestão dos canais, painel, configuração
 │   │   └── webhooks/           # entrada dos provedores
 │   ├── read_models/            # formato de leitura das telas (ConversationView, TimelineView) e suas fontes
@@ -242,11 +242,17 @@ Um resultado sem a semente e a configuração não conta como evidência (RNF-30
 | Dados iniciais (marca, fila, cliente, bot) | `src/platform/db/seeds/synthetic.rb`, chamado por `db/seeds.rb`. Rode com `make seed`; a semente vem de `SEED` no `.env` |
 | Versão do Ruby | No `.ruby-version` de cada serviço em `src/` (hoje Ruby 4.0.10, ADR-001). O CI e o `Makefile` leem esse arquivo; o `ARG RUBY_VERSION` do `Dockerfile` e o `TargetRubyVersion` do `.rubocop.yml` dos serviços repetem o mesmo valor. Ao trocar de versão, mude todos juntos e confira se o `ruby/setup-ruby` já publica a versão para o `ubuntu-latest` |
 | Conexão com o Redis | `src/platform/config/initializers/redis.rb`, com a URL em `REDIS_URL` |
+| Política do handoff (aviso de transferência, expressões de pedido de humano, prioridade da RN-41, limite de trocas) | `src/platform/app/services/handoff/policy.rb` (`Handoff::Policy`) |
+| Triagem do caso novo (categoria, prioridade, tags, atribuição) | `src/platform/app/services/triage/` (`Policy`, `Classify`, `Run`, `OnMessage`), chamada pelo `OutboxJob` no `message.received` e pelo `Turns::Open` |
+| Regras de roteamento | Conjunto versionado em `routing_rulesets` (`RoutingRuleset.publish!`), avaliado por `src/platform/app/services/routing/` (`Evaluate`, `Decision`, `RulesetCache`); esquema `routing_rules` em `src/contracts/v1` |
+| Fila humana no painel | `/fila` (`HumanQueueController`, `HumanQueue`), com Turbo Streams por marca |
+| Perfil do agente mock escolhido no simulador (`rapido`, `lento`, `mudo`) | Redis de controle em `AGENT_CONTROL_REDIS_URL` (no Compose, `redis://redis:6379/1`), chaves `helpdesk:agent-mock:profile:brand:<marca>` e `helpdesk:agent-mock:profile:global`. O `channels-mock` grava (`POST /simulador/agente/perfil`); o `agent-mock` lê a cada evento (`lib/agent_mock/profile_source.rb`), com `AGENT_PROFILE` como padrão se o Redis faltar |
 | Filas e pesos do Sidekiq | `src/platform/config/sidekiq.yml` |
-| ActionCable no Redis | `src/platform/config/cable.yml` |
+| ActionCable | `src/platform/config/cable.yml`: em desenvolvimento, adaptador `postgresql` (LISTEN/NOTIFY), porque o aviso da fila humana sai do worker e do consumer, não do web, e o `async` não cruza processos. Em produção, `redis` (07), que pede a gem `redis` no Gemfile. O broadcast sai do `after_create_commit` de `AuditEvent` e só pede a recarga da página |
 | Rate limit por marca e canal | `src/platform/app/services/rate_limit/` |
 | Criar um tópico Kafka ou mudar as partições | `infra/kafka/topics.yml` |
 | Consumir um tópico na plataforma | `src/platform/karafka.rb` e `app/consumers/` |
+| Mensagens da DLQ | Contrato `dead_letter` em `src/contracts/v1` (vista `{ key, headers, payload }`, sem envelope novo no Kafka). A plataforma consome no grupo `platform-dlq` (`app/consumers/dead_letters_consumer.rb`) e grava `dead_letters` por `DeadLetters::Record`; o painel fica em `/dlq` |
 | Publicar no Kafka | O broker (`src/broker/lib/broker/publisher.rb`) publica em `inbound` e o agente mock em `outbound`. A plataforma envia ao broker por webhook e só publica direto na DLQ, pelo próprio Karafka |
 | Prazos (janela, aviso, timeout, SLA) | Colunas na migration de `tickets`; consulta e laço em `app/services/deadlines/` (`Deadlines::DispatchDue`, `Deadlines::Loop`); processo em `bin/scheduler` (intervalo e lote em `SCHEDULER_INTERVAL` e `SCHEDULER_BATCH`) |
 | Esquema de um evento | `src/contracts/v1/schemas/` |
@@ -275,7 +281,7 @@ Migration existe para mudar o esquema de dados que precisam sobreviver. Só o Po
 | Componente | Guarda | Tem migration? | Onde fica a configuração |
 | --- | --- | --- | --- |
 | Postgres | Atendimentos, mensagens, configuração, outbox, auditoria | **Sim:** `src/platform/db/migrate/` | `config/database.yml`, `infra/postgres/init.sql` |
-| Redis | Filas do Sidekiq, pub/sub do ActionCable, contadores do rate limit | **Não.** São estruturas criadas sob demanda e descartáveis. Se o Redis perder tudo, o outbox republica (ADR-005, ADR-016) | `config/initializers/redis.rb`, `config/sidekiq.yml`, `config/cable.yml` |
+| Redis | Filas do Sidekiq, pub/sub do ActionCable, contadores do rate limit, perfil do agente mock escolhido no simulador (banco 1) | **Não.** São estruturas criadas sob demanda e descartáveis. Se o Redis perder tudo, o outbox republica (ADR-005, ADR-016) | `config/initializers/redis.rb`, `config/sidekiq.yml`, `config/cable.yml` |
 | Kafka | Eventos em trânsito entre plataforma, broker e agente | **Não como migration**, mas os tópicos são declarados em `infra/kafka/topics.yml` e criados pelo `kafka-init` | `infra/kafka/`, `karafka.rb` de cada serviço |
 
 Consequência prática: nenhum dado que precise ser consultado depois pode existir só no Redis ou só no Kafka. Se precisar, ele ganha uma tabela e uma migration.

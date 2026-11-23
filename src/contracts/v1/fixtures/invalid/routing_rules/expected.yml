@@ -1,0 +1,17 @@
+# Motivo esperado de cada fixture inválida: pointer e type da violação (spec/fixtures_spec.rb).
+any_vazio.json: { pointer: "/rules/0/any", type: minItems }
+campo_desconhecido.json: { pointer: "/rules/0/any/0/all/0/field", type: enum }
+condicao_sem_value.json: { pointer: "/rules/0/any/0/all/0/value", type: required }
+contains_fora_de_tags.json: { pointer: "/rules/0/any/0/all/0/op", type: not }
+eq_com_lista.json: { pointer: "/rules/0/any/0/all/0/value", type: string }
+grupo_sem_condicao.json: { pointer: "/rules/0/any/0/all", type: minItems }
+in_com_lista_vazia.json: { pointer: "/rules/0/any/0/all/0/value", type: minItems }
+in_com_texto.json: { pointer: "/rules/0/any/0/all/0/value", type: array }
+operador_desconhecido.json: { pointer: "/rules/0/any/0/all/0/op", type: enum }
+queue_id_texto.json: { pointer: "/rules/0/queue_id", type: integer }
+regra_sem_nome.json: { pointer: "/rules/0/name", type: pattern }
+regra_sem_queue_id.json: { pointer: "/rules/0/queue_id", type: required }
+schema_version_2.json: { pointer: "/schema_version", type: const }
+sem_rules.json: { pointer: "/rules", type: required }
+sem_schema_version.json: { pointer: "/schema_version", type: required }
+tags_com_eq.json: { pointer: "/rules/0/any/0/all/0/op", type: const }

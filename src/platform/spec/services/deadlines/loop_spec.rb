@@ -23,6 +23,27 @@ RSpec.describe Deadlines::Loop, "ADR-016: laço do scheduler (bin/scheduler)" do
     end
   end
 
+  it "RN-57: a mesma volta registra os avisos de progresso vencidos, com o mesmo horário e lote" do
+    freeze_time do
+      allow(Deadlines::DispatchDue).to receive(:call).and_return([])
+      allow(Deadlines::ProgressDue).to receive(:call).and_return([])
+
+      build(batch: 7).run
+
+      expect(Deadlines::ProgressDue).to have_received(:call).with(now: Time.current, limit: 7)
+    end
+  end
+
+  it "RN-57: os avisos contam no lote: lote cheio só com avisos volta sem dormir" do
+    allow(Deadlines::DispatchDue).to receive(:call).and_return([])
+    allow(Deadlines::ProgressDue).to receive(:call).and_return(%w[a b], [])
+
+    build(batch: 2).run
+
+    expect(Deadlines::ProgressDue).to have_received(:call).twice
+    expect(sleeps).to eq([ 0.25 ])
+  end
+
   it "lote cheio: volta sem dormir, para escoar o atraso" do
     allow(Deadlines::DispatchDue).to receive(:call).and_return(%w[a b], [])
 

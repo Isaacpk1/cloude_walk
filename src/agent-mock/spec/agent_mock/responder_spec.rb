@@ -307,6 +307,7 @@ RSpec.describe AgentMock::Responder do
       expect(message[:headers]).to include("dlq_reason" => "contrato", "dlq_source" => "agent-mock",
                                            "event_id" => event["event_id"], "traceparent" => traceparent)
       expect(JSON.parse(message[:headers]["dlq_violations"]).map { _1["pointer"] }).to include("/turn")
+      expect(dead_letter_errors(message)).to eq([])
     end
 
     it "JSON malformado também vai para a DLQ, com a chave do event_id do cabeçalho" do
@@ -316,6 +317,14 @@ RSpec.describe AgentMock::Responder do
 
       expect(result.status).to eq(:dead_lettered)
       expect(sole(dlq(producer))).to include(key: event_id, payload: "{nao e json")
+      expect(dead_letter_errors(sole(dlq(producer)))).to eq([])
+    end
+
+    it "RN-45: sem event_id nem traceparent nos cabeçalhos, a mensagem segue o contrato dead_letter" do
+      responder.call(payload: "{nao e json", headers: {})
+
+      expect(sole(dlq(producer))[:headers]).to include("event_id" => "", "traceparent" => "")
+      expect(dead_letter_errors(sole(dlq(producer)))).to eq([])
     end
   end
 
@@ -334,6 +343,7 @@ RSpec.describe AgentMock::Responder do
       expect(message[:headers]).to include("dlq_reason" => "acao_invalida", "dlq_source" => "agent-mock")
       expect(JSON.parse(message[:payload])).to include("in_reply_to" => event["event_id"], "action" => "reply")
       expect(log_lines(io).map { _1["event"] }).to include("agent.invalid_action")
+      expect(dead_letter_errors(message)).to eq([])
     end
   end
 
@@ -436,6 +446,91 @@ RSpec.describe AgentMock::Responder do
 
       expect(responder.call(payload: JSON.generate(event), headers: headers_for(event)).status).to eq(:failed)
       expect(producer.client.messages).to be_empty
+    end
+  end
+
+  describe "RF-38: perfil escolhido pelo simulador" do
+    let(:redis) { KafkaHelpers::FakeControlRedis.new }
+    let(:profiles) do
+      AgentMock::Profiles.new(config: AgentMock::Config.load(env: {}), source: AgentMock::ProfileSource.new(redis:),
+                              log: AgentMock::Log.new(io))
+    end
+    let(:live) { described_class.new(producer:, profiles:, log: AgentMock::Log.new(io), clock:) }
+    let(:key) { AgentMock::ProfileSource.key("brand:infinitepay") }
+
+    def send_event(responder = live, texts: [ "Bom dia" ])
+      event = inbound(texts:)
+      responder.call(payload: JSON.generate(event), headers: headers_for(event))
+    end
+
+    it "usa o perfil gravado no evento seguinte, sem reiniciar o agente" do
+      expect(send_event.status).to eq(:published)
+
+      redis.set(key, "mudo")
+      expect(send_event.status).to eq(:muted)
+      expect(log_lines(io).last).to include("event" => "agent.muted", "profile" => "mudo", "profile_source" => "brand")
+
+      redis.del(key)
+      expect(send_event.status).to eq(:published)
+      expect(outbound(producer).size).to eq(2)
+    end
+
+    it "mudo não publica nada, nem na DLQ" do
+      redis.set(AgentMock::ProfileSource.key("global"), "mudo")
+
+      3.times { send_event }
+
+      expect(producer.client.messages).to be_empty
+    end
+
+    it "lento responde depois do aviso de progresso (15 s) e antes do prazo do turno (20 s), com semente" do
+      redis.set(key, "lento")
+      latencies = Array.new(30) do
+        clock = KafkaHelpers::FakeClock.new
+        responder = described_class.new(producer:, profiles:, log: AgentMock::Log.new(StringIO.new), clock:)
+        send_event(responder).action.dig("timing", "agent_ms")
+      end
+
+      expect(latencies).to all(be > 15_000).and(all(be < 20_000))
+      expect(latencies.uniq.size).to be > 1
+    end
+
+    it "lento é determinístico: o mesmo evento dá a mesma latência (RNF-30)" do
+      redis.set(key, "lento")
+      event = inbound(texts: [ "Bom dia" ])
+      timings = Array.new(2) do
+        described_class.new(producer:, profiles:, log: AgentMock::Log.new(StringIO.new), clock: KafkaHelpers::FakeClock.new)
+                       .call(payload: JSON.generate(event), headers: headers_for(event)).action["timing"]
+      end
+
+      expect(timings.uniq.size).to eq(1)
+    end
+
+    it "o config_hash da ação reflete o perfil efetivo (RN-37)" do
+      rapido = send_event.action.dig("agent", "config_hash")
+      redis.set(key, "lento")
+      lento = send_event.action
+
+      expect(lento.dig("agent", "config_hash")).not_to eq(rapido)
+      expect(lento.dig("agent", "config_hash")).to eq(AgentMock::Config.load(env: { "AGENT_PROFILE" => "lento" }).config_hash)
+      expect(log_lines(io).last).to include("event" => "agent.published", "profile" => "lento",
+                                            "config_hash" => lento.dig("agent", "config_hash"))
+    end
+
+    it "marca errada: o perfil de uma marca não vale para a outra" do
+      redis.set(AgentMock::ProfileSource.key("brand:jim"), "mudo")
+
+      expect(send_event.status).to eq(:published)
+    end
+
+    it "Redis fora: responde no perfil padrão e loga, sem derrubar o consumo" do
+      redis.down!
+
+      result = send_event
+
+      expect(result.status).to eq(:published)
+      expect(result.action.dig("agent", "config_hash")).to eq(AgentMock::Config.load(env: {}).config_hash)
+      expect(log_lines(io).map { _1["event"] }).to eq(%w[agent.profile_source_failed agent.published])
     end
   end
 

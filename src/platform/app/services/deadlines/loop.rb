@@ -1,4 +1,5 @@
-# Laço do scheduler (bin/scheduler; ADR-016; 07, seção 2). Consulta os prazos vencidos a cada 250 ms.
+# Laço do scheduler (bin/scheduler; ADR-016; 07, seção 2). Consulta os prazos vencidos a cada 250 ms: abertura
+# de turno (DispatchDue) e aviso de progresso (ProgressDue, RN-57).
 # Lote cheio: volta sem dormir, para escoar o atraso. Erro numa volta (Postgres ou Redis fora) é
 # registrado e o laço segue. stop! só levanta uma flag, então pode ser chamado de um trap de sinal: o
 # laço termina a volta em curso e sai (desligamento gracioso).
@@ -10,6 +11,13 @@ module Deadlines
   class Loop
     DEFAULT_INTERVAL = 0.25
     DEFAULT_BATCH = 100
+    # Prazos consultados a cada volta, cada um no seu serviço (ADR-016). Uma linha por prazo, no fim da lista.
+    REGISTRATIONS = [
+      "Deadlines::DispatchDue",
+      "Deadlines::TurnTimeout",
+      "Deadlines::CycleTimeout",
+      "Deadlines::ProgressDue" # RN-57
+    ].freeze
 
     attr_reader :interval, :batch, :heartbeat
 
@@ -42,7 +50,10 @@ module Deadlines
 
     # Devolve quantos itens a volta emitiu (0 em caso de erro, para dormir antes de tentar de novo).
     def tick
-      emitted = Rails.application.executor.wrap { DispatchDue.call(now: Time.current, limit: batch).size }
+      emitted = Rails.application.executor.wrap do
+        now = Time.current
+        REGISTRATIONS.sum { _1.constantize.call(now:, limit: batch).size }
+      end
       beat
       emitted
     rescue StandardError => e

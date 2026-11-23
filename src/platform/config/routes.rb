@@ -20,4 +20,10 @@ Rails.application.routes.draw do
   root "conversations#index"
   resources :conversations, path: "conversas", only: %i[index show]
   resources :timelines, path: "linha-do-tempo", only: %i[index show]
+  # Bloco 07 (ADR-023): execuções gravadas em eval_runs.
+  resources :evals, only: %i[index show]
+  # Bloco 09 (RF-37): DLQ para o supervisor. Reprocessar fica para o bloco seguinte.
+  resources :dead_letters, path: "dlq", only: %i[index show]
+  # Bloco 10 (RF-42, RF-45, RN-29): casos em aguardando_humano. ?marca=<slug> restringe à marca.
+  get "fila" => "human_queue#index", as: :human_queue
 end

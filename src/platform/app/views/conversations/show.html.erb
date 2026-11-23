@@ -1,5 +1,10 @@
 <% c = @conversation %>
 <% content_for :title, "Conversa #{c.ticket_id}" %>
+<%# Bloco 10 (RNF-06): o AuditEvent pede a recarga quando o caso escala ou o resumo chega. %>
+<% unless c.source.synthetic? %>
+  <% content_for :head do %><%= turbo_refreshes_with method: :morph, scroll: :preserve %><% end %>
+  <%= turbo_stream_from(*c.stream) %>
+<% end %>
 
 <div class="page-header">
   <div>
@@ -27,8 +32,12 @@
           <p class="message__body"><%= message.body %></p>
           <div class="message__footer">
             <%= delivery_badge(message, c.source) %>
-            <% c.turns_covering(message.seq).each do |turn| %>
-              <span class="chip chip--<%= turn.status %>">Turno <%= turn.number %></span>
+            <% if (covering = c.turns_covering(message.seq)).any? %>
+              <span class="message__turns">entrou nos turnos
+                <% covering.each do |turn| %>
+                  <a class="message__turn chip chip--<%= turn.status %>" href="#turn-<%= turn.number %>">Turno <%= turn.number %></a>
+                <% end %>
+              </span>
             <% end %>
             <% if message.delivery_id %><code class="muted"><%= message.delivery_id %></code><% end %>
             <code class="muted" title="trace_id"><%= message.trace_id.first(8) %></code>
@@ -41,6 +50,15 @@
   </section>
 
   <aside class="conversation__side">
+    <% if c.triage || !c.source.synthetic? %><%= render "conversations/triage", triage: c.triage %><% end %>
+    <% if c.grouping %><%= render "conversations/grouping", grouping: c.grouping %><% end %>
+    <% if c.turn_refusal %><%= render "conversations/turn_refusal", refusal: c.turn_refusal %><% end %>
+    <% if c.handoff %><%= render "conversations/handoff", handoff: c.handoff %><% end %>
+    <% if c.handoff&.summary %><%= render "conversations/handoff_summary", summary: c.handoff.summary %><% end %>
+    <% if c.handoff&.transfer_notice %><%= render "conversations/transfer_notice", notice: c.handoff.transfer_notice %><% end %>
+    <% if c.deadlines %><%= render "conversations/deadlines", deadlines: c.deadlines %><% end %>
+    <% c.reconciliations.each do |reconciliation| %><%= render "conversations/reconciliation", reconciliation: %><% end %>
+
     <section class="card">
       <h2>Responsável atual</h2>
       <p><strong><%= c.assignee.name %></strong> <span class="badge badge--assignee-<%= c.assignee.kind %>"><%= c.assignee.kind_label %></span></p>
@@ -71,17 +89,26 @@
       <% end %>
       <ol class="turns">
         <% c.turns.each do |turn| %>
-          <li class="turn turn--<%= turn.status %>">
+          <li class="turn turn--<%= turn.status %>" id="turn-<%= turn.number %>">
             <div class="turn__header">
               <strong>Turno <%= turn.number %></strong>
               <%= turn_status_badge(turn) %>
               <span><%= covered_seqs_text(turn) %></span>
             </div>
-            <ul class="turn__messages">
-              <% c.messages_in(turn).each do |message| %>
-                <li><a href="#seq-<%= message.seq %>">seq <%= message.seq %></a>: <%= message.body %></li>
-              <% end %>
-            </ul>
+            <% if turn.superseded_by_seq %>
+              <p class="turn__superseded">
+                Turno superado pela mensagem <a href="#seq-<%= turn.superseded_by_seq %>">seq <%= turn.superseded_by_seq %></a><% if turn.superseded_at %> em <time datetime="<%= turn.superseded_at.iso8601(3) %>"><%= panel_time(turn.superseded_at) %></time><% end %> (RN-56)
+              </p>
+            <% end %>
+            <% if turn.context %>
+              <%= render "conversations/turn_context", context: turn.context %>
+            <% else %>
+              <ul class="turn__messages">
+                <% c.messages_in(turn).each do |message| %>
+                  <li><a href="#seq-<%= message.seq %>">seq <%= message.seq %></a>: <%= message.body %></li>
+                <% end %>
+              </ul>
+            <% end %>
             <dl class="turn__facts">
               <dt>context_until_seq</dt><dd><%= turn.context_until_seq %><%= " (não cobre a última mensagem)" unless c.covers_latest_customer_seq?(turn) %></dd>
               <dt>ação</dt><dd><code><%= turn.action %></code></dd>
@@ -95,7 +122,7 @@
             <% elsif !c.source.synthetic? %>
               <p class="turn__response-state"><strong><%= turn.response_state_label %></strong></p>
             <% end %>
-          </li>
+          </li><!-- /turn -->
         <% end %>
       </ol>
     </section>

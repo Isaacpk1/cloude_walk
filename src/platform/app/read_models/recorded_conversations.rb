@@ -1,10 +1,14 @@
 # Fonte dos registros reais para as telas de conversa e linha do tempo (ROADMAP 02).
 # Lê tickets, messages e outbox_events (07, seção 4) e devolve os mesmos ConversationView e
 # TimelineView dos exemplos, marcados como DataSource::SYSTEM. A espera da janela de agrupamento
-# (TurnWindowEvents) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03).
+# (TurnWindowEvents), a abertura e a recusa do turno com o contexto (TurnContextEvents, bloco 06) e a publicação no broker (PublicationEvents) vêm de ai_turns e da auditoria (bloco 03).
 # A ação recebida do agente (AgentActionEvents) vem de ai_turns.response e da auditoria (bloco 04).
 # As mensagens de saída e a entrega ao canal (DeliveryEvents) vêm de deliveries e da auditoria
-# delivery.* (bloco 05). Escalações entram aqui quando suas tabelas existirem (bloco 10).
+# delivery.* (bloco 05). Bloco 08: os prazos do ciclo e o aviso de progresso (DeadlinesPhase), o pedido de handoff e
+# a fila humana (HandoffPhase, que também monta o histórico de escalação) e, na linha do tempo, os registros do
+# scheduler, o turno expirado, o handoff e o aviso (DeadlineEvents). Atribuição a analista: bloco 10.
+# delivery.* (bloco 05). As tentativas e o desfecho de cada item do outbox (OutboxAttempts) e o evento da DLQ
+# (DeadLetterEvents) vêm do bloco 09. Escalações entram aqui quando suas tabelas existirem (bloco 10).
 class RecordedConversations
   LIMIT = 50
   WAITING = ConversationView::Participant.new(name: "Aguardando triagem", kind: "queue")
@@ -23,9 +27,16 @@ class RecordedConversations
     outbox = OutboxEvent.where(ticket:, event_type: "message.received").index_by { _1.payload["message_id"] }
     events = ticket.messages.select { _1.direction == "inbound" }.flat_map { message_events(ticket, _1, outbox[_1.id]) }
     events += TurnWindowEvents.new(ticket).events
+    events += TurnContextEvents.new(ticket).events
     events += PublicationEvents.new(ticket).events
+    events += TurnSupersededEvents.new(ticket).events
     events += AgentActionEvents.new(ticket).events
     events += DeliveryEvents.new(ticket).events
+    events += DeadlineEvents.new(ticket).events
+    events += HandoffEvents.new(ticket).events
+    events += TriageEvents.new(ticket).events
+    events += OutboxAttempts.new(ticket).events
+    events += DeadLetterEvents.new(ticket).events
     TimelineView.new(conversation_id: ticket.id.to_s, ticket_id: ticket.id.to_s, events:, source: DataSource::SYSTEM)
   end
 
@@ -41,14 +52,36 @@ class RecordedConversations
 
   def conversation(ticket)
     deliveries = DeliveryEvents.new(ticket)
+    handoff = HandoffPhase.new(ticket, deliveries:)
+    triage = TriagePhase.new(ticket).view
     ConversationView.new(
       id: ticket.id.to_s, ticket_id: ticket.id.to_s, brand_slug: ticket.brand.slug, brand_name: ticket.brand.name,
       customer_name: ticket.customer.display_name, channel: ticket.channel, state: ticket.state,
-      title: ticket.messages.first&.body.to_s.truncate(60), assignee: WAITING,
+      title: ticket.messages.first&.body.to_s.truncate(60), assignee: assignee(ticket, handoff, triage),
       assignment_version: ticket.assignment_version, latest_customer_seq: ticket.latest_customer_seq,
       messages: ticket.messages.map { message(ticket, _1, deliveries) }, turns: turns(ticket, deliveries),
-      escalations: [], source: DataSource::SYSTEM
+      escalations: handoff.escalations, source: DataSource::SYSTEM, deadlines: DeadlinesPhase.new(ticket).view,
+      handoff: handoff.view, reconciliations: deliveries.reconciliations, triage:, **phase(ticket)
     )
+  end
+
+  # Depois do handoff (bloco 08) o caso espera na fila humana da marca; a atribuição a analista é do bloco 13.
+  # Bloco 11: sem handoff, a atribuição da triagem diz se o caso está com a IA (RF-24) ou na fila humana (RN-28).
+  def assignee(ticket, handoff, triage)
+    queue = handoff.current_queue_name
+    return ConversationView::Participant.new(name: queue, kind: "queue") if queue
+
+    assignment = triage&.assignment
+    return WAITING unless assignment
+    return ConversationView::Participant.new(name: ticket.assignee&.name || "Agente de IA", kind: "bot") if assignment.to == "ia"
+
+    ConversationView::Participant.new(name: assignment.queue_name || "fila sem nome", kind: "queue")
+  end
+
+  # A recusa terminal do turno da última mensagem substitui a fase de agrupamento (RN-49, RN-46).
+  def phase(ticket)
+    refusal = TurnRefusalPhase.new(ticket).view
+    { turn_refusal: refusal, grouping: refusal ? nil : GroupingPhase.new(ticket).view }
   end
 
   def message(ticket, record, deliveries)
@@ -69,13 +102,35 @@ class RecordedConversations
 
   def turns(ticket, deliveries)
     actions = AgentActionEvents.new(ticket)
+    superseded = TurnSupersededEvents.new(ticket)
     first_received = ticket.messages.to_h { [ _1.seq, _1.received_at ] }
-    records = ticket.ai_turns.order(:turn).to_a
+    records = ticket.ai_turns.where(brand_id: ticket.brand_id).order(:turn).to_a
     publications = OutboxEvent.where(brand_id: ticket.brand_id, id: records.map(&:event_id)).index_by(&:id)
+    expirations = expiration_reasons(ticket)
     records.map do |record|
       agent_action = actions.for_turn(record)
-      note = record.status == "eligible" ? publication_note(publications[record.event_id]) : TURN_NOTES[record.status]
-      turn(record, agent_action, stages(record, agent_action, actions, deliveries, first_received), note)
+      note = case record.status
+      when "eligible" then publication_note(publications[record.event_id])
+      when "expired" then expired_note(expirations[record.turn], publications[record.event_id])
+      else TURN_NOTES[record.status]
+      end
+      turn(record, agent_action, stages(record, agent_action, actions, deliveries, first_received), note,
+           superseded.for_turn(record.turn))
+    end
+  end
+
+  # Bloco 08: o turno expira no pedido de handoff ou no timeout. A nota mostra a causa gravada em ai_turn.expired.
+  def expiration_reasons(ticket)
+    AuditEvent.where(brand_id: ticket.brand_id, ticket_id: ticket.id, event_type: "ai_turn.expired")
+              .order(:id).to_h { [ _1.data["turn"], _1.data["reason"] ] }
+  end
+
+  def expired_note(reason, publication)
+    case reason
+    when "publicacao_falhou"
+      "Turno expirado: a publicação para o agente falhou sem nova tentativa (#{publication&.last_error || 'recusa'}) e o caso vai para um humano (RN-46)."
+    when "falha_de_integracao" then "Turno expirado: a integração com o agente falhou e o caso vai para um humano (RN-45)."
+    else TURN_NOTES.fetch("expired")
     end
   end
 
@@ -107,14 +162,16 @@ class RecordedConversations
 
   # Bloco 03: o turno gravado em ai_turns. As mensagens cobertas são as pendentes do contexto enviado.
   # Bloco 04: a ação recebida do agente (ai_turns.response) e o seu desfecho.
-  def turn(record, agent_action, stages, note)
+  # Bloco 07: no turno superado, a mensagem que o superou e quando (RN-56).
+  def turn(record, agent_action, stages, note, superseded)
     ConversationView::Turn.new(
       number: record.turn, status: record.status,
       covered_seqs: Array(record.context["pending_messages"]).map { _1["seq"] },
       context_until_seq: record.context_until_seq, assignment_version: record.assignment_version,
       event_id: record.event_id, action: record.response&.dig("action") || "—",
       note:, tool_calls: Array(record.response&.dig("tool_calls")).map { _1["tool"] },
-      agent_action:, stages:
+      agent_action:, stages:, context: ConversationView::TurnContext.from(record),
+      superseded_by_seq: superseded&.by_seq, superseded_at: superseded&.at
     )
   end
 

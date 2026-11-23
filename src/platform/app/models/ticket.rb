@@ -20,6 +20,22 @@ class Ticket < ApplicationRecord
 
   scope :open, -> { where.not(state: "fechado") }
 
+  # Versão do contexto do próximo turno (07, seção 3.4, "Estado no atendimento"; RN-55, RF-33). Sobe 1 em toda
+  # gravação que muda o que a IA veria: mensagem do cliente e saída visível ao cliente. Quem chama já travou a
+  # linha, na mesma transação da gravação. A soma é feita no banco (`context_version + 1`), não no valor em
+  # memória, então uma cópia desatualizada não perde incremento. Escopo por marca (invariante 6).
+  def bump_context_version!
+    sql = self.class.sanitize_sql_array([ <<~SQL.squish, id, brand_id ])
+      UPDATE tickets SET context_version = context_version + 1 WHERE id = ? AND brand_id = ? RETURNING context_version
+    SQL
+    value = self.class.connection.select_value(sql, "Ticket Bump Context Version")
+    raise ActiveRecord::RecordNotFound.new("atendimento #{id} não encontrado na marca #{brand_id}", self.class.name) unless value
+
+    self[:context_version] = value
+    clear_attribute_changes([ :context_version ])
+    value
+  end
+
   # O caso está com a IA: fora dos estados humanos e sem responsável ou com o bot. A atribuição ao bot
   # entra com a triagem (bloco 11): até lá, todo caso que não está com um humano vai para a IA.
   def with_ai?

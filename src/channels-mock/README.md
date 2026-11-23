@@ -14,6 +14,7 @@ O histórico de envios fica só em memória (docs/10, seção 3.4). O botão **R
 | `CHAT_PROVIDER_FAULT` | `none` | Falha inicial do provedor do chat: `none`, `lose_ack`, `unavailable` ou `reject` |
 | `CHAT_PROVIDER_FAULT_TIMES` | `1` | Quantas entregas a falha inicial afeta |
 | `CHAT_STATUS_MAX_ATTEMPTS` | `5` | Tentativas do callback de status antes de desistir |
+| `AGENT_CONTROL_REDIS_URL` | vazio | Redis de controle do perfil do agente mock (no Compose, `redis://redis:6379/1`, o mesmo do agent-mock). Vazio desliga o seletor |
 
 ## Provedor do chat: envio das respostas (bloco 05)
 
@@ -56,7 +57,76 @@ curl -X POST localhost:4000/provider/chat/faults -H 'Content-Type: application/j
 
 **Na tela.** Cada envio do cliente mostra as respostas recebidas pelo provedor, ligadas pelo `reply_to` (= `message_id` do webhook do cliente), com `message_id`, `Idempotency-Key`, `seq`, repetições, `trace_id`, último status e o **tempo total**: chegada da resposta ao provedor − `sent_at` do envio (RNF-05, latência percebida). O `trace_id` do envio e o link para a linha do tempo levam até a mensagem original no painel. `/?atualizar=3` recarrega a página a cada 3 s.
 
+**Pedir humano (bloco 10).** O botão **Pedir humano** do formulário envia, pela mesma rota do chat, a frase de pedido explícito no idioma da marca da conta (`Quero falar com um atendente` na InfinitePay, `I want to talk to a human agent` na JIM; RN-34). O aviso de transferência (RN-42) aparece destacado como mensagem do **Sistema** sob o pedido. O envio do provedor (`chat_send`) não diz quem escreveu: o simulador reconhece o aviso pelo texto padrão da plataforma (`lib/channels_mock/human_request.rb`).
+
 O armazenamento é só em memória: reiniciar o mock apaga as mensagens aceitas e a última `seq` de cada conversa. Por isso uma retentativa depois de reiniciar é aceita como nova.
+
+## Cenários de rajada (bloco 06)
+
+Mandam várias mensagens do mesmo cliente em horários planejados, para ver o agrupamento em turnos e a corrida da resposta superada ([06, RN-55 e RN-56](../../docs/06-regras-de-negocio.md); [07, seção 3.4](../../docs/07-arquitetura.md)). Cada passo sai pelo mesmo caminho do formulário: webhook do chat no contrato `chat_webhook`, assinado com o segredo da conta, com a mesma conta do provedor, o mesmo `account_id` e o mesmo `customer_ref`, e um `message_id` novo. As mensagens aparecem na **Conversa** como as do formulário, com o tempo total das respostas.
+
+| Cenário | Passos (s desde a largada) | O que demonstra |
+| --- | --- | --- |
+| `corrida-3s` — Corrida dos 3 s (RN-56) | "meu repasse não caiu" em 0; "é o de ontem, R$ 1.200" em 3 | O turno 1 sai aos 1,5 s com a mensagem 1. O desfecho depende da latência do agente. **Agente lento** (`AGENT_PROFILE=lento` ou `AGENT_LATENCY_MS` ≥ 2000): a mensagem 2 é gravada aos 3 s, antes da resposta do turno 1, que é rejeitada com `turno_superado`; o turno 2 sai aos 4 s (teto desde a primeira pendente) com as mensagens 1 e 2. **Agente rápido** (`AGENT_PROFILE=rapido`, padrão do Compose): o turno 1 é respondido e entregue antes dos 3 s, e a mensagem dos 3 s abre um ciclo novo. Para ver a rejeição, escolha o perfil Lento na seção "Perfil do agente mock" (ou suba com `AGENT_PROFILE=lento`). Vai servir ao eval do bloco 07 |
+| `rajada-curta` — Rajada curta (RN-55) | 0; 0,5; 1,0 | Pausas menores que a janela de 1,5 s: as três entram num turno só, que sai ~1,5 s depois da última |
+| `rajada-longa` — Rajada longa (RN-55, teto) | 0; 0,9; 1,8; 2,7; 3,6; 4,5 (sem empate com o teto) | A janela nunca fecha; o turno 1 sai no teto de 4 s desde a primeira, com as mensagens até 3,6 s. A de 4,5 s é gravada depois do teto e supera o turno 1 (RN-56); o turno 2 sai na volta seguinte do scheduler com todas as pendentes. Com o agente rápido, a resposta do turno 1 pode ser aplicada antes dos 4,5 s, e a última mensagem abre um ciclo novo |
+
+Os passos ficam em `ChannelsMock::Scenarios::CATALOG` (`lib/channels_mock/scenarios.rb`). Cada execução roda numa thread própria e espera até o horário planejado (`largada + at`); os passos de uma execução saem em ordem, um depois do outro. A tela mostra, por passo, o horário planejado, o real (com o atraso em ms), o HTTP e o resultado da plataforma. Uma falha da plataforma num passo fica registrada e os passos seguintes continuam. Se a plataforma demorar a responder (até 5 s de timeout), o passo seguinte sai atrasado; o atraso aparece na coluna **Real**.
+
+**Na tela:** seção "Cenários de rajada", escolha a conta e o cliente e clique no cenário. A página passa a se atualizar a cada 1 s (`/?atualizar=1`; "Parar" no cartão da conversa).
+
+**Por script** (testes de ponta a ponta, eval do bloco 07):
+
+```bash
+curl -X POST localhost:4000/simulador/cenarios/corrida-3s -H 'Content-Type: application/json' \
+  -d '{"account":"infinitepay-chat-mock","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021"}'
+# 202 {"run_id":1,"scenario":"corrida-3s","status":"queued","status_url":"/simulador/cenarios/1"}
+
+curl localhost:4000/simulador/cenarios/1
+# 200 {"status":"finished","current_step":2,"total_steps":2,"steps":[{"step":1,"at":0.0,"planned_at":...,
+#      "sent_at":...,"http_status":202,"outcome":"Confirmada","message_id":...,"trace_id":...}, ...]}
+```
+
+| Resposta | Quando |
+| --- | --- |
+| `202` | Execução criada; os passos saem em segundo plano |
+| `404 { "error": "cenario_desconhecido" }` | Nome fora do catálogo |
+| `422 { "error": "contrato_invalido" \| "pedido_invalido" }` | Cliente fora do contrato `chat_webhook` ou conta do provedor fora da lista. Nenhum passo é enviado |
+
+O `message_id` e o `trace_id` de cada passo levam à mensagem e ao turno no painel. Os logs (`scenario.started`, `scenario.step_sent`, `scenario.finished`) são JSON e não trazem o texto nem o `account_id` e o `customer_ref` (RN-51). O histórico guarda as 20 execuções mais recentes, só em memória.
+
+## Perfil do agente mock (bloco 08)
+
+Escolhe o perfil do agent-mock **sem reiniciar o agente** (RF-38), para demonstrar o aviso de progresso e o timeout do turno ([06, RN-46 e RN-57](../../docs/06-regras-de-negocio.md)). O simulador grava o nome do perfil no Redis de controle; o agent-mock lê a cada evento novo ([README do agent-mock](../agent-mock/README.md#perfil-em-tempo-de-execução-bloco-08)). Nada passa pelo caminho do evento: se o simulador cair, o agente segue com o último perfil gravado.
+
+| Perfil | Latência | O que demonstra |
+| --- | --- | --- |
+| `rapido` — Rápido | 50–150 ms | Caminho feliz: a resposta chega antes de qualquer aviso |
+| `lento` — Lento | 16–18 s | Aviso de progresso aos 15 s (RN-57) e resposta antes do prazo de 20 s do turno (RN-46) |
+| `mudo` — Sem resposta | não responde | Aviso de progresso aos 15 s, timeout do turno aos 20 s e o caso na fila humana (RN-46, RN-33) |
+
+| Escopo | Chave no Redis | Vale para |
+| --- | --- | --- |
+| `global` | `helpdesk:agent-mock:profile:global` | Todas as marcas sem perfil próprio |
+| `infinitepay-chat-mock`, `jim-chat-mock` | `helpdesk:agent-mock:profile:brand:<marca>` | Os eventos da marca da conta (tem precedência sobre o global) |
+
+O escopo mais fino é a conta do provedor, que define a marca. Por cliente (`account_id`/`customer_ref`) não dá: o evento que o agente recebe traz o `cus_<id>` da plataforma, e o agente não consulta o Postgres (invariante 12). O perfil `padrao` apaga a escolha do escopo e volta a valer o `AGENT_PROFILE` do agente. A troca vale para o próximo evento que o agente consumir; um evento que já está na latência do perfil anterior termina nele.
+
+**Na tela:** seção "Perfil do agente mock", com o perfil ativo de cada escopo e a origem (marca, global ou `AGENT_PROFILE`). **Por script** (evals, testes de ponta a ponta):
+
+```bash
+curl -X POST localhost:4000/simulador/agente/perfil -H 'Content-Type: application/json' -d '{"scope":"global","profile":"mudo"}'
+# 200 {"available":true,"profiles":[...],"scopes":[{"scope":"global","brand":null,"profile":"mudo","effective":"mudo","source":"global"}, ...]}
+curl localhost:4000/simulador/agente/perfil   # estado atual
+```
+
+| Resposta | Quando |
+| --- | --- |
+| `200` | Gravado (repetir a mesma escolha é inofensivo); o corpo é o estado de todos os escopos |
+| `422 { "error": "perfil_desconhecido" \| "escopo_desconhecido" \| "pedido_invalido" }` | Perfil fora de `rapido`, `lento`, `mudo`, `padrao`; escopo fora da lista; JSON malformado. Nada é gravado |
+| `503 { "error": "controle_desligado" \| "controle_indisponivel" }` | Sem `AGENT_CONTROL_REDIS_URL`; Redis fora do ar (timeout de 200 ms). O resto do simulador segue funcionando |
+
+Os logs (`agent_profile.set`, `agent_profile.unavailable`) são JSON e trazem só escopo, marca e perfil (RN-51).
 
 ```bash
 bundle exec rackup -p 4000   # http://localhost:4000

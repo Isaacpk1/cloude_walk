@@ -13,6 +13,7 @@ class DeliveryEvents
     "delivery.retry_scheduled" => :delivery_retry_scheduled,
     "delivery.delivered" => :delivered,
     "delivery.failed" => :delivery_failed,
+    "delivery.cancelled" => :delivery_cancelled,
     "delivery.reconciliation_needed" => :delivery_reconciliation,
     "delivery.status_received" => :delivery_status
   }.freeze
@@ -26,6 +27,15 @@ class DeliveryEvents
     delivery = deliveries_by_message[message.id]
     delivery && status_view(delivery)
   end
+
+  # A entrega pelo delivery_id (o aviso de transferência do bloco 10). nil para entrega de outro atendimento.
+  def status_for(delivery_id)
+    delivery = deliveries_by_id[delivery_id]
+    delivery && status_view(delivery)
+  end
+
+  # A entrega kind handoff_notice mais nova do atendimento, para registros sem transfer_delivery_id.
+  def latest_handoff_notice_id = deliveries.reverse.find { _1.kind == "handoff_notice" }&.delivery_id
 
   # A auditoria delivery.requested da saída gravada pelo turno (a primeira, pela ordem do seq).
   def requested_for_turn(turn_number)
@@ -56,11 +66,28 @@ class DeliveryEvents
 
   def events = audits.filter_map { event_for(_1) }
 
+  # Entregas em conciliação (ROADMAP 09; 07, seções 3.2 e 6): ainda em `sending` depois do
+  # delivery.reconciliation_needed. Uma confirmação posterior (callback do provedor) tira do destaque.
+  def reconciliations
+    deliveries.filter_map do |delivery|
+      audit = audits_for(delivery.delivery_id).reverse.find { _1.event_type == "delivery.reconciliation_needed" }
+      next unless audit && delivery.status == "sending"
+
+      ConversationView::Reconciliation.new(
+        delivery_id: delivery.delivery_id, seq: delivery.seq, turn: requested[delivery.delivery_id]&.data&.dig("turn"),
+        attempts: delivery.attempts, last_error: delivery.last_error, since: audit.occurred_at, waiting_seqs: waiting_seqs(delivery)
+      )
+    end
+  end
+
   private
 
   def deliveries
     @deliveries ||= Delivery.where(brand_id: @ticket.brand_id, ticket_id: @ticket.id).order(:seq).to_a
   end
+
+  # Saídas abertas depois desta, que o envio segura enquanto ela não se encerrar (07, seção 3.2).
+  def waiting_seqs(delivery) = deliveries.select { _1.seq > delivery.seq && Delivery::OPEN.include?(_1.status) }.map(&:seq)
 
   def deliveries_by_message = @deliveries_by_message ||= deliveries.index_by(&:message_id)
   def deliveries_by_id = @deliveries_by_id ||= deliveries.index_by(&:delivery_id)
@@ -75,7 +102,7 @@ class DeliveryEvents
 
   def status_view(delivery)
     history = audits_for(delivery.delivery_id)
-    failed = history.reverse.find { _1.event_type == "delivery.failed" }
+    failed = history.reverse.find { %w[delivery.failed delivery.cancelled].include?(_1.event_type) }
     ConversationView::DeliveryStatus.new(
       delivery_id: delivery.delivery_id, seq: delivery.seq, kind: delivery.kind, status: delivery.status,
       attempts: delivery.attempts, provider_message_id: delivery.provider_message_id, delivered_at: delivery.delivered_at,
@@ -116,7 +143,7 @@ class DeliveryEvents
   def detail(kind, data, delivery)
     head = "Saída seq #{delivery.seq}, delivery_id #{delivery.delivery_id.first(8)}"
     case kind
-    when :delivery_requested then "#{head} (#{data['kind']}) gravada com a resposta aplicada do turno #{data['turn']}"
+    when :delivery_requested then requested_detail(head, data)
     when :delivery_sending then "#{head}: envio ao provedor, tentativa #{data['attempt']}"
     when :delivered
       replayed = data["replayed"] ? ", confirmação repetida pelo provedor (Idempotent-Replayed)" : ""
@@ -124,13 +151,32 @@ class DeliveryEvents
         "chamada de #{data['duration_ms']} ms#{replayed}"
     when :delivery_retry_scheduled then "#{head}: tentativa #{data['attempt']} falhou, nova tentativa agendada"
     when :delivery_failed then "#{head}: falha definitiva na tentativa #{data['attempt']}"
-    when :delivery_reconciliation then "#{head}: resultado incerto após #{data['attempts']} tentativas"
+    when :delivery_cancelled then "#{head}: cancelada antes do envio ao provedor"
+    when :delivery_reconciliation then reconciliation_detail(head, data, delivery)
     when :delivery_status
       "#{head}: provedor informou #{data['status']} (#{data['provider_message_id']}, às #{data['provider_timestamp']})"
     end
   end
 
-  def error(kind, data)
+  # Bloco 10: o aviso de transferência (RN-42) sai do handoff, sem turno.
+  def requested_detail(head, data)
+    return "#{head}: aviso de transferência (handoff_notice) gravado pelo handoff, sem turno (RN-42)" if data["kind"] == "handoff_notice"
+
+    "#{head} (#{data['kind']}) gravada com a resposta aplicada do turno #{data['turn']}"
+  end
+
+  def reconciliation_detail(head, data, delivery)
+    waiting = waiting_seqs(delivery)
+    "#{head}: resultado incerto após #{data['attempts']} tentativas" \
+      "#{delivery.last_error ? "; último erro #{delivery.last_error}" : ''}; saídas seguintes aguardam a conciliação" \
+      "#{waiting.any? ? " (seq #{waiting.join(', ')})" : ''}"
+  end
+
+  def error(kind, data) = self.class.error_for(kind, data)
+
+  # O erro de uma etapa da entrega, pelo tipo do evento (EVENT_KINDS). Num lugar só: a linha do tempo e o
+  # resumo das tentativas do item (OutboxAttempts) mostram o mesmo motivo.
+  def self.error_for(kind, data)
     case kind
     when :delivery_retry_scheduled
       delivery_error(origin: "provedor_transitorio", message: data["error"], attempt: data["attempt"], retry: true,
@@ -140,15 +186,20 @@ class DeliveryEvents
       origin = data["reason"] == "plataforma" ? "entrega_plataforma" : data["reason"]
       delivery_error(origin:, http_status: data["http_status"], attempt: data["attempt"],
                      message: data["platform_error"] || data["error"])
+    when :delivery_cancelled then delivery_error(origin: data["reason"])
     when :delivery_reconciliation
       delivery_error(origin: "conciliacao", attempt: data["attempts"], outcome: "conciliacao_pendente")
     end
   end
 
-  def delivery_error(origin:, http_status: nil, message: nil, attempt: nil, retry: false, next_attempt_at: nil, outcome: nil)
+  def self.delivery_error(origin:, http_status: nil, message: nil, attempt: nil, retry: false, next_attempt_at: nil, outcome: nil)
     TimelineView::Error.new(origin:, http_status:, message:, attempt:, retry:, next_attempt_at:, outcome:,
                             retry_key: "delivery_id")
   end
 
-  def parse_time(value) = value && Time.zone.parse(value)
+  def self.parse_time(value) = value && Time.zone.parse(value)
+
+  private_class_method :delivery_error
+
+  def parse_time(value) = self.class.parse_time(value)
 end

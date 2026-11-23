@@ -73,6 +73,10 @@ GEM
     rackup (2.3.1)
       rack (>= 3)
     rainbow (3.1.1)
+    redis (5.4.1)
+      redis-client (>= 0.22.0)
+    redis-client (0.31.0)
+      connection_pool
     regexp_parser (2.13.4)
     rexml (3.4.4)
     roda (3.110.0)
@@ -153,6 +157,7 @@ DEPENDENCIES
   puma (>= 6.0)
   rack-test (~> 2.1)
   rackup (~> 2.1)
+  redis (~> 5.4)
   roda (~> 3.0)
   rspec (~> 3.13)
   rubocop-rails-omakase
@@ -201,6 +206,8 @@ CHECKSUMS
   rack-test (2.3.0) sha256=b118d177cc002c572fc1b6fd8d19c9ed5881a36e8d6f689f9e618f9f861241e8
   rackup (2.3.1) sha256=6c79c26753778e90983761d677a48937ee3192b3ffef6bc963c0950f94688868
   rainbow (3.1.1) sha256=039491aa3a89f42efa1d6dec2fc4e62ede96eb6acd95e52f1ad581182b79bc6a
+  redis (5.4.1) sha256=b5e675b57ad22b15c9bcc765d5ac26f60b675408af916d31527af9bd5a81faae
+  redis-client (0.31.0) sha256=6820cb2a21e6795a823141f50fd25e655de2b8dc8ff833b43509a27b0263fd75
   regexp_parser (2.13.4) sha256=1d0547814f57e6f00946957bd0ca201bc42f42cfb08eee89df60998aedcd8a3b
   rexml (3.4.4) sha256=19e0a2c3425dfbf2d4fc1189747bdb2f849b6c5e74180401b15734bc97b5d142
   roda (3.110.0) sha256=474afda2668759c668b87de5bd6ddb996669a6fe75cca5c90c999c6abd8e7b30

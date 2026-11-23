@@ -1,0 +1,1 @@
+{ "schema_version": 1, "rules": [ { "name": "Alta", "queue_id": 7, "any": [ { "all": [ { "field": "priority", "op": "not_in", "value": [] } ] } ] } ] }

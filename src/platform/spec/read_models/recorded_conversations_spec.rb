@@ -131,11 +131,26 @@ RSpec.describe RecordedConversations, "ROADMAP 02: a tela lê a mensagem gravada
         expect(note(ticket)).not_to include("Publicado")
       end
 
-      it "falhou de vez (recusa definitiva do broker): não aparece como publicado" do
+      it "falhou de vez (recusa definitiva do broker): o turno expira no pedido de handoff e a nota mostra a falha" do
         ticket = open_and_publish({ status: 401 })
 
-        expect(note(ticket)).to start_with("Publicação para o agente falhou sem nova tentativa")
-        expect(note(ticket)).not_to include("Publicado")
+        expect(note(ticket)).to start_with("Turno expirado: a publicação para o agente falhou sem nova tentativa (")
+        expect(note(ticket)).to include("RN-46")
+        expect(note(ticket)).not_to include("Publicado", "prazo")
+      end
+
+      it "RN-45: turno expirado pelo pedido da DLQ mostra a falha de integração" do
+        ticket = open_and_publish({ status: 200 })
+        request_handoff(ticket, reason: "falha_de_integracao", source: "dlq", turn: 1)
+
+        expect(note(ticket)).to eq("Turno expirado: a integração com o agente falhou e o caso vai para um humano (RN-45).")
+      end
+
+      it "RN-46: turno expirado pelo prazo do turno mantém a nota do prazo" do
+        ticket = open_and_publish({ status: 200 })
+        request_handoff(ticket, reason: "prazo_do_turno", source: "scheduler", turn: 1)
+
+        expect(note(ticket)).to eq("Turno expirado: o prazo da IA venceu (RN-46).")
       end
     end
 

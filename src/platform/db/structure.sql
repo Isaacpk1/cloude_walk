@@ -23,6 +23,46 @@ $$;
 
 
 --
+-- Name: dead_letters_retention(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.dead_letters_retention() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.created_at > (now() AT TIME ZONE 'UTC') - interval '7 days' THEN
+    RAISE EXCEPTION 'dead_letters: retenção mínima de 7 dias (RN-48), registro %', OLD.id;
+  END IF;
+  RETURN OLD;
+END $$;
+
+
+--
+-- Name: handoff_summaries_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.handoff_summaries_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'handoff_summaries é só inserção (RN-39, RN-54): o primeiro resumo do handoff vale';
+END;
+$$;
+
+
+--
+-- Name: eval_runs_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.eval_runs_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'eval_runs é só de inserção';
+END $$;
+
+
+--
 -- Name: queue_versions_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -31,6 +71,59 @@ CREATE FUNCTION public.queue_versions_immutable() RETURNS trigger
     AS $$
 BEGIN
   RAISE EXCEPTION 'versão de fila é imutável (RN-20): crie uma versão nova';
+END;
+$$;
+
+
+--
+-- Name: routing_rulesets_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.routing_rulesets_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'routing_rulesets é só inserção (RN-20): publique uma versão nova';
+END;
+$$;
+
+
+--
+-- Name: routing_rulesets_queues_of_brand(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.routing_rulesets_queues_of_brand() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  bad text;
+BEGIN
+  SELECT rule ->> 'queue_id' INTO bad
+    FROM jsonb_array_elements(NEW.rules -> 'rules') AS rule
+   WHERE NOT EXISTS (
+           SELECT 1 FROM queues q
+            WHERE q.id::text = rule ->> 'queue_id' AND q.brand_id = NEW.brand_id AND q.active)
+   LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'regra aponta para fila % que não é ativa da marca % (RN-15)', bad, NEW.brand_id;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM queues q WHERE q.id = NEW.default_queue_id AND q.active) THEN
+    RAISE EXCEPTION 'fila padrão % inativa (RF-17)', NEW.default_queue_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: tickets_evaluation_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.tickets_evaluation_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'tickets.evaluation não muda depois da criação';
 END;
 $$;
 
@@ -59,8 +152,13 @@ CREATE TABLE public.ai_turns (
     response_received_at timestamp(6) without time zone,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    context_version integer,
+    context_digest character varying,
     CONSTRAINT ai_turns_applied_event_check CHECK ((((status)::text = 'applied'::text) = (applied_event_id IS NOT NULL))),
+    CONSTRAINT ai_turns_context_digest_check CHECK (((context_digest IS NULL) OR ((context_digest)::text ~ '^sha256:[0-9a-f]{64}$'::text))),
     CONSTRAINT ai_turns_context_until_seq_check CHECK ((context_until_seq >= 1)),
+    CONSTRAINT ai_turns_context_version_check CHECK (((context_version IS NULL) OR (context_version >= 0))),
+    CONSTRAINT ai_turns_context_version_digest_check CHECK (((context_version IS NULL) = (context_digest IS NULL))),
     CONSTRAINT ai_turns_status_check CHECK (((status)::text = ANY (ARRAY[('eligible'::character varying)::text, ('applied'::character varying)::text, ('superseded'::character varying)::text, ('expired'::character varying)::text]))),
     CONSTRAINT ai_turns_turn_check CHECK ((turn >= 1))
 );
@@ -239,6 +337,55 @@ ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
 
 
 --
+-- Name: dead_letters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.dead_letters (
+    id bigint NOT NULL,
+    brand_id bigint,
+    ticket_id bigint,
+    topic character varying NOT NULL,
+    partition integer NOT NULL,
+    "offset" bigint NOT NULL,
+    source character varying NOT NULL,
+    reason character varying NOT NULL,
+    event_id character varying,
+    trace_id character varying,
+    turn integer,
+    violations jsonb DEFAULT '[]'::jsonb NOT NULL,
+    headers jsonb DEFAULT '{}'::jsonb NOT NULL,
+    payload text NOT NULL,
+    error text,
+    attempts integer DEFAULT 0 NOT NULL,
+    outcome character varying,
+    reprocessed_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT dead_letters_outcome_check CHECK (((outcome IS NULL) OR ((outcome)::text = ANY ((ARRAY['escalated'::character varying, 'audited'::character varying, 'uncorrelated'::character varying])::text[])))),
+    CONSTRAINT dead_letters_source_check CHECK (((source)::text = ANY ((ARRAY['broker'::character varying, 'agent-mock'::character varying, 'platform'::character varying, 'unknown'::character varying])::text[]))),
+    CONSTRAINT dead_letters_ticket_brand_check CHECK (((ticket_id IS NULL) OR (brand_id IS NOT NULL)))
+);
+
+
+--
+-- Name: dead_letters_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.dead_letters_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: dead_letters_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.dead_letters_id_seq OWNED BY public.dead_letters.id;
+
+
+--
 -- Name: deliveries; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -264,12 +411,12 @@ CREATE TABLE public.deliveries (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     CONSTRAINT deliveries_attempts_check CHECK ((attempts >= 0)),
-    CONSTRAINT deliveries_channel_check CHECK (((channel)::text = ANY ((ARRAY['chat'::character varying, 'whatsapp'::character varying, 'email'::character varying])::text[]))),
+    CONSTRAINT deliveries_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT deliveries_delivered_at_check CHECK ((((status)::text = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT deliveries_delivered_confirmation_check CHECK ((((status)::text <> 'delivered'::text) OR (provider_message_id IS NOT NULL))),
-    CONSTRAINT deliveries_kind_check CHECK (((kind)::text = ANY ((ARRAY['reply'::character varying, 'resolution'::character varying, 'progress'::character varying, 'handoff_notice'::character varying, 'analyst'::character varying])::text[]))),
+    CONSTRAINT deliveries_kind_check CHECK (((kind)::text = ANY (ARRAY[('reply'::character varying)::text, ('resolution'::character varying)::text, ('progress'::character varying)::text, ('handoff_notice'::character varying)::text, ('analyst'::character varying)::text]))),
     CONSTRAINT deliveries_seq_check CHECK ((seq >= 1)),
-    CONSTRAINT deliveries_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'sending'::character varying, 'delivered'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[])))
+    CONSTRAINT deliveries_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('sending'::character varying)::text, ('delivered'::character varying)::text, ('cancelled'::character varying)::text, ('failed'::character varying)::text])))
 );
 
 
@@ -290,6 +437,72 @@ CREATE SEQUENCE public.deliveries_id_seq
 --
 
 ALTER SEQUENCE public.deliveries_id_seq OWNED BY public.deliveries.id;
+
+
+--
+-- Name: eval_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.eval_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    scenario character varying NOT NULL,
+    status character varying NOT NULL,
+    agent_model character varying NOT NULL,
+    agent_version character varying NOT NULL,
+    config_hash character varying,
+    expected jsonb DEFAULT '{}'::jsonb NOT NULL,
+    observed jsonb DEFAULT '{}'::jsonb NOT NULL,
+    checks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint,
+    trace_id character varying,
+    error text,
+    started_at timestamp(6) without time zone NOT NULL,
+    finished_at timestamp(6) without time zone,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT eval_runs_checks_check CHECK ((jsonb_typeof(checks) = 'array'::text)),
+    CONSTRAINT eval_runs_status_check CHECK (((status)::text = ANY (ARRAY[('passed'::character varying)::text, ('failed'::character varying)::text, ('error'::character varying)::text])))
+);
+
+
+--
+-- Name: handoff_summaries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.handoff_summaries (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint NOT NULL,
+    from_assignment_version integer NOT NULL,
+    source character varying NOT NULL,
+    status character varying NOT NULL,
+    fields jsonb,
+    missing_reason character varying,
+    trace_id character varying NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT handoff_summaries_source_check CHECK (((source)::text = ANY ((ARRAY['agent'::character varying, 'platform'::character varying])::text[]))),
+    CONSTRAINT handoff_summaries_status_check CHECK (((status)::text = ANY ((ARRAY['available'::character varying, 'missing'::character varying])::text[]))),
+    CONSTRAINT handoff_summaries_status_fields_check CHECK (((((status)::text = 'available'::text) AND (fields IS NOT NULL)) OR (((status)::text = 'missing'::text) AND (missing_reason IS NOT NULL))))
+);
+
+
+--
+-- Name: handoff_summaries_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.handoff_summaries_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: handoff_summaries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.handoff_summaries_id_seq OWNED BY public.handoff_summaries.id;
 
 
 --
@@ -387,6 +600,7 @@ CREATE TABLE public.provider_accounts (
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
+    evaluation boolean DEFAULT false NOT NULL,
     CONSTRAINT provider_accounts_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT provider_accounts_whatsapp_phone_check CHECK ((((channel)::text <> 'whatsapp'::text) OR (phone_number_id IS NOT NULL)))
 );
@@ -459,7 +673,8 @@ CREATE TABLE public.queues (
     is_default boolean DEFAULT false NOT NULL,
     active boolean DEFAULT true NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    escalation boolean DEFAULT false NOT NULL
 );
 
 
@@ -480,6 +695,42 @@ CREATE SEQUENCE public.queues_id_seq
 --
 
 ALTER SEQUENCE public.queues_id_seq OWNED BY public.queues.id;
+
+
+--
+-- Name: routing_rulesets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.routing_rulesets (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    version integer NOT NULL,
+    rules jsonb NOT NULL,
+    default_queue_id bigint NOT NULL,
+    created_by_id bigint NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT routing_rulesets_rules_check CHECK ((jsonb_typeof((rules -> 'rules'::text)) = 'array'::text)),
+    CONSTRAINT routing_rulesets_version_check CHECK ((version >= 1))
+);
+
+
+--
+-- Name: routing_rulesets_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.routing_rulesets_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: routing_rulesets_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.routing_rulesets_id_seq OWNED BY public.routing_rulesets.id;
 
 
 --
@@ -582,10 +833,17 @@ CREATE TABLE public.tickets (
     first_pending_at timestamp(6) without time zone,
     dispatch_due_at timestamp(6) without time zone,
     ai_deadline_at timestamp(6) without time zone,
+    context_version integer DEFAULT 0 NOT NULL,
+    evaluation boolean DEFAULT false NOT NULL,
+    progress_due_at timestamp(6) without time zone,
+    ai_turns_count integer DEFAULT 0 NOT NULL,
+    CONSTRAINT tickets_ai_turns_count_check CHECK ((ai_turns_count >= 0)),
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
+    CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
     CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
     CONSTRAINT tickets_first_pending_pair_check CHECK (((first_pending_seq IS NULL) = (first_pending_at IS NULL))),
     CONSTRAINT tickets_first_pending_seq_check CHECK (((first_pending_seq IS NULL) OR (first_pending_seq >= 1))),
+    CONSTRAINT tickets_progress_requires_cycle_check CHECK (((progress_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
     CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text])))
 );
 
@@ -686,10 +944,24 @@ ALTER TABLE ONLY public.customers ALTER COLUMN id SET DEFAULT nextval('public.cu
 
 
 --
+-- Name: dead_letters id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters ALTER COLUMN id SET DEFAULT nextval('public.dead_letters_id_seq'::regclass);
+
+
+--
 -- Name: deliveries id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.deliveries ALTER COLUMN id SET DEFAULT nextval('public.deliveries_id_seq'::regclass);
+
+
+--
+-- Name: handoff_summaries id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries ALTER COLUMN id SET DEFAULT nextval('public.handoff_summaries_id_seq'::regclass);
 
 
 --
@@ -718,6 +990,13 @@ ALTER TABLE ONLY public.queue_versions ALTER COLUMN id SET DEFAULT nextval('publ
 --
 
 ALTER TABLE ONLY public.queues ALTER COLUMN id SET DEFAULT nextval('public.queues_id_seq'::regclass);
+
+
+--
+-- Name: routing_rulesets id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets ALTER COLUMN id SET DEFAULT nextval('public.routing_rulesets_id_seq'::regclass);
 
 
 --
@@ -797,11 +1076,35 @@ ALTER TABLE ONLY public.customers
 
 
 --
+-- Name: dead_letters dead_letters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT dead_letters_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: deliveries deliveries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.deliveries
     ADD CONSTRAINT deliveries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: eval_runs eval_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT eval_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: handoff_summaries handoff_summaries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries
+    ADD CONSTRAINT handoff_summaries_pkey PRIMARY KEY (id);
 
 
 --
@@ -853,6 +1156,14 @@ ALTER TABLE ONLY public.queues
 
 
 --
+-- Name: routing_rulesets routing_rulesets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT routing_rulesets_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -890,6 +1201,20 @@ ALTER TABLE ONLY public.tickets
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_on_ticket_id_from_assignment_version_5e5bf8094e; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_on_ticket_id_from_assignment_version_5e5bf8094e ON public.handoff_summaries USING btree (ticket_id, from_assignment_version);
+
+
+--
+-- Name: index_ai_turns_eligible_deadline; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_turns_eligible_deadline ON public.ai_turns USING btree (deadline_at) WHERE ((status)::text = 'eligible'::text);
 
 
 --
@@ -984,6 +1309,41 @@ CREATE UNIQUE INDEX index_customers_on_id_and_brand_id ON public.customers USING
 
 
 --
+-- Name: index_dead_letters_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_brand_id ON public.dead_letters USING btree (brand_id);
+
+
+--
+-- Name: index_dead_letters_on_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_created_at ON public.dead_letters USING btree (created_at);
+
+
+--
+-- Name: index_dead_letters_on_event_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_event_id ON public.dead_letters USING btree (event_id);
+
+
+--
+-- Name: index_dead_letters_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_dead_letters_on_ticket_id ON public.dead_letters USING btree (ticket_id);
+
+
+--
+-- Name: index_dead_letters_on_topic_and_partition_and_offset; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_dead_letters_on_topic_and_partition_and_offset ON public.dead_letters USING btree (topic, partition, "offset");
+
+
+--
 -- Name: index_deliveries_on_brand_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1026,10 +1386,45 @@ CREATE UNIQUE INDEX index_deliveries_on_ticket_id_and_seq ON public.deliveries U
 
 
 --
+-- Name: index_deliveries_one_progress_per_cycle; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_deliveries_one_progress_per_cycle ON public.deliveries USING btree (ticket_id, ai_first_pending_seq) WHERE ((kind)::text = 'progress'::text);
+
+
+--
 -- Name: index_deliveries_open; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX index_deliveries_open ON public.deliveries USING btree (ticket_id, seq) WHERE ((status)::text = ANY ((ARRAY['pending'::character varying, 'sending'::character varying])::text[]));
+CREATE INDEX index_deliveries_open ON public.deliveries USING btree (ticket_id, seq) WHERE ((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('sending'::character varying)::text]));
+
+
+--
+-- Name: index_eval_runs_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_eval_runs_on_brand_id ON public.eval_runs USING btree (brand_id);
+
+
+--
+-- Name: index_eval_runs_on_scenario_and_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_eval_runs_on_scenario_and_started_at ON public.eval_runs USING btree (scenario, started_at);
+
+
+--
+-- Name: index_eval_runs_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_eval_runs_on_ticket_id ON public.eval_runs USING btree (ticket_id);
+
+
+--
+-- Name: index_handoff_summaries_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_handoff_summaries_on_brand_id ON public.handoff_summaries USING btree (brand_id);
 
 
 --
@@ -1145,6 +1540,13 @@ CREATE INDEX index_queues_on_brand_id ON public.queues USING btree (brand_id);
 
 
 --
+-- Name: index_queues_on_id_and_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_queues_on_id_and_brand_id ON public.queues USING btree (id, brand_id);
+
+
+--
 -- Name: index_queues_on_team_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1156,6 +1558,27 @@ CREATE INDEX index_queues_on_team_id ON public.queues USING btree (team_id);
 --
 
 CREATE UNIQUE INDEX index_queues_one_default_per_brand ON public.queues USING btree (brand_id) WHERE is_default;
+
+
+--
+-- Name: index_queues_one_escalation_per_brand; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_queues_one_escalation_per_brand ON public.queues USING btree (brand_id) WHERE (escalation AND active);
+
+
+--
+-- Name: index_routing_rulesets_on_brand_id_and_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_routing_rulesets_on_brand_id_and_version ON public.routing_rulesets USING btree (brand_id, version);
+
+
+--
+-- Name: index_routing_rulesets_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_routing_rulesets_on_created_by_id ON public.routing_rulesets USING btree (created_by_id);
 
 
 --
@@ -1208,6 +1631,13 @@ CREATE INDEX index_tickets_dispatch_due ON public.tickets USING btree (dispatch_
 
 
 --
+-- Name: index_tickets_on_ai_deadline_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_ai_deadline_at ON public.tickets USING btree (ai_deadline_at) WHERE (ai_deadline_at IS NOT NULL);
+
+
+--
 -- Name: index_tickets_on_assignee_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1243,6 +1673,13 @@ CREATE INDEX index_tickets_on_linked_ticket_id ON public.tickets USING btree (li
 
 
 --
+-- Name: index_tickets_on_progress_due_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_on_progress_due_at ON public.tickets USING btree (progress_due_at) WHERE (progress_due_at IS NOT NULL);
+
+
+--
 -- Name: index_tickets_on_queue_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1271,10 +1708,52 @@ CREATE TRIGGER audit_events_immutable BEFORE DELETE OR UPDATE ON public.audit_ev
 
 
 --
+-- Name: dead_letters dead_letters_retention; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER dead_letters_retention BEFORE DELETE ON public.dead_letters FOR EACH ROW EXECUTE FUNCTION public.dead_letters_retention();
+
+
+--
+-- Name: handoff_summaries handoff_summaries_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER handoff_summaries_immutable BEFORE DELETE OR UPDATE ON public.handoff_summaries FOR EACH ROW EXECUTE FUNCTION public.handoff_summaries_immutable();
+
+
+--
+-- Name: eval_runs eval_runs_no_update; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_runs_no_update BEFORE DELETE OR UPDATE ON public.eval_runs FOR EACH ROW EXECUTE FUNCTION public.eval_runs_immutable();
+
+
+--
 -- Name: queue_versions queue_versions_immutable; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER queue_versions_immutable BEFORE DELETE OR UPDATE ON public.queue_versions FOR EACH ROW EXECUTE FUNCTION public.queue_versions_immutable();
+
+
+--
+-- Name: routing_rulesets routing_rulesets_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER routing_rulesets_immutable BEFORE DELETE OR UPDATE ON public.routing_rulesets FOR EACH ROW EXECUTE FUNCTION public.routing_rulesets_immutable();
+
+
+--
+-- Name: routing_rulesets routing_rulesets_queues_of_brand; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER routing_rulesets_queues_of_brand BEFORE INSERT ON public.routing_rulesets FOR EACH ROW EXECUTE FUNCTION public.routing_rulesets_queues_of_brand();
+
+
+--
+-- Name: tickets tickets_evaluation_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER tickets_evaluation_immutable BEFORE UPDATE OF evaluation ON public.tickets FOR EACH ROW WHEN ((new.evaluation IS DISTINCT FROM old.evaluation)) EXECUTE FUNCTION public.tickets_evaluation_immutable();
 
 
 --
@@ -1302,11 +1781,35 @@ ALTER TABLE ONLY public.customer_identities
 
 
 --
+-- Name: dead_letters fk_dead_letters_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT fk_dead_letters_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
 -- Name: deliveries fk_deliveries_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.deliveries
     ADD CONSTRAINT fk_deliveries_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
+-- Name: eval_runs fk_eval_runs_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT fk_eval_runs_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
+-- Name: handoff_summaries fk_handoff_summaries_ticket_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries
+    ADD CONSTRAINT fk_handoff_summaries_ticket_same_brand FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
 
 
 --
@@ -1358,6 +1861,14 @@ ALTER TABLE ONLY public.messages
 
 
 --
+-- Name: dead_letters fk_rails_1a56f359d6; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT fk_rails_1a56f359d6 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
 -- Name: tickets fk_rails_1dfd143528; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1379,6 +1890,22 @@ ALTER TABLE ONLY public.queues
 
 ALTER TABLE ONLY public.customer_identities
     ADD CONSTRAINT fk_rails_22532c432d FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: eval_runs fk_rails_358a9c83c1; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT fk_rails_358a9c83c1 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: eval_runs fk_rails_3d8538fc74; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.eval_runs
+    ADD CONSTRAINT fk_rails_3d8538fc74 FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
 
 
 --
@@ -1414,14 +1941,6 @@ ALTER TABLE ONLY public.team_memberships
 
 
 --
--- Name: tickets fk_rails_5ce8e37f94; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.tickets
-    ADD CONSTRAINT fk_rails_5ce8e37f94 FOREIGN KEY (queue_id) REFERENCES public.queues(id);
-
-
---
 -- Name: team_memberships fk_rails_61c29b529e; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1454,6 +1973,14 @@ ALTER TABLE ONLY public.customer_identities
 
 
 --
+-- Name: dead_letters fk_rails_7ee7c1307c; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dead_letters
+    ADD CONSTRAINT fk_rails_7ee7c1307c FOREIGN KEY (ticket_id) REFERENCES public.tickets(id);
+
+
+--
 -- Name: ai_turns fk_rails_82b05d2e53; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1478,6 +2005,14 @@ ALTER TABLE ONLY public.deliveries
 
 
 --
+-- Name: handoff_summaries fk_rails_93ff00cebd; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.handoff_summaries
+    ADD CONSTRAINT fk_rails_93ff00cebd FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
 -- Name: ai_turns fk_rails_ad9c9534a9; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1491,6 +2026,22 @@ ALTER TABLE ONLY public.ai_turns
 
 ALTER TABLE ONLY public.audit_events
     ADD CONSTRAINT fk_rails_b7193bfed1 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: routing_rulesets fk_rails_b886984cf3; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT fk_rails_b886984cf3 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
+-- Name: routing_rulesets fk_rails_bc6d57a4e7; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT fk_rails_bc6d57a4e7 FOREIGN KEY (created_by_id) REFERENCES public.users(id);
 
 
 --
@@ -1558,11 +2109,27 @@ ALTER TABLE ONLY public.queue_versions
 
 
 --
+-- Name: routing_rulesets fk_routing_rulesets_default_queue_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.routing_rulesets
+    ADD CONSTRAINT fk_routing_rulesets_default_queue_same_brand FOREIGN KEY (default_queue_id, brand_id) REFERENCES public.queues(id, brand_id);
+
+
+--
 -- Name: tickets fk_tickets_customer_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.tickets
     ADD CONSTRAINT fk_tickets_customer_same_brand FOREIGN KEY (customer_id, brand_id) REFERENCES public.customers(id, brand_id);
+
+
+--
+-- Name: tickets fk_tickets_queue_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.tickets
+    ADD CONSTRAINT fk_tickets_queue_same_brand FOREIGN KEY (queue_id, brand_id) REFERENCES public.queues(id, brand_id);
 
 
 --
@@ -1572,6 +2139,16 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261123020000'),
+('20261123010000'),
+('20261123000000'),
+('20261122030000'),
+('20261122015000'),
+('20261122010000'),
+('20261122000000'),
+('20261121040000'),
+('20261121030000'),
+('20261121020000'),
 ('20261121010000'),
 ('20261121000000'),
 ('20261120010000'),

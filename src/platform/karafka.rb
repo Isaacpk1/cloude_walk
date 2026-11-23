@@ -4,6 +4,8 @@
 #
 # Consome as ações do agente em helpdesk.agent.outbound.v1 e só publica direto no Kafka para a DLQ
 # (docs/10: "A plataforma envia ao broker por webhook e só publica direto na DLQ, pelo próprio Karafka").
+# Consome também a DLQ (helpdesk.agent.dlq.v1), num grupo próprio (platform-dlq): grava o espelho em
+# dead_letters e aplica a RN-45 (bloco 09). Grupo separado para o atraso de um não segurar o outro.
 # O Rails carrega este arquivo no boot (railtie do Karafka); a conexão com o Kafka só abre quando o
 # consumer roda ou quando a DLQ é usada.
 class KarafkaApp < Karafka::App
@@ -32,6 +34,12 @@ class KarafkaApp < Karafka::App
   routes.draw do
     topic AgentActions::Apply::TOPICS.fetch(:outbound) do
       consumer AgentActionsConsumer
+    end
+
+    consumer_group "platform-dlq" do
+      topic AgentActions::Apply::TOPICS.fetch(:dlq) do
+        consumer DeadLettersConsumer
+      end
     end
   end
 end

@@ -1,7 +1,8 @@
 # Configuração do agente mock (ADR-008, RF-38). Tudo aqui entra no config_hash de cada ação (RN-37):
 # mudar uma vírgula muda o hash, e a auditoria mostra com qual configuração a IA decidiu.
 #
-# Perfil escolhido por AGENT_PROFILE (padrão: rapido). Variáveis de ambiente sobrepõem o perfil:
+# Perfil padrão por AGENT_PROFILE (padrão: rapido). O simulador troca o perfil em tempo de execução,
+# sem reiniciar, pelo Redis de controle (AGENT_CONTROL_REDIS_URL; README). Variáveis de ambiente sobrepõem o perfil:
 # AGENT_LATENCY_MS ("200" ou "1000-3000"), AGENT_FAILURE_RATE (0.0 a 1.0), AGENT_MUTE (true/false)
 # e AGENT_SEED. Mesma entrada + mesma configuração + mesma semente = mesma ação (RNF-30).
 version: 1
@@ -14,9 +15,11 @@ profiles:
     latency_ms: { min: 50, max: 150 }
     failure_rate: 0.0
     mute: false
-  # Agente lento, ainda dentro dos 20 s do turno (RN-46): latência de LLM real.
+  # Agente lento: responde depois do aviso de progresso (15 s desde a primeira pendente, RN-57) e antes
+  # do prazo do turno (20 s desde a abertura, RN-46). O turno abre ~1,5 s depois da primeira mensagem
+  # (janela da RN-55), então 16-18 s de latência chegam em ~17,5-19,5 s do ciclo, 2 s antes do prazo.
   lento:
-    latency_ms: { min: 2000, max: 6000 }
+    latency_ms: { min: 16000, max: 18000 }
     failure_rate: 0.0
     mute: false
   # Agente fora do ar (E2): consome e não responde. A plataforma escala pelo prazo (RN-33 (4), RN-46).

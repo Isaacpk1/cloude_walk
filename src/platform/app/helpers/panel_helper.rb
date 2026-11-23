@@ -1,7 +1,7 @@
 # Apresentação do painel: selos, rótulos e formatação de tempo. Sem regra de negócio.
 module PanelHelper
-  DISPLAY_TIME_ZONE = "America/Sao_Paulo".freeze
-  RESERVED_SECTIONS = %w[Filas Evals Configuração].freeze
+  DISPLAY_TIME_ZONE = PanelClock::TIME_ZONE
+  RESERVED_SECTIONS = %w[Filas Configuração].freeze
 
   def nav_link(label, path, active:)
     link_to label, path, class: class_names("nav__item", "nav__item--active" => active), aria: { current: (active ? "page" : nil) }
@@ -37,9 +37,7 @@ module PanelHelper
     "cobre seq #{turn.covered_seqs.to_sentence(words_connector: ', ', two_words_connector: ' e ', last_word_connector: ' e ')}"
   end
 
-  def panel_time(time, precise: false)
-    time.in_time_zone(DISPLAY_TIME_ZONE).strftime(precise ? "%d/%m/%Y %H:%M:%S.%L" : "%d/%m/%Y %H:%M:%S")
-  end
+  def panel_time(time, precise: false) = PanelClock.format(time, precise:)
 
   def duration_text(ms)
     ms.nil? ? "sem fim registrado" : "#{ms} ms"
@@ -48,6 +46,13 @@ module PanelHelper
   # Argumentos e resultados das consultas do agente (ROADMAP 04) como JSON compacto. Volta como texto
   # comum: o ERB escapa (o conteúdo vem de fora).
   def agent_data_text(data) = JSON.generate(data)
+
+  def eval_status_badge(run)
+    tag.span(run.status_label, class: "badge badge--eval badge--eval-#{run.status}")
+  end
+
+  # Esperado e observado de um eval (ADR-023) como JSON legível. Texto comum: o ERB escapa.
+  def eval_json(data) = JSON.pretty_generate(data)
 
   def timeline_bar_style(timeline, event)
     total = [ timeline.total_duration_ms.to_i, 1 ].max

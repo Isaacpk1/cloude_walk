@@ -1,0 +1,63 @@
+<% content_for :title, "Fila humana" %>
+<% content_for :head do %><%= turbo_refreshes_with method: :morph, scroll: :preserve %><% end %>
+<% marca = @queue.brand&.slug %>
+<%# Tempo real (RNF-06; 07, seção 3.2): o AuditEvent pede a recarga deste stream depois do commit. %>
+<%= turbo_stream_from(*@queue.streams) %>
+
+<div class="page-header">
+  <div>
+    <h1>Fila humana</h1>
+    <p class="page-header__subtitle">Casos em <code>aguardando_humano</code>, na ordem da RN-29: prioridade, depois o mais antigo na fila (o SLA entra no bloco 13)<% if marca %> · marca <code><%= marca %></code><% end %></p>
+  </div>
+  <div class="page-header__actions">
+    <span class="badge badge--source badge--system" title="Atualiza sozinha quando um caso entra na fila ou o resumo chega">Tempo real</span>
+  </div>
+</div>
+
+<section class="human-queue" aria-label="Fila humana">
+  <% if @entries.empty? %>
+    <p class="muted">Nenhum caso aguardando humano<%= " nesta marca" if marca %>.</p>
+  <% else %>
+    <table class="timeline human-queue__table">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Atendimento</th>
+          <th scope="col">Categoria</th>
+          <th scope="col">Fila e versão</th>
+          <th scope="col">Motivo e origem</th>
+          <th scope="col">Prioridade</th>
+          <th scope="col">Na fila há</th>
+          <th scope="col">Resumo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @entries.each_with_index do |entry, index| %>
+          <tr class="human-queue__row" id="queue-ticket-<%= entry.ticket_id %>">
+            <td class="human-queue__position"><%= index + 1 %></td>
+            <td>
+              <%= link_to "##{entry.ticket_id}", conversation_path(entry.ticket_id) %> · <%= entry.brand_name %>
+              <div><%= entry.title %></div>
+              <div class="muted"><%= entry.customer_name %> · <%= link_to "linha do tempo", timeline_path(entry.ticket_id) %></div>
+            </td>
+            <td><span class="human-queue__category"><%= entry.category_label %></span></td>
+            <td><%= entry.queue_label %></td>
+            <td>
+              <div class="human-queue__reason"><%= entry.reason_label || "motivo não registrado" %></div>
+              <div class="muted"><%= entry.source_label %></div>
+            </td>
+            <td>
+              <span class="badge badge--priority badge--priority-<%= entry.priority || 'media' %>"><%= entry.priority_label %></span>
+              <% if entry.priority_raise_label %><div class="human-queue__raised"><%= entry.priority_raise_label %></div><% end %>
+            </td>
+            <td>
+              <%= entry.waiting_text(@now) %>
+              <div class="muted">desde <time datetime="<%= entry.escalated_at.iso8601(3) %>"><%= panel_time(entry.escalated_at) %></time></div>
+            </td>
+            <td><span class="human-queue__summary human-queue__summary--<%= entry.summary.status %>"><%= entry.summary.label %></span></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>

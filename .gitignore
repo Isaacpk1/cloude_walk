@@ -9,3 +9,6 @@ Claude outputs/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Dump local do Redis (redis-server rodando na pasta)
+dump.rdb

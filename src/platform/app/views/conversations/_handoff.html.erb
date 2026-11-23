@@ -1,0 +1,28 @@
+<%# Bloco 08, RN-46 e RF-36 (bloco 10: fila de escalas, prioridade e RN-41): pedido de handoff e o seu desfecho (ConversationView::Handoff). Texto gravado só com o escape padrão do ERB. %>
+<section class="card handoff handoff--<%= handoff.state %>" aria-label="Handoff para humano">
+  <h2><%= handoff.headline %></h2>
+  <dl class="turn__facts">
+    <dt>motivo</dt><dd><%= handoff.reason_label %></dd>
+    <dt>gatilho</dt><dd><%= handoff.source_label %></dd>
+    <dt>origem</dt><dd><%= handoff.turn ? link_to("turno #{handoff.turn}", "#turn-#{handoff.turn}") : "sem turno publicado" %><% if handoff.first_pending_seq %> · primeira pendente <a href="#seq-<%= handoff.first_pending_seq %>">seq <%= handoff.first_pending_seq %></a><% end %></dd>
+    <dt>pedido às</dt><dd><time datetime="<%= handoff.requested_at.iso8601(3) %>"><%= panel_time(handoff.requested_at, precise: true) %></time></dd>
+    <% if handoff.escalated? %>
+      <dt>na fila às</dt><dd><time datetime="<%= handoff.resolved_at.iso8601(3) %>"><%= panel_time(handoff.resolved_at, precise: true) %></time><% if handoff.waited_ms %> <span class="muted">(<%= handoff.waited_ms %> ms desde a primeira mensagem pendente; RNF-18)</span><% end %></dd>
+      <dt>atribuição</dt><dd>assignment_version <%= handoff.from_assignment_version %> → <%= handoff.to_assignment_version %></dd>
+      <dt>fila</dt><dd><%= handoff.queue_label %></dd>
+      <dt>prioridade</dt><dd><span class="badge badge--priority badge--priority-<%= handoff.priority || 'media' %>"><%= handoff.priority_label %></span><% if handoff.priority_raise_label %> <span class="human-queue__raised"><%= handoff.priority_raise_label %></span><% end %></dd>
+    <% elsif handoff.state == :discarded %>
+      <dt>descartado às</dt><dd><%= panel_time(handoff.resolved_at, precise: true) %></dd>
+      <dt>motivo do descarte</dt><dd><%= handoff.discard_reason_label %></dd>
+    <% end %>
+  </dl>
+  <% if handoff.cancelled_deliveries.any? %>
+    <h3>Saídas canceladas pelo handoff</h3>
+    <ul>
+      <% handoff.cancelled_deliveries.each do |delivery| %>
+        <li><a href="#seq-<%= delivery.seq %>">seq <%= delivery.seq %></a> · <%= delivery.kind %> · <code><%= delivery.delivery_id.first(8) %></code></li>
+      <% end %>
+    </ul>
+  <% end %>
+  <p class="muted">trace <%= handoff.trace_id %><% if handoff.escalated? %> · <%= link_to "ver na fila humana", human_queue_path %><% end %></p>
+</section>

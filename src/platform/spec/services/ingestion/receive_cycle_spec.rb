@@ -96,7 +96,7 @@ RSpec.describe Ingestion::Receive do
     it "com analista humano, a mensagem não abre ciclo" do
       first = ingest_at(t0)
       first.ticket.update_columns(state: "com_analista", assignee_id: create(:user).id, first_pending_seq: nil,
-                                  first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil)
+                                  first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil, progress_due_at: nil)
 
       ticket = ingest_at(t0 + 1.second).ticket.reload
 
@@ -151,6 +151,76 @@ RSpec.describe Ingestion::Receive do
 
       expect { ingest_at(t0 + 1.second) }.to raise_error(ActiveRecord::StatementInvalid)
       expect(Ticket.sole).to have_attributes(latest_customer_seq: 1, dispatch_due_at: t0 + 1.5.seconds)
+    end
+  end
+
+  describe "RN-55, RF-33: versão do contexto na ingestão (07, seção 3.4)" do
+    it "cada mensagem do cliente sobe context_version em 1, na mesma transação" do
+      ingest_at(t0)
+      expect(Ticket.sole.context_version).to eq(1)
+
+      ingest_at(t0 + 1.second)
+      expect(Ticket.sole.context_version).to eq(2)
+    end
+
+    it "RNF-15: a duplicata não sobe a versão (repetição)" do
+      message = normalized(external_id: "chat_msg_dup_versao")
+      ingest_at(t0, message)
+      ingest_at(t0 + 1.second, message)
+
+      expect(Ticket.sole.context_version).to eq(1)
+    end
+
+    it "caso fora da IA também sobe: a mensagem muda o que a IA veria quando o caso voltar" do
+      first = ingest_at(t0)
+      first.ticket.update_columns(state: "com_analista", assignee_id: create(:user).id)
+
+      expect(ingest_at(t0 + 1.second).ticket.reload.context_version).to eq(2)
+    end
+
+    it "invariante 1: falha no outbox desfaz também a versão (falha de dependência)" do
+      ingest_at(t0)
+      allow(OutboxEvent).to receive(:create!).and_raise(ActiveRecord::StatementInvalid, "outbox fora do ar")
+
+      expect { ingest_at(t0 + 1.second) }.to raise_error(ActiveRecord::StatementInvalid)
+      expect(Ticket.sole.context_version).to eq(1)
+    end
+
+    it "invariante 6: a mensagem de uma marca não sobe a versão do atendimento da outra (marca errada)" do
+      ip = ingest_at(t0, normalized(identity: "acc_versao")).ticket
+      ingest_at(t0 + 1.second, normalized(identity: "acc_versao", brand: "jim"))
+
+      expect(ip.reload.context_version).to eq(1)
+      expect(Ticket.find_by!(brand: jim).context_version).to eq(1)
+    end
+  end
+
+  describe "Invariante 7: message.received traz a janela usada, o teto e a versão do contexto" do
+    def received_audit(result) = AuditEvent.where(ticket: result.ticket, event_type: "message.received").order(:id).last.data
+
+    it "RN-55: chat registra window_ms 1500, ceiling_at = first_pending_at + 4 s e a versão depois do incremento" do
+      ingest_at(t0)
+      data = received_audit(ingest_at(t0 + 1.second))
+
+      expect(data).to include("window_ms" => 1500, "ceiling_at" => (t0 + 4.seconds).iso8601(3), "context_version" => 2,
+                              "dispatch_due_at" => (t0 + 2.5.seconds).iso8601(3))
+    end
+
+    it "RN-55: e-mail registra window_ms 0" do
+      data = received_audit(ingest_at(t0, normalized(channel: "email", identity: "cliente@example.test")))
+
+      expect(data).to include("window_ms" => 0, "ceiling_at" => (t0 + 4.seconds).iso8601(3), "context_version" => 1,
+                              "dispatch_due_at" => t0.iso8601(3))
+    end
+
+    it "07, seção 3.3: caso fora da IA não usa janela; a versão continua registrada" do
+      first = ingest_at(t0)
+      first.ticket.update_columns(state: "com_analista", assignee_id: create(:user).id, first_pending_seq: nil,
+                                  first_pending_at: nil, dispatch_due_at: nil, ai_deadline_at: nil, progress_due_at: nil)
+
+      data = received_audit(ingest_at(t0 + 1.second))
+
+      expect(data).to include("window_ms" => nil, "ceiling_at" => nil, "dispatch_due_at" => nil, "context_version" => 2)
     end
   end
 end
