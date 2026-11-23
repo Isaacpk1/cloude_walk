@@ -28,7 +28,8 @@ class OutboxJob < ApplicationJob
   TIMEOUTS = [ Deadlines::TurnTimeout::EVENT_TYPE, Deadlines::CycleTimeout::EVENT_TYPE ].freeze
   HANDLED = [ MESSAGE_RECEIVED, Turns::Open::DISPATCH_TYPE, Turns::Open::EVENT_TYPE, Deliveries::Send::EVENT_TYPE,
               *TIMEOUTS, Handoff::Request::EVENT_TYPE,
-              Deadlines::ProgressDue::EVENT_TYPE, Handoff::Summarize::EVENT_TYPE ].freeze
+              Deadlines::ProgressDue::EVENT_TYPE, Handoff::Summarize::EVENT_TYPE,
+              Deadlines::AnalystOffline::EVENT_TYPE, Deadlines::SlaAlert::EVENT_TYPE, Deadlines::SlaBreach::EVENT_TYPE ].freeze
 
   def perform(outbox_event_id)
     item = OutboxEvent.find_by(id: outbox_event_id)
@@ -58,12 +59,23 @@ class OutboxJob < ApplicationJob
       self.class.set(wait_until: result.next_attempt_at).perform_later(item.id) if result.next_attempt_at
     when Handoff::Summarize::EVENT_TYPE
       Handoff::Summarize.call(item.id)
+    when Deadlines::AnalystOffline::EVENT_TYPE
+      retry_when_not_due(Distribution::ReturnToQueue.call(item.id), item)
+    when Deadlines::SlaAlert::EVENT_TYPE
+      retry_when_not_due(Sla::Alert.call(item.id), item)
+    when Deadlines::SlaBreach::EVENT_TYPE
+      retry_when_not_due(Sla::Breach.call(item.id), item)
     when MESSAGE_RECEIVED
       Triage::OnMessage.call(item.id).wake_ids.each { wake(_1) }
     end
   end
 
   private
+
+  # Prazo ainda não vencido pelo relógio do banco: o item fica aberto e o despertador vai para o prazo gravado.
+  def retry_when_not_due(result, item)
+    self.class.set(wait_until: result.next_attempt_at).perform_later(item.id) if result.next_attempt_at
+  end
 
   # Acorda o item gravado na transação do serviço, já depois do commit (invariante 2). Se o Redis falhar, o
   # item segue aberto e a recuperação o reoferece.
