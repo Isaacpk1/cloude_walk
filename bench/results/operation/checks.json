@@ -1,0 +1,23 @@
+{
+  "observed_at": "2026-11-23T19:06:47Z",
+  "command": "bundle exec rspec --seed 42",
+  "database": "helpdesk_test_1718",
+  "summary": {
+    "duration": 11912.91294459,
+    "example_count": 1694,
+    "failure_count": 0,
+    "pending_count": 0,
+    "errors_outside_of_examples_count": 0
+  },
+  "coverage": {
+    "result": {
+      "line": 99.21,
+      "branch": 87.94
+    }
+  },
+  "rubocop": "446 files inspected, no offenses detected",
+  "brakeman": [
+    "Errors: 0",
+    "Security Warnings: 0"
+  ]
+}

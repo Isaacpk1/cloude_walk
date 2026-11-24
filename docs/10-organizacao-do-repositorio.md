@@ -215,11 +215,15 @@ Testes que só fazem sentido com o Compose de pé. Exemplo: o simulador envia "m
 bench/
 ├── k6/                         # um script por experimento (E1, E5)
 ├── analysis/                   # reconcile.rb (perdas, turnos, latência por etapa); gráficos com pandas + Plotly (ADR-010) ainda não feitos
+├── validation/                 # executor de E2/E3/E4/E6 e roteiro visual dos blocos 17 e 18
 └── results/
+    ├── operation/              # evidência por cenário, checks e capturas da validação operacional
     └── AAAA-MM-DD-e1-referencia/  # semente, configuração, taxas e saídas
 ```
 
 Um resultado sem a semente e a configuração não conta como evidência (RNF-30).
+
+`make validate-operation` executa os testes em `helpdesk_test_operation`, separado do desenvolvimento. O roteiro e as limitações ficam em `bench/validation/README.md`; o relato da execução fica no [11](11-validacao-operacional.md). Os relatórios funcionais não substituem os números de carga do bloco 19.
 
 ### 3.9 Raiz
 

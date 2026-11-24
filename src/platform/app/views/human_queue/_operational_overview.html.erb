@@ -1,0 +1,35 @@
+<section class="operational-overview" aria-label="Indicadores operacionais">
+  <h2>Operação por fila</h2>
+  <p>Consulta em <time datetime="<%= overview.now.iso8601(3) %>"><%= panel_time(overview.now) %></time>.
+    Abertos: excluem resolvidos e fechados. Espera: somente quem aguarda humano, desde a entrada na fila.
+    SLA: marca permanente ou prazo de assunção vencido, inclusive no instante limite.</p>
+  <p>Últimas 24 horas: <time datetime="<%= overview.window_start.iso8601(3) %>"><%= panel_time(overview.window_start) %></time>
+    até <time datetime="<%= overview.now.iso8601(3) %>"><%= panel_time(overview.now) %></time>.
+    Taxa de escalação: casos distintos escalados / casos criados nessa janela, agrupados pela fila atual.</p>
+  <% if overview.rows.empty? %>
+    <p class="muted">Sem dados nas marcas autorizadas.</p>
+  <% else %>
+    <table class="timeline">
+      <thead><tr>
+        <th scope="col">Marca / fila atual</th><th scope="col">Abertos</th><th scope="col">Aguardando humano</th>
+        <th scope="col">Espera média / maior</th><th scope="col">Fora do SLA</th><th scope="col">Escalação · 24 h</th>
+      </tr></thead>
+      <tbody>
+        <% overview.rows.each do |row| %>
+          <tr>
+            <th scope="row"><%= row.brand_name %> / <%= row.queue_name %></th>
+            <td><%= row.open_count %></td><td><%= row.waiting_count %></td>
+            <td>
+              <% if row.average_wait_s %><%= row.average_wait_s.round %> s / <%= row.max_wait_s.round %> s<% else %>Sem dados<% end %>
+              <% if row.waiting_without_start.positive? %><div class="muted"><%= row.waiting_without_start %> sem horário de entrada</div><% end %>
+            </td>
+            <td class="<%= 'human-queue__sla--breached' if row.outside_sla_count.positive? %>"><%= row.outside_sla_count %></td>
+            <td><% if row.escalation_rate %><%= number_with_precision(row.escalation_rate, precision: 1) %>%<% else %>Sem dados<% end %>
+              <span class="muted">(<%= row.escalated_count %> / <%= row.cohort_count %>)</span></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+    <p class="muted">Contagens completas, sem o limite de 200 linhas da lista abaixo. Atualize a página para consultar novamente.</p>
+  <% end %>
+</section>

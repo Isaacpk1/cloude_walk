@@ -663,3 +663,27 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 **Alternativas.** Row-Level Security no Postgres (já descartada acima: exige contexto de sessão em cada job); gem Devise (mais peças do que o projeto precisa); SSO (fora do escopo, sem sistema da CloudWalk).
 
 **Consequências.** Os seeds criam usuários com senha sintética conhecida (só dados sintéticos, RN-51). Tentativas de login erradas não revelam se o e-mail existe.
+
+## ADR-025 — Indicadores operacionais com população explícita
+
+**Status:** vigente, definição aprovada pelo usuário em 23/11/2026 (bloco 18).
+
+**Contexto.** RF-60 pede volume, espera, SLA e taxa de escalação, mas não define população nem janela. Usar as primeiras 200 linhas da fila produziria indicadores incompletos.
+
+**Decisão.** Consultar o Postgres por marca autorizada e fila atual, sem o limite da listagem. Separar a fotografia dos casos abertos da coorte criada nas últimas 24 horas. Contar escalação por atendimento distinto, com numerador e denominador visíveis. Mostrar ausência de dados em vez de uma taxa zero quando não há população. As definições ficam no 07, seção 3.8.
+
+**Alternativas.** Calcular sobre a listagem (descartado pelo corte em 200); manter contadores novos (mais escrita e risco de divergência); painel de séries temporais (bloco 19).
+
+**Consequências.** Não há migration nem efeito externo. Transferências mudam a fila atual da população. A leitura não é uma medição de desempenho nem uma série histórica. A página informa a janela e o instante de leitura.
+
+## ADR-026 — Tolerância do healthcheck web no ambiente local
+
+**Status:** vigente (bloco 17), 23/11/2026.
+
+**Contexto.** O Compose de desenvolvimento monta o código do Windows no contêiner. A sonda com limite de 3 s expirou sem receber bytes; repetida com limite de 20 s, recebeu HTTP 200 em 4,76 s. Os logs também registraram respostas 200. A preparação e a recarga de arquivos antes do controller podem exceder o limite da sonda, produzindo `unhealthy` mesmo com o servidor respondendo.
+
+**Decisão.** O healthcheck do serviço `web` no Compose local tem timeout de 15 s. Mantêm-se endpoint `/up`, intervalo, tentativas e período inicial. As sondas dos demais serviços e os prazos do domínio não mudam.
+
+**Alternativas.** Manter 3 s (falso negativo reproduzido); retirar a pasta montada ou desligar a recarga (muda o fluxo de desenvolvimento; o perfil sem bind mount fica para o bloco 19); remover a sonda (perde a barreira de prontidão).
+
+**Consequências.** Uma falha silenciosa pode levar mais tempo para ser reconhecida pela sonda. A tolerância local não comprova nem altera metas de latência ou disponibilidade. O experimento de desempenho precisa do perfil próprio, sem pasta montada.

@@ -9,5 +9,8 @@ class HumanQueueController < PanelController
     @entries = @queue.entries
     @capacity = AnalystCapacity.new(brand: @queue.brand, brand_ids: scope_brand_ids)
     @now = Time.current
+    if current_user.supervisor?
+      @overview = OperationalOverview.new(brand_ids: @queue.brand ? [ @queue.brand.id ] : scope_brand_ids, now: @now)
+    end
   end
 end

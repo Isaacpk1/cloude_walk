@@ -1,0 +1,473 @@
+{
+  "observed_at": "2026-11-23 14:37:26 UTC",
+  "run": "20261123142348",
+  "method": "HTTP, Kafka, scheduler e worker reais; consultas da plataforma no Postgres",
+  "configuration_events": [
+    {
+      "brand_id": 3,
+      "type": "routing_ruleset.published",
+      "at": "2026-11-23 14:23:48 UTC",
+      "data": {
+        "version": 1,
+        "rules_count": 0,
+        "default_queue_id": 11,
+        "routing_ruleset_id": 3
+      }
+    },
+    {
+      "brand_id": 1,
+      "type": "queue.created",
+      "at": "2026-11-23 14:24:55 UTC",
+      "data": {
+        "name": "Repasses de validação",
+        "team_id": 1,
+        "version": 1,
+        "ai_first": false,
+        "queue_id": 13,
+        "sla_policy": {}
+      }
+    },
+    {
+      "brand_id": 3,
+      "type": "queue.created",
+      "at": "2026-11-23 14:26:01 UTC",
+      "data": {
+        "name": "Repasses de validação",
+        "team_id": 3,
+        "version": 1,
+        "ai_first": false,
+        "queue_id": 14,
+        "sla_policy": {}
+      }
+    },
+    {
+      "brand_id": 3,
+      "type": "routing_ruleset.published",
+      "at": "2026-11-23 14:26:56 UTC",
+      "data": {
+        "version": 2,
+        "rules_count": 1,
+        "default_queue_id": 11,
+        "routing_ruleset_id": 4
+      }
+    },
+    {
+      "brand_id": 1,
+      "type": "queue.deleted",
+      "at": "2026-11-23 14:37:15 UTC",
+      "data": {
+        "name": "Repasses de validação",
+        "queue_id": 13
+      }
+    }
+  ],
+  "cases": [
+    {
+      "ticket_id": 7,
+      "brand": "validacao-20261123142348",
+      "state": "aguardando_humano",
+      "queue_id": 12,
+      "ruleset_version": 1,
+      "sla_started_at": "2026-11-23 14:30:04 UTC",
+      "sla_due_at": "2026-11-23 14:45:04 UTC",
+      "messages": [
+        [
+          "validacao-8deddef8-5da0-483f-8baa-09839f375af5",
+          1,
+          "cf53c2cc9356f5602e1d693e8f28a8aa"
+        ],
+        [
+          "validacao-d2323594-625a-42e0-afce-d89ee7c78df8",
+          4,
+          "b34afac0965f0328290ecb041afcdc7d"
+        ]
+      ],
+      "routing": [
+        {
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa",
+          "data": {
+            "moment": "criacao",
+            "default": true,
+            "queue_id": 11,
+            "rule_name": null,
+            "conditions": [],
+            "queue_name": "Geral de validação",
+            "rule_index": null,
+            "group_index": null,
+            "queue_version": 1,
+            "skipped_rules": [],
+            "ruleset_version": 1
+          }
+        }
+      ],
+      "turns": [
+        [
+          1,
+          "applied",
+          "561c8e67-71fb-423d-af2f-e34c5b6d0d5b",
+          "0fc4a2e6-cadb-4cd5-b7fa-7e1427808b90"
+        ]
+      ],
+      "deliveries": [
+        [
+          "ee615d2b-06ae-48cb-972f-fc28f74d7f53",
+          2,
+          "failed",
+          "conta_desconhecida (404)"
+        ],
+        [
+          "eb14109f-8f6e-4c76-8d4f-bd3e63babe6a",
+          3,
+          "failed",
+          "conta_desconhecida (404)"
+        ],
+        [
+          "9c844bac-300b-4905-9299-bb82ebba7c24",
+          5,
+          "failed",
+          "conta_desconhecida (404)"
+        ]
+      ],
+      "events": [
+        {
+          "type": "ticket.created",
+          "at": "2026-11-23 14:26:36 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "message.received",
+          "at": "2026-11-23 14:26:36 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "turn.dispatch_scheduled",
+          "at": "2026-11-23 14:26:39 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "triage.classified",
+          "at": "2026-11-23 14:26:41 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "routing.decided",
+          "at": "2026-11-23 14:26:41 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "ticket.assigned",
+          "at": "2026-11-23 14:26:42 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "ai_turn.opened",
+          "at": "2026-11-23 14:26:44 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "agent_event.published",
+          "at": "2026-11-23 14:26:50 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "progress.notice_scheduled",
+          "at": "2026-11-23 14:26:51 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "delivery.requested",
+          "at": "2026-11-23 14:26:51 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "progress.notice_sent",
+          "at": "2026-11-23 14:26:51 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "delivery.sending",
+          "at": "2026-11-23 14:26:52 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "delivery.failed",
+          "at": "2026-11-23 14:26:52 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "agent_action.applied",
+          "at": "2026-11-23 14:26:52 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "delivery.requested",
+          "at": "2026-11-23 14:26:53 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "delivery.sending",
+          "at": "2026-11-23 14:26:53 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "delivery.failed",
+          "at": "2026-11-23 14:26:53 UTC",
+          "trace_id": "cf53c2cc9356f5602e1d693e8f28a8aa"
+        },
+        {
+          "type": "handoff.requested",
+          "at": "2026-11-23 14:30:03 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        },
+        {
+          "type": "customer.human_requested",
+          "at": "2026-11-23 14:30:04 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        },
+        {
+          "type": "message.received",
+          "at": "2026-11-23 14:30:04 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        },
+        {
+          "type": "delivery.requested",
+          "at": "2026-11-23 14:30:04 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        },
+        {
+          "type": "ticket.escalated",
+          "at": "2026-11-23 14:30:04 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        },
+        {
+          "type": "delivery.sending",
+          "at": "2026-11-23 14:30:04 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        },
+        {
+          "type": "handoff.summary_available",
+          "at": "2026-11-23 14:30:04 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        },
+        {
+          "type": "delivery.failed",
+          "at": "2026-11-23 14:30:05 UTC",
+          "trace_id": "b34afac0965f0328290ecb041afcdc7d"
+        }
+      ]
+    },
+    {
+      "ticket_id": 8,
+      "brand": "validacao-20261123142348",
+      "state": "aguardando_humano",
+      "queue_id": 14,
+      "ruleset_version": 2,
+      "sla_started_at": "2026-11-23 14:27:36 UTC",
+      "sla_due_at": "2026-11-23 14:42:36 UTC",
+      "messages": [
+        [
+          "validacao-cef8998b-fcfc-41bf-ac19-de9d7aacc35b",
+          1,
+          "ae801536874fbac71260e4a8f7b7ace0"
+        ]
+      ],
+      "routing": [
+        {
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0",
+          "data": {
+            "moment": "criacao",
+            "default": false,
+            "queue_id": 14,
+            "rule_name": "Repasse da operação",
+            "conditions": [
+              {
+                "op": "eq",
+                "field": "category",
+                "value": "repasses"
+              }
+            ],
+            "queue_name": "Repasses de validação",
+            "rule_index": 0,
+            "group_index": 0,
+            "queue_version": 1,
+            "skipped_rules": [],
+            "ruleset_version": 2
+          }
+        }
+      ],
+      "turns": [],
+      "deliveries": [
+        [
+          "9cea3a9b-fa17-4445-b4b6-f561860f9b3d",
+          2,
+          "failed",
+          "conta_desconhecida (404)"
+        ]
+      ],
+      "events": [
+        {
+          "type": "ticket.created",
+          "at": "2026-11-23 14:27:35 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "message.received",
+          "at": "2026-11-23 14:27:35 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "turn.dispatch_scheduled",
+          "at": "2026-11-23 14:27:36 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "triage.classified",
+          "at": "2026-11-23 14:27:36 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "routing.decided",
+          "at": "2026-11-23 14:27:36 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "ticket.assigned",
+          "at": "2026-11-23 14:27:36 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "ai_turn.not_opened",
+          "at": "2026-11-23 14:27:36 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "delivery.sending",
+          "at": "2026-11-23 14:27:37 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        },
+        {
+          "type": "delivery.failed",
+          "at": "2026-11-23 14:27:37 UTC",
+          "trace_id": "ae801536874fbac71260e4a8f7b7ace0"
+        }
+      ]
+    },
+    {
+      "ticket_id": 9,
+      "brand": "infinitepay",
+      "state": "com_ia",
+      "queue_id": 1,
+      "ruleset_version": 1,
+      "sla_started_at": null,
+      "sla_due_at": null,
+      "messages": [
+        [
+          "validacao-d463244a-9ff3-44ef-af47-30082661e2c8",
+          1,
+          "2eebace0965f35d1110a1bec8e06c886"
+        ]
+      ],
+      "routing": [
+        {
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886",
+          "data": {
+            "moment": "criacao",
+            "default": true,
+            "queue_id": 1,
+            "rule_name": null,
+            "conditions": [],
+            "queue_name": "Geral",
+            "rule_index": null,
+            "group_index": null,
+            "queue_version": 1,
+            "skipped_rules": [],
+            "ruleset_version": 1
+          }
+        }
+      ],
+      "turns": [
+        [
+          1,
+          "applied",
+          "6d183125-8cd8-43a9-a188-f3cda14d557b",
+          "c638fc07-c577-4864-b3ff-74a247da1747"
+        ]
+      ],
+      "deliveries": [
+        [
+          "082479a6-c4c1-456f-abe6-bb512d668da5",
+          2,
+          "delivered",
+          null
+        ]
+      ],
+      "events": [
+        {
+          "type": "ticket.created",
+          "at": "2026-11-23 14:29:13 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "message.received",
+          "at": "2026-11-23 14:29:13 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "turn.dispatch_scheduled",
+          "at": "2026-11-23 14:29:15 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "triage.classified",
+          "at": "2026-11-23 14:29:15 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "routing.decided",
+          "at": "2026-11-23 14:29:15 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "ticket.assigned",
+          "at": "2026-11-23 14:29:15 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "ai_turn.opened",
+          "at": "2026-11-23 14:29:15 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "agent_event.published",
+          "at": "2026-11-23 14:29:15 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "agent_action.applied",
+          "at": "2026-11-23 14:29:16 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "delivery.requested",
+          "at": "2026-11-23 14:29:17 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "delivery.sending",
+          "at": "2026-11-23 14:29:17 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "delivery.delivered",
+          "at": "2026-11-23 14:29:17 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        },
+        {
+          "type": "delivery.status_received",
+          "at": "2026-11-23 14:29:22 UTC",
+          "trace_id": "2eebace0965f35d1110a1bec8e06c886"
+        }
+      ]
+    }
+  ]
+}
