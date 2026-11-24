@@ -14,6 +14,8 @@
   </div>
 </div>
 
+<%= render "operational_overview", overview: @overview if @overview %>
+
 <section class="analyst-capacity" aria-label="Analistas">
   <h2>Analistas</h2>
   <% if @capacity.unattended? %><p class="analyst-capacity__alert">Há casos esperando e nenhum analista online com vaga.</p><% end %>

@@ -311,6 +311,12 @@ Só o supervisor (RN-53), dentro das marcas das equipes dele (RNF-24), em `/conf
 - **Equipes e atendentes (RF-22, RF-58).** Equipe com nome único na marca; atendente humano com senha (bcrypt, 10 caracteres ou mais), perfil analista ou supervisor, capacidade de 1 a 50 e uma equipe da marca.
 - **Fora deste bloco:** cadastro de marcas (as marcas vêm do seed), tempos da IA por marca versionados em `Turns::Policy.for(brand)` e SLA por horário de atendimento da fila.
 
+### 3.8 Indicadores operacionais (bloco 18, RF-60)
+
+O painel operacional do supervisor fica em `/fila`, usa as marcas autorizadas e informa o instante da consulta. Volume, espera e SLA representam os atendimentos abertos por fila, sem o limite de linhas da listagem. Para esses indicadores, abertos são os estados diferentes de `resolvido` e `fechado`. Espera é o tempo desde `sla_started_at` dos casos `aguardando_humano`; o painel mostra quantidade esperando, média e maior espera, e informa os casos sem esse marco. SLA mostra os casos marcados permanentemente com `sla_breached` e os que ainda aguardam assunção no prazo exato ou após `sla_due_at`.
+
+A taxa de escalação considera os atendimentos criados nas últimas 24 horas: quantidade distinta com `ticket.escalated` dividida pelo total criado na mesma janela; sem atendimentos, mostra “sem dados”. O painel exibe numerador, denominador e janela. Os limites da janela são inclusivos. A fila é a atual do atendimento, não uma reconstrução histórica de transferências. Registros sem fila aparecem como “Sem fila”. Os indicadores são uma leitura do Postgres, atualizada ao recarregar a página; não são resultados de carga nem percentis experimentais.
+
 ## 4. Modelo de dados
 
 ```mermaid

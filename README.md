@@ -21,6 +21,7 @@ O help desk atual da CloudWalk é de terceiros: é lento, tem defeitos recorrent
 | Handoff com resumo | Pedido de humano, escalação do agente ou prazo da IA levam o caso à fila humana com o resumo do agente |
 | Painel do analista | Fila de escalas, contexto, histórico do atendimento e dos anteriores, resposta, nota interna e resolução |
 | Rastreabilidade e auditoria | `audit_events` só de inserção, com `trace_id`, versão das regras e modelo do agente; linha do tempo por conversa |
+| Indicadores da operação | `/fila`, só supervisor: volume por fila, espera, SLA e taxa de escalação com janela e população explícitas (ADR-025) |
 | Memória e contexto | Contexto do turno com as mensagens pendentes e o histórico, versionado e com prova (ADR-022) |
 | Experimento técnico | [`bench/`](bench/README.md): hipótese, método, limitações e roteiro de carga (E1 e E5) |
 
@@ -118,6 +119,7 @@ O experimento principal mede carga e latência (E1) e capacidade com réplicas (
 ## Resultados
 
 - **Testes automatizados:** mais de 1.600 exemplos na plataforma, além dos do broker, do agente mock, dos contratos e dos canais simulados. `make check` roda tudo com rubocop e brakeman.
+- **Validação operacional (blocos 17 e 18):** 1.694 exemplos na suíte completa da plataforma, sem falhas, domínio com 99,31% de cobertura; RuboCop e Brakeman passaram. E2/E3/E4/E6 somam 166 exemplos no executor reproduzível. Há também observação com Kafka e entrega real no Compose, roteiro de configuração no navegador e capturas. Consulte [resultados e limites](docs/11-validacao-operacional.md) e [como repetir](bench/validation/README.md).
 - **Carga (E1 e E5):** **ainda não medida.** O roteiro está pronto e testado, mas nenhuma execução foi feita no Compose. Os números entram em `bench/results/` e aqui quando existirem. Nenhuma meta de desempenho do [05](docs/05-requisitos-nao-funcionais.md) está comprovada.
 - **Fluxo ponta a ponta com Kafka real:** comprovado nos testes por partes e, nos blocos iniciais, no Compose. A validação dos blocos recentes com `make up` e Kafka real está pendente (veja a coluna "Situação" do roadmap).
 
@@ -126,7 +128,8 @@ O experimento principal mede carga e latência (E1) e capacidade com réplicas (
 - O agente é mock: a qualidade das respostas e a latência de um modelo real não são avaliadas.
 - Os canais são simulados no formato dos provedores. Ficam de fora: assinatura nativa da Meta e do Pub/Sub, template do WhatsApp fora da janela de 24 h, status de entrega por canal, anexos além dos metadados.
 - Triagem por palavras-chave, não por modelo.
-- Painel sem tela de usuários e sem política de senha além do básico; assumir caso manualmente e transferir ainda não existem.
+- O supervisor cadastra equipes e atendentes humanos pela configuração; cadastro de marcas e tempos da IA por marca ainda faltam. A política de senha é básica; assumir caso manualmente e transferir ainda não existem.
+- Falhas de dependência foram injetadas nos testes; não há medição de queda física de Redis nem estudo de usabilidade com duas pessoas. Os limites dos blocos 17 e 18 estão no [relatório](docs/11-validacao-operacional.md).
 - O ambiente Compose roda em desenvolvimento com a pasta montada, o que pesa nas medições ([bench/README.md](bench/README.md), limitação 2).
 - Dados só sintéticos.
 
@@ -149,6 +152,7 @@ Propostas, que só entram por pedido explícito ([09](docs/09-evolucao-da-integr
 | 08 | [Decisões de arquitetura](docs/08-decisoes-de-arquitetura.md) | Stack escolhida e 18 ADRs com alternativas e consequências | Rascunho |
 | 09 | [Evolução da integração com a IA](docs/09-evolucao-da-integracao-com-ia.md) | Fronteira do agente, leitura sob demanda, RAG, desempenho e avaliações | Proposta |
 | 10 | [Organização do repositório](docs/10-organizacao-do-repositorio.md) | Para que serve cada pasta, onde ficam migrations, Redis, Kafka e contratos | Rascunho |
+| 11 | [Validação operacional](docs/11-validacao-operacional.md) | Evidências e limites de E2/E3/E4/E6, configuração e indicadores | Executado com limites registrados |
 
 ## Como contribuir
 

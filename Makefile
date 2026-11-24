@@ -4,7 +4,7 @@ PLATFORM := $(COMPOSE) run --rm web
 # Mesma versão do CI (setup-ruby lê o .ruby-version de cada serviço).
 CONTRACTS_RUBY := $(shell sed 's/^ruby-//' src/contracts/.ruby-version)
 
-.PHONY: help up down logs seed reset test lint security check topics eval bench
+.PHONY: help up down logs seed reset test lint security check topics eval bench validate-operation
 
 help: ## Lista os comandos
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -34,7 +34,7 @@ reset: ## Recria o banco, carrega o seed e reinicia o channels-mock (o estado de
 	$(COMPOSE) restart channels-mock
 
 test: ## Roda o rspec da plataforma, dos contratos, do broker, do agente mock e dos canais simulados
-	$(PLATFORM) sh -c "RAILS_ENV=test bin/rails db:prepare && bundle exec rspec"
+	$(PLATFORM) -v $(CURDIR)/bench:/bench:ro sh -c "RAILS_ENV=test bin/rails db:prepare && RAILS_ENV=test DATABASE_CLEANER_ALLOW_REMOTE_DATABASE_URL=true bundle exec rspec"
 	docker run --rm -v $(CURDIR)/src/contracts:/contracts -w /contracts ruby:$(CONTRACTS_RUBY)-slim sh -c "bundle install --quiet && bundle exec rspec"
 	$(COMPOSE) run --rm --no-deps broker bundle exec rspec
 	$(COMPOSE) run --rm --no-deps agent-mock bundle exec rspec
@@ -76,5 +76,9 @@ bench: ## Roda o experimento de carga e reconcilia o resultado (PROFILE=smoke|re
 	  $(COMPOSE) run --rm -T -v $$(pwd)/bench:/bench:ro -v $$(pwd)/$$dir:/results web bin/rails runner /bench/analysis/reconcile.rb $$run /results/$$run-k6.json > $$dir/$$run-db.json || true; \
 	  cat $$dir/$$run-db.json; \
 	done
+
+validate-operation: ## Evidências de E2/E3/E4/E6 em banco de teste separado (blocos 17 e 18)
+	@mkdir -p bench/results/operation
+	$(PLATFORM) -v $(CURDIR)/bench:/bench:ro -v $(CURDIR)/bench/results/operation:/results -e RAILS_ENV=test -e TEST_ENV_NUMBER=_operation -e VALIDATION_REVISION=$(shell git rev-parse HEAD) -e DATABASE_CLEANER_ALLOW_REMOTE_DATABASE_URL=true sh -c "bin/rails db:prepare && ruby /bench/validation/run.rb /results"
 
 check: test lint security ## Tudo que precisa passar antes do PR

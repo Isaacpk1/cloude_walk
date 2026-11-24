@@ -64,7 +64,9 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:3000/up"]
       interval: 5s
-      timeout: 3s
+      # ADR-026: o bind mount no Docker Desktop pode custar mais de 3 s antes do controller.
+      # É tolerância da sonda local, não um prazo de atendimento nem uma meta de desempenho.
+      timeout: 15s
       retries: 30
       # Na primeira subida (ou depois de trocar o Ruby) o entrypoint instala as gems no volume
       # `bundle` e roda o db:prepare: pode passar de 150 s. Falhas nesse período não contam.

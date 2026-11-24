@@ -50,7 +50,8 @@ module Configuration
       row = row.to_h.stringify_keys
       field = row["field"].to_s.strip
       value = row["value"].to_s.strip
-      return if field.empty? && value.empty? && row["op"].to_s.strip.empty?
+      # O select de operador vem preenchido com "eq" mesmo nas linhas extras vazias do formulário.
+      return if field.empty? && value.empty?
 
       op = field == "tags" ? "contains" : row["op"].to_s.strip
       { "field" => field, "op" => op, "value" => LIST_OPS.include?(op) ? value.split(",").map(&:strip).reject(&:empty?) : value }
