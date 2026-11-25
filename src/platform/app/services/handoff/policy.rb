@@ -72,7 +72,7 @@ module Handoff
       }.freeze,
       human_request_patterns: { "pt-BR" => PT_BR, "en" => EN }.freeze,
       # RN-41: o cliente já esperou mais que o normal.
-      priority_raising_reasons: %w[prazo_do_turno teto_do_ciclo publicacao_falhou falha_de_integracao].freeze,
+      priority_raising_reasons: %w[prazo_do_turno teto_do_ciclo publicacao_falhou falha_de_integracao agente_sem_vaga].freeze,
       # RN-33, item 6: uma troca é um turno com `reply` aplicado na atribuição atual da IA (AgentActions::Apply).
       exchanges_limit: 10
     )

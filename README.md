@@ -120,7 +120,7 @@ O experimento principal mede carga e latência (E1) e capacidade com réplicas (
 
 - **Testes automatizados:** mais de 1.600 exemplos na plataforma, além dos do broker, do agente mock, dos contratos e dos canais simulados. `make check` roda tudo com rubocop e brakeman.
 - **Validação operacional (blocos 17 e 18):** 1.694 exemplos na suíte completa da plataforma, sem falhas, domínio com 99,31% de cobertura; RuboCop e Brakeman passaram. E2/E3/E4/E6 somam 166 exemplos no executor reproduzível. Há também observação com Kafka e entrega real no Compose, roteiro de configuração no navegador e capturas. Consulte [resultados e limites](docs/11-validacao-operacional.md) e [como repetir](bench/validation/README.md).
-- **Carga (E1 e E5):** **ainda não medida.** O roteiro está pronto e testado, mas nenhuma execução foi feita no Compose. Os números entram em `bench/results/` e aqui quando existirem. Nenhuma meta de desempenho do [05](docs/05-requisitos-nao-funcionais.md) está comprovada.
+- **Carga (E1 e E5):** **em andamento, sem aprovação ainda.** As rodadas de 24 e 25/11 (perfil de produção, agente simulado de 3 a 12 s) acharam e corrigiram seis gargalos: disputa pela trava do atendimento, threads demais por processo, fila única do Sidekiq, entrada HTTP num processo só, fila do agente mal dimensionada e falta de reação à capacidade do agente (ADR-031 a 035). Com as primeiras correções, nenhuma mensagem aceita se perdeu e o trecho da plataforma sem a fila do agente caiu para ~1,6 s no mediano; o ack e o overhead com a fila ainda passam das metas. Detalhes, antes e depois e limites no [docs/12](docs/12-validacao-realista.md); a série de testes que falta, no [docs/13](docs/13-roteiro-de-testes.md).
 - **Fluxo ponta a ponta com Kafka real:** comprovado nos testes por partes e, nos blocos iniciais, no Compose. A validação dos blocos recentes com `make up` e Kafka real está pendente (veja a coluna "Situação" do roadmap).
 
 ## Limitações
@@ -130,7 +130,8 @@ O experimento principal mede carga e latência (E1) e capacidade com réplicas (
 - Triagem por palavras-chave, não por modelo.
 - O supervisor cadastra equipes e atendentes humanos pela configuração; cadastro de marcas e tempos da IA por marca ainda faltam. A política de senha é básica; assumir caso manualmente e transferir ainda não existem.
 - Falhas de dependência foram injetadas nos testes; não há medição de queda física de Redis nem estudo de usabilidade com duas pessoas. Os limites dos blocos 17 e 18 estão no [relatório](docs/11-validacao-operacional.md).
-- O ambiente Compose roda em desenvolvimento com a pasta montada, o que pesa nas medições ([bench/README.md](bench/README.md), limitação 2).
+- O ambiente Compose de desenvolvimento roda com a pasta montada, o que pesa nas medições; as rodadas de carga usam o perfil de produção (`helpdesk-bench`). Tudo roda num notebook (14 CPUs): os números provam o comportamento nessa configuração, não a capacidade de produção.
+- A capacidade do agente real (turnos em paralelo, tempo de resposta) é desconhecida; o controle de admissão (ADR-035) depende dela e precisa ser combinado com a CloudWalk.
 - Dados só sintéticos.
 
 ## Evolução
@@ -149,10 +150,12 @@ Propostas, que só entram por pedido explícito ([09](docs/09-evolucao-da-integr
 | 05 | [Requisitos não funcionais](docs/05-requisitos-nao-funcionais.md) | RNF com métricas | Rascunho |
 | 06 | [Regras de negócio](docs/06-regras-de-negocio.md) | 57 RN em 12 temas, parâmetros padrão e perguntas para o onboarding | Rascunho |
 | 07 | [Arquitetura](docs/07-arquitetura.md) | Princípios, componentes, fluxos, modelo de dados, contratos, falhas, escalabilidade e segurança | Rascunho |
-| 08 | [Decisões de arquitetura](docs/08-decisoes-de-arquitetura.md) | Stack escolhida e 18 ADRs com alternativas e consequências | Rascunho |
+| 08 | [Decisões de arquitetura](docs/08-decisoes-de-arquitetura.md) | Stack escolhida e 35 ADRs com alternativas e consequências | Rascunho |
 | 09 | [Evolução da integração com a IA](docs/09-evolucao-da-integracao-com-ia.md) | Fronteira do agente, leitura sob demanda, RAG, desempenho e avaliações | Proposta |
 | 10 | [Organização do repositório](docs/10-organizacao-do-repositorio.md) | Para que serve cada pasta, onde ficam migrations, Redis, Kafka e contratos | Rascunho |
 | 11 | [Validação operacional](docs/11-validacao-operacional.md) | Evidências e limites de E2/E3/E4/E6, configuração e indicadores | Executado com limites registrados |
+| 12 | [Validação realista](docs/12-validacao-realista.md) | Carga com agente realista: gargalos achados, correções, antes e depois, como o overhead é medido | Executado em parte |
+| 13 | [Roteiro de testes](docs/13-roteiro-de-testes.md) | Série de testes na ordem, critérios de aprovação, plano de correção e registro das execuções | Em andamento |
 
 ## Como contribuir
 

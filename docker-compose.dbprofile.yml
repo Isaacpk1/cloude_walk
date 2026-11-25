@@ -1,0 +1,8 @@
+# Postgres com pg_stat_statements: mostra as consultas mais lentas e mais frequentes do experimento (ADR-029).
+#
+#   docker compose -p helpdesk-bench -f docker-compose.yml -f docker-compose.bench.yml -f docker-compose.dbprofile.yml up -d --wait
+# Depois da subida, crie a extensão no banco do experimento (uma vez) e leia com bench/db/slow_queries.sql:
+#   Get-Content bench/db/enable.sql | docker compose -p helpdesk-bench ... exec -T postgres psql -U helpdesk -d helpdesk_benchmark
+services:
+  postgres:
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all", "-c", "track_io_timing=on"]

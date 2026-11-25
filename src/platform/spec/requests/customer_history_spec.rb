@@ -39,6 +39,14 @@ RSpec.describe "RF-47: histórico dos atendimentos anteriores do cliente", :anon
     expect(response.body).to include("Primeiro atendimento deste cliente")
   end
 
+  it "RF-52: mostra o resumo persistido do atendimento anterior" do
+    previous = previous_for(ticket.customer, channel: "email", state: "resolvido")
+    TicketSummary.create!(brand: infinitepay, ticket: previous, assignment_version: 0, resolved_at: Time.current,
+                          body: "Problema de repasse resolvido.", created_at: Time.current)
+    get conversation_path(ticket.id)
+    expect(doc.css(".customer-history").text).to include("Problema de repasse resolvido.")
+  end
+
   it "RN-52: não mistura atendimentos de outra marca com o mesmo identificador" do
     foreign = create(:customer, brand: jim)
     previous_for(foreign, channel: "chat", state: "resolvido")

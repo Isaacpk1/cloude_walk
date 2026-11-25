@@ -23,8 +23,8 @@ RSpec.describe AgentActionsConsumer, "RF-31, RNF-14: consumer de helpdesk.agent.
     consumer.consume
 
     expect(AgentActions::Apply).to have_received(:call)
-      .with('{"a":1}', traceparent: AgentActionHelpers::TRACEPARENT, header_event_id: "e-1").ordered
-    expect(AgentActions::Apply).to have_received(:call).with('{"b":2}', traceparent: nil, header_event_id: nil).ordered
+      .with('{"a":1}', traceparent: AgentActionHelpers::TRACEPARENT, header_event_id: "e-1", broker_at: kind_of(Time)).ordered
+    expect(AgentActions::Apply).to have_received(:call).with('{"b":2}', traceparent: nil, header_event_id: nil, broker_at: kind_of(Time)).ordered
     expect(consumer.messages.last.offset + 1).to eq(consumer.coordinator.seek_offset)
   end
 
@@ -53,6 +53,17 @@ RSpec.describe AgentActionsConsumer, "RF-31, RNF-14: consumer de helpdesk.agent.
 
     expect(turn.reload).to have_attributes(status: "applied", applied_event_id: action["event_id"])
     expect(AuditEvent.find_by(event_type: "agent_action.applied").trace_id).to eq(AgentActionHelpers::TRACE_ID)
+  end
+
+  it "RNF-03: a auditoria guarda quando a resposta entrou no broker, a saída do agente medida na fronteira" do
+    turn = opened_turn
+    produce(JSON.generate(agent_action_for(turn)))
+
+    consumer.consume
+
+    data = AuditEvent.find_by!(event_type: "agent_action.applied").data
+    broker_at = Time.iso8601(data.fetch("broker_at"))
+    expect(broker_at).to be <= Time.iso8601(data.fetch("platform_received_at"))
   end
 
   it "RN-44: JSON malformado vai para a DLQ com o event_id do cabeçalho da mensagem e o offset é confirmado" do

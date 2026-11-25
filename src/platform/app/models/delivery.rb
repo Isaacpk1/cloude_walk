@@ -3,7 +3,7 @@
 class Delivery < ApplicationRecord
   STATUSES = %w[pending sending delivered cancelled failed].freeze
   OPEN = %w[pending sending].freeze
-  KINDS = %w[reply resolution progress handoff_notice analyst].freeze
+  KINDS = %w[reply resolution progress handoff_notice analyst reminder].freeze
 
   belongs_to :brand
   belongs_to :ticket

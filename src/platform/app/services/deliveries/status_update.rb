@@ -35,7 +35,7 @@ module Deliveries
         # Travas: processed_events e depois o atendimento, como o AgentActions::Apply (sem ciclo).
         next Result.new(status: :duplicate, delivery:) unless mark_processed
 
-        Ticket.lock.find_by!(id: delivery.ticket_id, brand_id: delivery.brand_id)
+        Ticket.lock(Ticket::ROW_LOCK).find_by!(id: delivery.ticket_id, brand_id: delivery.brand_id)
         delivery.reload
         apply(delivery)
         Result.new(status: :accepted, delivery:)

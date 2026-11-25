@@ -1,4 +1,7 @@
 ENV["RACK_ENV"] = "test"
+# Os testes assumem o padrão do código. No Compose o contêiner já traz PLATFORM_URL (http://web:3000) e outras; sem
+# limpar, os stubs do WebMock (localhost) não casam e 36 testes falham.
+%w[PLATFORM_URL PLATFORM_PUBLIC_URL CHAT_PROVIDER_FAULT CHAT_PROVIDER_FAULT_TIMES AGENT_CONTROL_REDIS_URL].each { ENV.delete(_1) }
 require "rack/test"
 require "stringio"
 require "webmock/rspec"

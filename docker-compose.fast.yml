@@ -1,0 +1,11 @@
+# Modo rápido para navegar no painel (demonstração e ensaio da apresentação).
+# Desliga a recarga automática do código no web: no Docker Desktop do Windows a pasta montada fazia o Rails
+# conferir os arquivos a cada pedido (1,5 a 3 s por tela, medição do bloco 03). Sem isso, a troca de tela cai
+# para centenas de milissegundos. Custo: mudou o código ou o CSS, reinicie com `docker compose restart web`.
+#
+# Subir:   docker compose -f docker-compose.yml -f docker-compose.fast.yml up -d --build --wait
+# Voltar:  docker compose up -d --force-recreate web   (recarga automática de volta, para desenvolver)
+services:
+  web:
+    environment:
+      RAILS_ENABLE_RELOADING: "0"

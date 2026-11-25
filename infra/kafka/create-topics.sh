@@ -4,6 +4,7 @@
 #
 #   KAFKA_BOOTSTRAP=kafka:9092 sh create-topics.sh [topics.yml]
 #   DRY_RUN=1 sh create-topics.sh   # só imprime os comandos (usado nos testes)
+#   TOPIC_PARTITIONS=192 sh create-topics.sh   # mesma lista com outro número de partições
 set -eu
 
 FILE="${1:-$(dirname "$0")/topics.yml}"
@@ -21,6 +22,8 @@ awk '
                                     configs = configs (configs == "" ? "" : ",") key "=" value; next }
   END { flush() }
 ' "$FILE" | while read -r name partitions replication configs; do
+  # TOPIC_PARTITIONS sobrepõe as partições na criação (teste de carga, ADR-034); sem ela vale o topics.yml.
+  partitions="${TOPIC_PARTITIONS:-$partitions}"
   set -- --bootstrap-server "$BOOTSTRAP" --create --if-not-exists --topic "$name" \
     --partitions "$partitions" --replication-factor "$replication"
   if [ "$configs" != "-" ]; then

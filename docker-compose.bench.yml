@@ -1,0 +1,48 @@
+# Bloco 19: sobreposição usada com -p helpdesk-bench para não tocar os dados do desenvolvimento.
+# docker compose -p helpdesk-bench -f docker-compose.yml -f docker-compose.bench.yml up -d --build --wait
+x-bench-env: &bench-env
+  RAILS_ENV: production
+  BENCHMARK_MODE: "1"
+  POSTGRES_DB: helpdesk_benchmark
+  SECRET_KEY_BASE: benchmark-only-synthetic-secret-key-base-do-not-use-outside-local-experiments
+  AR_ENCRYPTION_PRIMARY_KEY: benchmark-only-primary-key-0000000000000000
+  AR_ENCRYPTION_DETERMINISTIC_KEY: benchmark-only-deterministic-00000000000000
+  AR_ENCRYPTION_KEY_DERIVATION_SALT: benchmark-only-salt-00000000000000000000000
+  BROKER_WEBHOOK_SECRET: benchmark-only-broker-secret
+  RAILS_LOG_LEVEL: warn
+
+services:
+  postgres:
+    ports: !reset []
+  redis:
+    ports: !reset []
+  kafka:
+    ports: !reset []
+  web:
+    environment:
+      <<: *bench-env
+    volumes: !reset []
+    ports: !override ["127.0.0.1:3300:3000"]
+  worker:
+    environment:
+      <<: *bench-env
+    volumes: !reset []
+  scheduler:
+    environment:
+      <<: *bench-env
+    volumes: !reset []
+  consumer:
+    environment:
+      <<: *bench-env
+    volumes: !reset []
+  broker:
+    environment:
+      BROKER_WEBHOOK_SECRET: benchmark-only-broker-secret
+    ports: !reset []
+  agent-mock:
+    environment:
+      AGENT_LATENCY_MS: "2000"
+  channels-mock:
+    environment:
+      PLATFORM_PUBLIC_URL: http://localhost:3300
+    ports: !override ["127.0.0.1:3400:4000"]

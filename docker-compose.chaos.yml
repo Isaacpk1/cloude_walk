@@ -1,0 +1,43 @@
+# Falhas de rede entre a plataforma e o Postgres / Redis, com Toxiproxy (ADR-029).
+# Kafka NÃO passa pelo proxy: o broker devolve o endereço anunciado (advertised listener) e o cliente
+# passaria a falar direto com ele, ignorando o proxy. Para o Kafka use `docker compose pause kafka`.
+#
+#   docker compose -p helpdesk-bench -f docker-compose.yml -f docker-compose.bench.yml -f docker-compose.chaos.yml up -d --wait
+#   docker compose -p helpdesk-bench ... exec toxiproxy /toxiproxy-cli toxic add -t latency -a latency=300 postgres
+#   docker compose -p helpdesk-bench ... exec toxiproxy /toxiproxy-cli toxic remove -n latency_downstream postgres
+# Roteiro pronto: bench/chaos/run.ps1
+x-via-proxy: &via-proxy
+  DATABASE_URL: postgres://${POSTGRES_USER:-helpdesk}:${POSTGRES_PASSWORD:-helpdesk}@toxiproxy:15432
+  REDIS_URL: redis://toxiproxy:16379/0
+
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    volumes:
+      - ./infra/chaos/toxiproxy.json:/config/toxiproxy.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  web:
+    environment: *via-proxy
+    depends_on:
+      toxiproxy:
+        condition: service_started
+  worker:
+    environment: *via-proxy
+    depends_on:
+      toxiproxy:
+        condition: service_started
+  scheduler:
+    environment: *via-proxy
+    depends_on:
+      toxiproxy:
+        condition: service_started
+  consumer:
+    environment: *via-proxy
+    depends_on:
+      toxiproxy:
+        condition: service_started

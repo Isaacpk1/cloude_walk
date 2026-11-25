@@ -3,7 +3,7 @@
 #   Distribution::Assign.call(ticket_id:, brand_id:, trace_id: nil, now: Time.current)
 #   # => Result(status: :assigned | :waiting | :not_waiting, assignee_id:, reason:)
 #
-# Numa transação, trava o atendimento (FOR UPDATE, na marca dele: invariante 6) e só age se ele ainda está em
+# Numa transação, trava o atendimento (FOR NO KEY UPDATE, ADR-031, na marca dele: invariante 6) e só age se ele ainda está em
 # `aguardando_humano`, sem responsável e com fila. Os candidatos são analistas humanos online da equipe da fila,
 # abaixo da capacidade, do menor `active_count` e, em empate, de quem está há mais tempo sem receber caso (nulo
 # primeiro, depois o menor id). A vaga é reservada por `Distribution::Slot.claim!` (atualização condicional):
@@ -28,7 +28,7 @@ module Distribution
 
     def call
       ActiveRecord::Base.transaction do
-        ticket = Ticket.lock.find_by(id: @ticket_id, brand_id: @brand_id)
+        ticket = Ticket.lock(Ticket::ROW_LOCK).find_by(id: @ticket_id, brand_id: @brand_id)
         if ticket.nil? || !waiting?(ticket) then Result.new(:not_waiting, nil, ticket.nil? ? "inexistente" : ticket.state)
         else attempt(ticket)
         end

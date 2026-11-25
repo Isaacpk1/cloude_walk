@@ -8,7 +8,7 @@ module Human
       def initialize(delivery_event_id: nil, reason: nil, **) = super
     end
     REJECTED = :rejected
-    HUMAN_STATES = %w[com_analista].freeze
+    HUMAN_STATES = %w[com_analista aguardando_cliente].freeze
 
     def self.call(...) = new(...).call
 
@@ -22,7 +22,7 @@ module Human
 
     def call
       result = ActiveRecord::Base.transaction do
-        @ticket = Ticket.lock.find_by(id: @ticket_id, brand_id: @brand_id)
+        @ticket = Ticket.lock(Ticket::ROW_LOCK).find_by(id: @ticket_id, brand_id: @brand_id)
         reason = rejection
         reason ? Result.new(status: REJECTED, reason:) : perform
       end

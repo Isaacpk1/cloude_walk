@@ -12,12 +12,12 @@ RSpec.describe "ADR-023, RNF-30: aba de evals" do
   def scenario_card = doc.at_css("#scenario-corrida-3s")
 
   describe "navegação" do
-    it "Evals é link no menu do supervisor" do
+    it "Qualidade da IA (evals) é link no menu do supervisor" do
       get "/"
 
-      expect(doc.at_css(%(nav a[href="#{evals_path}"])).text).to eq("Evals")
+      expect(doc.at_css(%(nav a[href="#{evals_path}"])).text).to eq("Qualidade da IA")
       get evals_path
-      expect(doc.at_css(%(nav a[aria-current="page"])).text).to eq("Evals")
+      expect(doc.at_css(%(nav a[aria-current="page"])).text).to eq("Qualidade da IA")
     end
   end
 

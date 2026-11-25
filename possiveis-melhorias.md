@@ -19,6 +19,11 @@ As evoluções maiores da integração com a IA (MCP, RAG, LLM como juiz, modo s
 | 9 | Deploy em servidor com Kamal | Infra | Depois do MVP | Médio |
 | 10 | Ilha React no editor de regras | Front | Se o teste do RNF-31 falhar | Médio |
 | 11 | Fila na porta da ingestão (webhook cru em tópico) | Ingestão / infra | Se o E1 mostrar o ack acima de 500 ms (p99) na carga de referência | Alto |
+| 12 | Despachante único da admissão no scheduler | Desempenho | Se a trava única da admissão (ADR-035) virar gargalo com centenas de turnos na espera | Médio |
+| 13 | Cota de vagas do agente por marca | Isolamento | Antes de várias marcas dividirem o mesmo agente em produção (RNF-33) | Médio |
+| 14 | Prioridade e cancelamento combinados com o agente | Contrato | Quando o agente real puder ler um tópico de prioridade ou cancelar turno superado | Médio |
+| 15 | Autoescala do agente pelo sinal da plataforma | Infra / CloudWalk | Com o agente real em produção (KEDA, ECS) | Médio |
+| 16 | Autoescala dos workers pela idade do item mais antigo da `critical` | Infra | Depois do deploy (item 9) | Médio |
 
 ## 1. Avisar o agente que o turno foi superado
 
@@ -117,8 +122,42 @@ As evoluções maiores da integração com a IA (MCP, RAG, LLM como juiz, modo s
 | Complexidade | Uma etapa | Mais um consumer, mais um ponto de falha, deduplicação depois do ack |
 | Pico | Limite por marca devolve `429` (RNF-33) | Absorve o pico, a fila cresce |
 
-**Decisão (18/11/2026).** Manter como está no MVP e deixar o experimento E1 decidir. Colocar agora seria otimizar sem número.
+**Decisão (18/11/2026).** Manter como está no MVP e deixar o experimento E1 decidir.
+
+**Atualização (25/11/2026).** O ack passou de 500 ms nas rodadas de carga, mas o `web` rodava num processo só (GVL). Antes de adotar a fila na porta, mede-se o Puma em cluster (ADR-033): só se o ack continuar alto com ele, esta melhoria vira ADR. Colocar agora seria otimizar sem número.
 
 **Quando vale.** Se o E1 mostrar o ack da ingestão acima de 500 ms (p99 do RNF-01) na carga de referência. Nesse caso, vira ADR novo no 08 e muda o texto do RNF-14 ("o ack só sai depois de a mensagem estar persistida" passaria a aceitar a persistência no tópico).
 
 **Origem.** Pergunta do usuário durante o bloco 03: por que não há fila entre os webhooks dos canais e a plataforma.
+
+## 12. Despachante único da admissão no scheduler
+
+**Problema.** No controle de admissão (ADR-035), cada turno na espera confere a vaga a cada 1 s, sob uma trava única. Com centenas de turnos esperando, essa trava pode virar gargalo.
+
+**Ideia.** Um passo do `scheduler` lê a fila em ordem de prazo e libera exatamente as vagas livres, acordando só os turnos escolhidos. A resposta aplicada acorda o próximo da fila.
+
+**Quando vale.** Se as amostras de bloqueio ou o tempo do `agent.event` na espera mostrarem a trava da admissão no topo.
+
+## 13. Cota de vagas do agente por marca
+
+**Problema.** A admissão tem um limite só para o agente inteiro: a rajada de uma marca ocupa as vagas da outra.
+
+**Ideia.** Vagas reservadas por marca, com empréstimo das vagas ociosas.
+
+**Quando vale.** Antes de InfinitePay e JIM dividirem o mesmo agente em produção (RNF-33).
+
+## 14. Prioridade e cancelamento combinados com o agente
+
+**Problema.** O Kafka é um log: depois que o turno entra na partição, não dá para passar na frente nem retirar.
+
+**Ideia.** Proposta de contrato: um tópico de prioridade lido primeiro e o evento `turn.superseded` (item 1). Com a admissão, a fila de verdade já fica na plataforma; isto só cobre o que já foi enviado.
+
+**Pergunta para a CloudWalk.** O agente real consome cada partição em série? Quantos turnos processa em paralelo?
+
+## 15. Autoescala do agente pelo sinal da plataforma
+
+**Ideia.** A plataforma expõe turnos no agente, fila na espera e idade do mais antigo; a CloudWalk escala o agente por esse sinal (KEDA, ECS).
+
+## 16. Autoescala dos workers
+
+**Ideia.** Escalar os processos do `worker` pela idade do item mais antigo da fila `critical` (não pela CPU), com subida rápida e descida com espera. Um script de prova de conceito no Compose é possível, mas divide os mesmos núcleos do notebook.

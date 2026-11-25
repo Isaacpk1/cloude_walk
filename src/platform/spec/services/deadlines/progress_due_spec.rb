@@ -55,7 +55,7 @@ RSpec.describe Deadlines::ProgressDue, "RN-57: aviso de progresso registrado pel
 
       ids = emit_at(t0 + 15.seconds)
 
-      expect(OutboxJob).to have_been_enqueued.with(ids.sole).on_queue("critical")
+      expect(OutboxJob).to have_been_enqueued.with(ids.sole).on_queue("timers")
     end
 
     it "falha de dependência: Redis fora não desfaz o item (a recuperação reoferece)" do

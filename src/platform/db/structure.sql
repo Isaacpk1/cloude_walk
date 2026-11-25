@@ -10,6 +10,18 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: ai_policy_versions_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ai_policy_versions_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'versão dos tempos da IA é imutável (ADR-028)';
+END $$;
+
+
+--
 -- Name: audit_events_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -116,6 +128,18 @@ $$;
 
 
 --
+-- Name: ticket_summaries_immutable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ticket_summaries_immutable() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  RAISE EXCEPTION 'resumo de resolução é imutável (ADR-027)';
+END $$;
+
+
+--
 -- Name: tickets_evaluation_immutable(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -146,6 +170,42 @@ END $$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: ai_policy_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ai_policy_versions (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    version integer NOT NULL,
+    settings jsonb NOT NULL,
+    created_by_id bigint,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT ai_policy_limits CHECK (((settings ?& ARRAY['turn_deadline'::text, 'cycle_deadline'::text, 'progress_notice'::text, 'chat_window'::text, 'whatsapp_window'::text, 'email_window'::text, 'ceiling'::text]) AND ((((settings ->> 'turn_deadline'::text))::numeric >= (5)::numeric) AND (((settings ->> 'turn_deadline'::text))::numeric <= (60)::numeric)) AND ((((settings ->> 'cycle_deadline'::text))::numeric >= ((settings ->> 'turn_deadline'::text))::numeric) AND (((settings ->> 'cycle_deadline'::text))::numeric <= (300)::numeric)) AND (((settings ->> 'progress_notice'::text))::numeric > (0)::numeric) AND (((settings ->> 'progress_notice'::text))::numeric < ((settings ->> 'cycle_deadline'::text))::numeric) AND ((((settings ->> 'ceiling'::text))::numeric >= (0)::numeric) AND (((settings ->> 'ceiling'::text))::numeric <= (4)::numeric)) AND ((((settings ->> 'chat_window'::text))::numeric >= (0)::numeric) AND (((settings ->> 'chat_window'::text))::numeric <= ((settings ->> 'ceiling'::text))::numeric)) AND ((((settings ->> 'whatsapp_window'::text))::numeric >= (0)::numeric) AND (((settings ->> 'whatsapp_window'::text))::numeric <= ((settings ->> 'ceiling'::text))::numeric)) AND ((((settings ->> 'email_window'::text))::numeric >= (0)::numeric) AND (((settings ->> 'email_window'::text))::numeric <= ((settings ->> 'ceiling'::text))::numeric)))),
+    CONSTRAINT ai_policy_numeric_values CHECK (((jsonb_typeof((settings -> 'turn_deadline'::text)) = 'number'::text) AND (jsonb_typeof((settings -> 'cycle_deadline'::text)) = 'number'::text) AND (jsonb_typeof((settings -> 'progress_notice'::text)) = 'number'::text) AND (jsonb_typeof((settings -> 'chat_window'::text)) = 'number'::text) AND (jsonb_typeof((settings -> 'whatsapp_window'::text)) = 'number'::text) AND (jsonb_typeof((settings -> 'email_window'::text)) = 'number'::text) AND (jsonb_typeof((settings -> 'ceiling'::text)) = 'number'::text))),
+    CONSTRAINT ai_policy_positive_version CHECK ((version > 0))
+);
+
+
+--
+-- Name: ai_policy_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ai_policy_versions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ai_policy_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ai_policy_versions_id_seq OWNED BY public.ai_policy_versions.id;
+
 
 --
 -- Name: ai_turns; Type: TABLE; Schema: public; Owner: -
@@ -429,7 +489,7 @@ CREATE TABLE public.deliveries (
     CONSTRAINT deliveries_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
     CONSTRAINT deliveries_delivered_at_check CHECK ((((status)::text = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT deliveries_delivered_confirmation_check CHECK ((((status)::text <> 'delivered'::text) OR (provider_message_id IS NOT NULL))),
-    CONSTRAINT deliveries_kind_check CHECK (((kind)::text = ANY (ARRAY[('reply'::character varying)::text, ('resolution'::character varying)::text, ('progress'::character varying)::text, ('handoff_notice'::character varying)::text, ('analyst'::character varying)::text]))),
+    CONSTRAINT deliveries_kind_check CHECK (((kind)::text = ANY (ARRAY[('reply'::character varying)::text, ('resolution'::character varying)::text, ('progress'::character varying)::text, ('handoff_notice'::character varying)::text, ('analyst'::character varying)::text, ('reminder'::character varying)::text]))),
     CONSTRAINT deliveries_seq_check CHECK ((seq >= 1)),
     CONSTRAINT deliveries_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('sending'::character varying)::text, ('delivered'::character varying)::text, ('cancelled'::character varying)::text, ('failed'::character varying)::text])))
 );
@@ -826,6 +886,41 @@ ALTER SEQUENCE public.teams_id_seq OWNED BY public.teams.id;
 
 
 --
+-- Name: ticket_summaries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ticket_summaries (
+    id bigint NOT NULL,
+    brand_id bigint NOT NULL,
+    ticket_id bigint NOT NULL,
+    assignment_version integer NOT NULL,
+    resolved_at timestamp(6) without time zone NOT NULL,
+    body text NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    CONSTRAINT ticket_summary_not_empty CHECK ((length(body) > 0))
+);
+
+
+--
+-- Name: ticket_summaries_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ticket_summaries_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ticket_summaries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ticket_summaries_id_seq OWNED BY public.ticket_summaries.id;
+
+
+--
 -- Name: tickets; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -860,16 +955,30 @@ CREATE TABLE public.tickets (
     sla_due_at timestamp(6) without time zone,
     sla_alerted_at timestamp(6) without time zone,
     sla_breached boolean DEFAULT false NOT NULL,
+    resolved_at timestamp(6) without time zone,
+    resolution_source character varying,
+    resolution_reason character varying,
+    close_due_at timestamp(6) without time zone,
+    waiting_since timestamp(6) without time zone,
+    reminder_due_at timestamp(6) without time zone,
+    inactivity_due_at timestamp(6) without time zone,
+    ai_policy_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT tickets_ai_policy_object CHECK ((jsonb_typeof(ai_policy_snapshot) = 'object'::text)),
     CONSTRAINT tickets_ai_turns_count_check CHECK ((ai_turns_count >= 0)),
     CONSTRAINT tickets_channel_check CHECK (((channel)::text = ANY (ARRAY[('chat'::character varying)::text, ('whatsapp'::character varying)::text, ('email'::character varying)::text]))),
+    CONSTRAINT tickets_close_after_resolution CHECK (((close_due_at IS NULL) OR (close_due_at >= resolved_at))),
     CONSTRAINT tickets_context_version_check CHECK ((context_version >= 0)),
     CONSTRAINT tickets_dispatch_requires_cycle_check CHECK (((dispatch_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
     CONSTRAINT tickets_first_pending_pair_check CHECK (((first_pending_seq IS NULL) = (first_pending_at IS NULL))),
     CONSTRAINT tickets_first_pending_seq_check CHECK (((first_pending_seq IS NULL) OR (first_pending_seq >= 1))),
     CONSTRAINT tickets_progress_requires_cycle_check CHECK (((progress_due_at IS NULL) OR (first_pending_at IS NOT NULL))),
+    CONSTRAINT tickets_resolution_deadline_pair CHECK (((resolved_at IS NULL) = (close_due_at IS NULL))),
+    CONSTRAINT tickets_resolution_source CHECK (((resolution_source IS NULL) OR ((resolution_source)::text = ANY (ARRAY[('agent'::character varying)::text, ('human'::character varying)::text, ('inactivity'::character varying)::text])))),
     CONSTRAINT tickets_sla_alert_requires_start_check CHECK (((sla_alerted_at IS NULL) OR (sla_started_at IS NOT NULL))),
     CONSTRAINT tickets_sla_due_after_start_check CHECK (((sla_due_at IS NULL) OR ((sla_started_at IS NOT NULL) AND (sla_due_at >= sla_started_at)))),
-    CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text])))
+    CONSTRAINT tickets_state_check CHECK (((state)::text = ANY (ARRAY[('novo'::character varying)::text, ('em_triagem'::character varying)::text, ('com_ia'::character varying)::text, ('aguardando_humano'::character varying)::text, ('com_analista'::character varying)::text, ('aguardando_cliente'::character varying)::text, ('resolvido'::character varying)::text, ('fechado'::character varying)::text]))),
+    CONSTRAINT tickets_waiting_deadlines_order CHECK (((waiting_since IS NULL) OR ((reminder_due_at >= waiting_since) AND (inactivity_due_at > reminder_due_at)))),
+    CONSTRAINT tickets_waiting_deadlines_pair CHECK ((((waiting_since IS NULL) = (reminder_due_at IS NULL)) AND ((waiting_since IS NULL) = (inactivity_due_at IS NULL))))
 );
 
 
@@ -934,6 +1043,13 @@ CREATE SEQUENCE public.users_id_seq
 --
 
 ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+
+
+--
+-- Name: ai_policy_versions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_policy_versions ALTER COLUMN id SET DEFAULT nextval('public.ai_policy_versions_id_seq'::regclass);
 
 
 --
@@ -1042,6 +1158,13 @@ ALTER TABLE ONLY public.teams ALTER COLUMN id SET DEFAULT nextval('public.teams_
 
 
 --
+-- Name: ticket_summaries id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ticket_summaries ALTER COLUMN id SET DEFAULT nextval('public.ticket_summaries_id_seq'::regclass);
+
+
+--
 -- Name: tickets id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1053,6 +1176,14 @@ ALTER TABLE ONLY public.tickets ALTER COLUMN id SET DEFAULT nextval('public.tick
 --
 
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- Name: ai_policy_versions ai_policy_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_policy_versions
+    ADD CONSTRAINT ai_policy_versions_pkey PRIMARY KEY (id);
 
 
 --
@@ -1216,6 +1347,14 @@ ALTER TABLE ONLY public.teams
 
 
 --
+-- Name: ticket_summaries ticket_summaries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ticket_summaries
+    ADD CONSTRAINT ticket_summaries_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: tickets tickets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1236,6 +1375,27 @@ ALTER TABLE ONLY public.users
 --
 
 CREATE UNIQUE INDEX idx_on_ticket_id_from_assignment_version_5e5bf8094e ON public.handoff_summaries USING btree (ticket_id, from_assignment_version);
+
+
+--
+-- Name: index_ai_policy_versions_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_policy_versions_on_brand_id ON public.ai_policy_versions USING btree (brand_id);
+
+
+--
+-- Name: index_ai_policy_versions_on_brand_id_and_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_ai_policy_versions_on_brand_id_and_version ON public.ai_policy_versions USING btree (brand_id, version);
+
+
+--
+-- Name: index_ai_policy_versions_on_created_by_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ai_policy_versions_on_created_by_id ON public.ai_policy_versions USING btree (created_by_id);
 
 
 --
@@ -1652,6 +1812,27 @@ CREATE UNIQUE INDEX index_teams_on_id_and_brand_id ON public.teams USING btree (
 
 
 --
+-- Name: index_ticket_summaries_on_brand_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ticket_summaries_on_brand_id ON public.ticket_summaries USING btree (brand_id);
+
+
+--
+-- Name: index_ticket_summaries_on_ticket_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_ticket_summaries_on_ticket_id ON public.ticket_summaries USING btree (ticket_id);
+
+
+--
+-- Name: index_ticket_summaries_on_ticket_id_and_assignment_version; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_ticket_summaries_on_ticket_id_and_assignment_version ON public.ticket_summaries USING btree (ticket_id, assignment_version);
+
+
+--
 -- Name: index_tickets_analyst_cases; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1736,6 +1917,13 @@ CREATE UNIQUE INDEX index_tickets_one_open_per_customer_channel ON public.ticket
 
 
 --
+-- Name: index_tickets_sla_waiting; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_tickets_sla_waiting ON public.tickets USING btree (sla_due_at, id) WHERE (((state)::text = 'aguardando_humano'::text) AND (assignee_id IS NULL) AND (sla_breached = false));
+
+
+--
 -- Name: index_users_distribution; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1747,6 +1935,27 @@ CREATE INDEX index_users_distribution ON public.users USING btree (status, activ
 --
 
 CREATE UNIQUE INDEX index_users_on_email ON public.users USING btree (email);
+
+
+--
+-- Name: tickets_due_close; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tickets_due_close ON public.tickets USING btree (close_due_at) WHERE ((state)::text = 'resolvido'::text);
+
+
+--
+-- Name: tickets_due_inactivity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX tickets_due_inactivity ON public.tickets USING btree (inactivity_due_at) WHERE ((state)::text = 'aguardando_cliente'::text);
+
+
+--
+-- Name: ai_policy_versions ai_policy_versions_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ai_policy_versions_immutable BEFORE DELETE OR UPDATE ON public.ai_policy_versions FOR EACH ROW EXECUTE FUNCTION public.ai_policy_versions_immutable();
 
 
 --
@@ -1796,6 +2005,13 @@ CREATE TRIGGER routing_rulesets_immutable BEFORE DELETE OR UPDATE ON public.rout
 --
 
 CREATE TRIGGER routing_rulesets_queues_of_brand BEFORE INSERT ON public.routing_rulesets FOR EACH ROW EXECUTE FUNCTION public.routing_rulesets_queues_of_brand();
+
+
+--
+-- Name: ticket_summaries ticket_summaries_immutable; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER ticket_summaries_immutable BEFORE DELETE OR UPDATE ON public.ticket_summaries FOR EACH ROW EXECUTE FUNCTION public.ticket_summaries_immutable();
 
 
 --
@@ -1901,6 +2117,14 @@ ALTER TABLE ONLY public.queues
 
 
 --
+-- Name: ai_policy_versions fk_rails_064a96e95b; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_policy_versions
+    ADD CONSTRAINT fk_rails_064a96e95b FOREIGN KEY (created_by_id) REFERENCES public.users(id);
+
+
+--
 -- Name: messages fk_rails_19770f78ed; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1965,6 +2189,14 @@ ALTER TABLE ONLY public.eval_runs
 
 
 --
+-- Name: ticket_summaries fk_rails_3f35de0686; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ticket_summaries
+    ADD CONSTRAINT fk_rails_3f35de0686 FOREIGN KEY (ticket_id, brand_id) REFERENCES public.tickets(id, brand_id);
+
+
+--
 -- Name: deliveries fk_rails_4feecaaa86; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1986,6 +2218,14 @@ ALTER TABLE ONLY public.teams
 
 ALTER TABLE ONLY public.tickets
     ADD CONSTRAINT fk_rails_5685ed71b0 FOREIGN KEY (customer_id) REFERENCES public.customers(id);
+
+
+--
+-- Name: ai_policy_versions fk_rails_57cc80e5b5; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_policy_versions
+    ADD CONSTRAINT fk_rails_57cc80e5b5 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
 
 
 --
@@ -2165,6 +2405,14 @@ ALTER TABLE ONLY public.queue_versions
 
 
 --
+-- Name: ticket_summaries fk_rails_f054b24865; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ticket_summaries
+    ADD CONSTRAINT fk_rails_f054b24865 FOREIGN KEY (brand_id) REFERENCES public.brands(id);
+
+
+--
 -- Name: routing_rulesets fk_routing_rulesets_default_queue_same_brand; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2195,6 +2443,11 @@ ALTER TABLE ONLY public.tickets
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20261124064000'),
+('20261124063000'),
+('20261124062000'),
+('20261124061000'),
+('20261124060000'),
 ('20261124050000'),
 ('20261124040000'),
 ('20261124030000'),

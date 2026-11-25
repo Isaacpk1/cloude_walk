@@ -1,0 +1,16 @@
+# Agente de IA com comportamento de produção: latência em faixa e falhas sorteadas (ADR-029).
+# O padrão do perfil de experimento (2 s fixos) é otimista: um agente real com consulta a sistemas e LLM
+# costuma levar de segundos a dezenas de segundos, com cauda (429, 5xx, timeout).
+#
+#   docker compose -p helpdesk-bench -f docker-compose.yml -f docker-compose.bench.yml -f docker-compose.realistic.yml up -d
+#
+# AGENT_LATENCY_MS sorteia uma latência uniforme na faixa, por event_id (reprodutível com a semente).
+# AGENT_FAILURE_RATE: a ação não sai; a plataforma escala pelo prazo do turno (RN-46, RN-33).
+# AGENT_CONCURRENCY: vazão do agente ~ concorrência / latência média. Com 48 threads e média de 7,5 s,
+# o teto é ~6,4 turnos/s. É o primeiro gargalo esperado (docs/07, seção 7).
+services:
+  agent-mock:
+    environment:
+      AGENT_LATENCY_MS: ${REALISTIC_AGENT_LATENCY_MS:-3000-12000}
+      AGENT_FAILURE_RATE: ${REALISTIC_AGENT_FAILURE_RATE:-0.03}
+      AGENT_CONCURRENCY: ${REALISTIC_AGENT_CONCURRENCY:-48}

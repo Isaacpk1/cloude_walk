@@ -687,3 +687,136 @@ O Sidekiq recebe o ID da ação após o commit. O worker conclui o item do outbo
 **Alternativas.** Manter 3 s (falso negativo reproduzido); retirar a pasta montada ou desligar a recarga (muda o fluxo de desenvolvimento; o perfil sem bind mount fica para o bloco 19); remover a sonda (perde a barreira de prontidão).
 
 **Consequências.** Uma falha silenciosa pode levar mais tempo para ser reconhecida pela sonda. A tolerância local não comprova nem altera metas de latência ou disponibilidade. O experimento de desempenho precisa do perfil próprio, sem pasta montada.
+
+## ADR-027 — Conclusão do ciclo e memória do atendimento
+
+**Status:** aprovado pelo usuário em 24/11/2026.
+
+**Contexto.** RF-09, RF-11, RF-32, RF-48 e RF-52/53 exigem resolução, reabertura e memória. A implementação anterior só registrava a ação `resolve` da IA. RN-07 a RN-09 definem os prazos, mas faltam os marcos persistidos e o tratamento de ações atrasadas.
+
+**Decisão aprovada antes do código do ciclo.**
+
+1. Resolver grava `resolved_at`, motivo e origem (`agent`, `human` ou `inactivity`), na mesma transação da mudança de estado e da auditoria, sob o lock do atendimento. A ação da IA mantém as condições de validade do turno e o contrato vigente. O mock só emite `resolve` com confirmação afirmativa, conforme RN-36.
+2. Cada resolução grava um resumo determinístico dos fatos do caso, com o problema, as ações registradas e o motivo da resolução. Notas internas não integram o contexto do agente. Resoluções sucessivas, após reabertura, têm resumos distintos, somente de inserção. O contexto usa o último resumo persistido dos três atendimentos recentes, sempre na mesma marca.
+3. A janela de reabertura inclui `resolved_at + 72 h`. Uma mensagem posterior fecha o caso anterior e abre um novo vinculado. Dentro da janela, reabre na mesma fila; resolução humana retorna à fila humana sem ocupar vaga. Resolução da IA retorna à IA somente em fila IA primeiro e sem pedido explícito de humano. Toda reabertura incrementa `assignment_version` e invalida trabalhos antigos. O SLA de assunção já iniciado permanece preservado (RN-23/RN-32).
+4. O scheduler fecha casos resolvidos estritamente depois da janela. Cada prazo é uma ação durável no outbox, com chave contendo o marco do ciclo. O worker revalida o estado, a versão e o marco sob o lock e conclui a ação na mesma transação do efeito (ADR-016).
+5. A espera pela resposta do cliente começa no commit da entrega bem-sucedida de uma resposta, nunca na sua preparação. Enquanto não há entrega, não corre inatividade. Resposta nova do cliente encerra a espera no commit da ingestão. O lembrete vence em 24 h e a resolução em 48 h; no vencimento de 48 h, não se envia lembrete atrasado. A resolução por inatividade libera a vaga humana uma vez. Lembretes usam o mesmo canal, ordem e idempotência das demais entregas.
+6. Não se inferem marcos históricos por `updated_at`. Casos antigos sem marco exigem conciliação explícita antes de ativar esses prazos. As restrições novas permitem esses registros legados; todos os fluxos novos gravam os marcos.
+
+O analista responsável mantém as ações de responder, anotar e resolver enquanto aguarda o cliente. A espera não libera a vaga; a resolução a libera uma vez.
+
+**Alternativas.** Usar `updated_at` confundiria mensagem, atribuição e resolução. Fechar imediatamente impediria a reabertura. Medir a espera antes da entrega consumiria o prazo enquanto o canal está indisponível.
+
+**Consequências.** O histórico continua completo e respostas tardias não reativam ciclos antigos. O resumo é determinístico, não uma avaliação da qualidade de uma IA real. Contratos externos permanecem na versão 1; campos novos ficam na persistência interna.
+
+## ADR-028 — Cadastro de marcas e configuração dos tempos da IA
+
+**Status:** aprovado pelo usuário em 24/11/2026. Fecha as lacunas do bloco 12 (RF-58 e ADR-020).
+
+**Contexto.** O supervisor só vê marcas das suas equipes (ADR-024). Criar uma marca sem equipe o impediria de administrá-la. O ADR-020 exige versões e efeito apenas em ciclos novos, inclusive quando o ciclo anterior começou com a política padrão.
+
+**Decisão aprovada antes do código.**
+
+1. Um supervisor autenticado pode cadastrar uma nova marca com nome, slug único, idioma (`pt-BR` ou `en`) e fuso IANA válido. A criação não modifica marcas existentes nem amplia acesso a elas. A mesma transação cria a equipe inicial “Operação”, vincula o criador como supervisor e cria filas padrão e de escalas com versões iniciais, além de um bot da nova marca. Todas as decisões são auditadas na marca nova. Não se cadastram contas de provedores nem segredos fictícios silenciosamente: uma marca nova fica sem canais conectados até configurar as contas. As duas marcas de demonstração continuam provisionadas pelo seed.
+2. Tempos da IA são configurações imutáveis numeradas por marca. A publicação exige supervisor com acesso à marca, cria nova versão sob o lock da marca e registra autor e valores na auditoria. Valores do ADR-020: turno de 5 a 60 s, ciclo entre o turno e 300 s, aviso positivo e anterior ao ciclo. Janela de cada canal entre 0 e 4 s; teto da janela de 0 a 4 s e não inferior à maior janela.
+3. No primeiro recebimento de um ciclo, a plataforma persiste uma cópia dos tempos e da versão em uso no atendimento. As mensagens seguintes, a abertura dos turnos e os avisos do mesmo ciclo usam essa cópia. Publicar uma política não altera ciclos em andamento. Ciclos legados sem cópia conservam os padrões anteriores; nunca são reinterpretados com a configuração nova.
+4. Os formulários exibem valores, versão e erros. Marcas e políticas ficam acessíveis pelo mesmo escopo de marca das demais configurações. As tabelas de versões recusam UPDATE/DELETE, têm unicidade por marca e versão e integridade referencial no banco.
+
+**Alternativas.** Criar sem equipe deixaria a marca inacessível ao próprio criador. Ler sempre a versão mais recente mudaria os prazos de ciclos ativos. Criar provedores falsos daria a impressão de um canal conectado sem existir no simulador.
+
+**Consequências.** Cadastro da marca não equivale a integração de um canal. Provisionar contas novas no simulador requer um contrato próprio e fica como uma decisão separada. As marcas já provisionadas cobrem a demonstração multi-marca do TAP.
+
+
+## ADR-029 — Ferramentas de validação realista: agente com cauda, falhas de rede, observabilidade, banco, telas e qualidade
+
+**Contexto.** O perfil de experimento usava um agente com 2 s fixos e nenhuma falha. Isso prova a plataforma num dia perfeito e esconde onde ela quebra. O teto do agente é concorrência ÷ latência (07, seção 7): com 48 threads e média de 7,5 s, cerca de 6,4 turnos/s, abaixo dos 20 msg/s da hipótese de E1.
+
+**Decisão.**
+- **Agente realista** por sobreposição do Compose (`docker-compose.realistic.yml`): `AGENT_LATENCY_MS=3000-12000` (uniforme, reprodutível pela semente) e `AGENT_FAILURE_RATE=0.03`. Sem código novo: o agent-mock já suporta as duas variáveis. Valores de partida, a calibrar com um agente real.
+- **Falhas de rede com Toxiproxy** entre a plataforma e o Postgres e o Redis (`docker-compose.chaos.yml`). O Kafka fica de fora: o broker anuncia o próprio endereço e o cliente contornaria o proxy. Para o Kafka, `docker compose pause`/`stop` (queda total é o caso de interesse).
+- **Observabilidade (ADR-009, RNF-22):** `/metrics` na plataforma, sem gem, com histograma de latência por ação, fila do outbox, turnos, entregas e DLQ; Prometheus e Grafana com painel versionado; traces OpenTelemetry para o Jaeger, ligados só se as gems existirem.
+- **Banco:** `pg_stat_statements` (sobreposição `docker-compose.dbprofile.yml`) para consultas lentas; Bullet em desenvolvimento para N+1.
+- **Telas (RNF-32):** Playwright mede troca de tela, TTFB, LCP e CLS; Lighthouse mede a página autenticada.
+- **Qualidade do agente:** conjunto de casos (`bench/agent-quality/cases.yaml`) e config do promptfoo com asserções determinísticas, para comparar um agente real. Sem LLM como juiz (docs/09).
+
+**Alternativas rejeitadas.** Locust e Gatling (o k6 já cobre). Gem `prometheus-exporter` ou `yabeda` (o que o experimento precisa cabe em 80 linhas e evita mudar o Gemfile e o lock). DeepEval e Ragas (pedem LLM como juiz e um agente real, fora do escopo). Toxiproxy no Kafka (advertised listeners).
+
+**Consequências.** A leitura de `/metrics` faz `COUNT` no outbox, nos turnos e nas entregas a cada 15 s: aceitável no experimento, a trocar por contadores se for para produção. A latência HTTP é por processo (um Puma, sem workers): com mais processos, cada um expõe a sua. Nada disto foi executado ainda: ver docs/12.
+
+
+## ADR-030 — Agente com LLM (Gemini) como motor opcional do agent-mock
+
+**Situação: código pronto, desligado por padrão e não validado. Só entra depois de validar tudo com o agente simulado (docs/12).** **Contexto.** O agente real está fora do escopo (ADR-008), mas o experimento e a demonstração ficam mais convincentes com uma resposta gerada por modelo, e o ADR-008 já prevê que "o contrato do tópico não muda, então um agente com LLM pode substituir o mock". O usuário pediu a integração com o Gemini (docs/09 liberado por pedido explícito).
+
+**Decisão.** `AGENT_ENGINE=gemini` troca o motor do agent-mock por um motor **híbrido**: a política (pedido de humano, estorno, troca de conta, resolução, limite de trocas, cliente não verificado) continua nas regras e **não passa pelo modelo**; o Gemini só redige a resposta das regras de consulta e do caso padrão, a partir do resultado das consultas sintéticas. Chamada REST direta a `generateContent` com saída estruturada (`{"text"}`), sem gem. Falha, timeout, teto de chamadas ou saída inválida **voltam à resposta das regras**, nunca ao silêncio.
+
+**Por quê.** (1) RN-34 e RN-35 são invariantes de negócio: um modelo não pode decidir estorno nem recusar um pedido de humano. (2) O contrato `agent_outbound`, o Kafka, o DLQ e o prazo do turno não mudam. (3) A degradação mantém a plataforma respondendo quando o provedor limita ou cai.
+
+**Registro (RN-37).** `agent.model` passa a ser o modelo do Gemini; o `config_hash` inclui motor, modelo, temperatura e prompt do sistema. A chave nunca entra no hash, nos logs nem no repositório (`.env` fora do Git).
+
+**Limites e riscos.** (a) **Só dados sintéticos:** o texto do cliente e o resultado das consultas saem para a API do Google; nome, contato e ID do cliente não saem (RN-51). Dado real exigiria base legal e revisão de privacidade. (b) **Reprodutibilidade (RNF-30):** com LLM a saída varia entre execuções, mesmo com temperatura baixa; a prova de determinismo continua valendo só no motor por regras. (c) **Custo e limite de uso:** `GEMINI_MAX_CALLS` e `GEMINI_MAX_CONCURRENCY` protegem; o plano gratuito tem limite de requisições que a carga cheia estoura, então rode a carga com o motor por regras e use o Gemini em amostras. (d) **Nome do modelo:** o padrão `gemini-3.8-flash` deve ser conferido no AI Studio antes do uso. (e) **Injeção de prompt:** o texto do cliente é entrada não confiável; por isso o modelo não decide ação e não tem ferramentas, e o prompt manda usar só os fatos consultados.
+
+**Alternativas rejeitadas.** Modelo decidindo a ação, com chamada de ferramentas (mais realista, mas arrisca RN-34/RN-35 e exige avaliação por juiz, docs/09). SDK oficial (gem extra e lock que não consigo regenerar; a chamada REST cabe em 40 linhas).
+
+
+## ADR-031 — Trava do atendimento com FOR NO KEY UPDATE e menos threads por processo do worker
+
+**Situação: implementado e medido no pico de 24/11 (docs/13). Melhora real, ainda insuficiente.** Medido (mesmo perfil e agente): 6/879 turnos aplicados antes; 52/1270 só com a trava mais fraca (4 workers × 8 threads) e 121/1276 com 8 workers × 2 threads. Evento do outbox: 11,6 s → 9,1 s → 1,3 s (mediano). Overhead da plataforma: 36 s → 25,5 s → 11,7 s. O efeito das threads por processo foi maior que o da trava; os dois efeitos não foram isolados em rodadas repetidas (rodada única por configuração). **Contexto.** O pico (perfil `pico`, 4 workers, agente realista) aplicou 6 de 879 respostas. O `pg_stat_statements` mostrou `SELECT tickets ... FOR UPDATE` com 12 135 chamadas e ~1 015 s de espera somada (média 84 ms, pior 12,6 s), e o `FOR KEY SHARE` das chaves estrangeiras (gravar `audit_events`, `messages`, `deliveries`, `outbox_events`) com ~200 s de espera somada. O evento do outbox levava 11,6 s (mediano) para sair, dentro de um prazo de turno de 20 s.
+
+**Decisão.** (1) Toda trava da linha do atendimento passa a usar `Ticket::ROW_LOCK = "FOR NO KEY UPDATE"`, inclusive as varreduras `SKIP LOCKED` do scheduler. (2) O esquema dos modelos é carregado na subida do Sidekiq, para a primeira consulta de cada modelo não ler o catálogo com o atendimento travado. (3) O número de threads por processo do worker passa a ser parâmetro do teste (`pico.ps1 -Threads`), para comparar poucos threads em muitos processos com muitos threads em poucos.
+
+**Por quê.** `FOR UPDATE` conflita com `FOR KEY SHARE`, a trava que o Postgres toma na linha pai ao gravar uma linha filha; `FOR NO KEY UPDATE` não. O id do atendimento nunca muda, então a trava mais fraca basta e continua exclusiva entre quem altera o atendimento (o teste `ticket_row_lock_spec` cobre os dois lados). Já há precedente no código (`RoutingRuleset`, marca). Sobre as threads: com o GVL, quem segura o lock e perde a vez para outras threads do mesmo processo mantém a transação aberta por mais tempo; as amostras mostram 800 `ClientRead` (o banco esperando o Ruby) contra 197 `Lock`.
+
+**Alternativas rejeitadas.** Mais threads no mesmo processo (piorou a resposta em teste anterior). Mais workers sozinhos (mais processos disputando as mesmas linhas). Tirar a trava do `Turns::Open` e do `Apply` (reabre as corridas que a RN-46 e os testes de concorrência fecham).
+
+**Consequências e limites.** O ganho esperado cobre só a espera entre trava e chave estrangeira (~200 s dos ~1 200 s); a disputa entre quem altera o mesmo atendimento continua. Se o pico seguir ruim, o próximo passo é encurtar o que roda dentro da transação do `Turns::Open` e do `AgentActions::Apply` (consulta da política, contexto, auditoria) ou deduplicar os jobs que disputam o mesmo atendimento.
+
+
+## ADR-032 — Jobs do outbox: fila por urgência, trava sem espera e escala por processo
+
+**Situação: código e testes escritos; efeito ainda não medido (docs/13, etapas C, D e E).** **Contexto.** No pico e no realista de 24 e 25/11, três causas da demora estavam nos jobs: (1) todos os tipos do outbox na fila `critical`, então timeouts, avisos e resumos furavam a fila de quem leva a resposta ao cliente; (2) jobs do mesmo atendimento esperando a trava uns dos outros, com a thread parada; (3) muitas threads por processo (GVL). O consumer das respostas do agente rodava com 5 threads para 48 partições, num processo só.
+
+**Decisão.** (1) `OutboxJob.queue_for` escolhe a fila pelo tipo do item: `critical` (message.received, turn.dispatch, agent.event, delivery.requested), `timers` (turn.timeout, cycle.timeout, progress.notice, handoff.requested, analyst.offline) e `low` (handoff.summary, SLA, ciclo de vida). Tipo desconhecido fica na `critical`. Os pesos do `config/sidekiq.yml` (6, 2, 1) já existiam. (2) O job roda com `lock_timeout = 300ms` na própria conexão; travado por outro, desiste e volta à fila em 0,1 a 0,5 s (`retry_on`, até 25 vezes, depois a retentativa padrão e a recuperação do outbox). O painel e a ingestão continuam esperando a trava normalmente. (3) Padrão do teste de carga: 8 processos × 2 threads no worker e 4 réplicas do consumer × 4 threads.
+
+**Por quê.** Separar por urgência é o padrão de filas do Sidekiq e já estava previsto no 07, seção 2. Tentar e sair troca espera por retentativa curta: os serviços revalidam o estado no banco (RNF-15), então repetir é seguro. Processos em vez de threads contornam o GVL; réplicas do consumer dividem as partições do Kafka, o balanceamento é do próprio grupo de consumidores (não há balanceador na frente).
+
+**Riscos.** Timeouts em fila própria podem atrasar o handoff (RN-46): o peso de `timers` fica acima de `low` e o atraso entre o vencimento e a execução precisa ser medido. Retentativa curta pode virar ciclo de reenvio quando um atendimento fica muito disputado: o limite de 25 tentativas corta o ciclo. Conexões no Postgres: 8 × 4 + 4 × 6 + web ≈ 75, abaixo de 100; acima disso entra o PgBouncer.
+
+**Alternativas rejeitadas.** Processar todos os eventos de um atendimento num job só (mais eficiente, mas muda a forma de todos os serviços; fica para depois se a medição pedir). Balanceador na frente dos workers (a fila já distribui o trabalho).
+
+
+## ADR-033 — Puma em modo cluster na entrada HTTP
+
+**Situação: configuração escrita; efeito ainda não medido.** **Contexto.** No realista de 25/11 (depois do ADR-032) a plataforma ficou rápida entre o agente e o canal (ida + volta: mediano 1,6 s), mas o ack do webhook piorou: p95 de 39,6 s no patamar, 325 requisições sem resposta em 60 s e 1,3% de falha. O `web` ficou em ~100% de CPU: um processo Puma com 16 threads usa no máximo um núcleo por causa do GVL.
+
+**Decisão.** `config/puma.rb` liga o modo cluster quando `WEB_CONCURRENCY > 1`, sem `preload_app!`. No teste de carga: 4 processos × 4 threads (`docker-compose.scale.yml`). Fora dele, nada muda (um processo).
+
+**Por quê.** É o mesmo argumento do worker (ADR-032): processos, não threads. O próprio Puma reparte as conexões entre os processos, sem balanceador; vários containers `web` com balanceador ficam para quando um container não bastar.
+
+**Consequências.** `/metrics` passa a ser por processo (já anotado no ADR-029): cada leitura do Prometheus cai num processo; para o teste valem os números do k6 e do banco. Memória: ~150 MB por processo. Conexões no Postgres: +16.
+
+
+## ADR-034 — Mais partições que threads no tópico do agente
+
+**Situação: configuração do teste escrita; efeito ainda não medido.** **Contexto.** Medido na fronteira (25/11), o turno passava ~15 s entre ser publicado e a resposta entrar no Kafka, mas o agente declarava ~6 s de processamento: ~9 s de fila. A fila é da integração, não do agente: a plataforma define o tópico, as partições e a chave. Com 48 partições e 48 threads, cada partição é consumida em série; duas conversas ativas na mesma partição esperam uma atrás da outra enquanto outras threads ficam ociosas (head-of-line blocking).
+
+**Decisão.** No teste de carga, os tópicos são criados com 192 partições (`TOPIC_PARTITIONS`, `docker-compose.scale.yml`), sem mudar a capacidade do agente (`AGENT_CONCURRENCY = 48`). A chave continua sendo a conversa, então a ordem por conversa se mantém. O overhead passa a ser medido com a fila incluída (`overhead_com_fila` = total − processamento declarado pelo agente − janela).
+
+**Por quê.** Com mais partições que threads, uma thread livre pega a próxima partição com mensagem; a chance de duas conversas ativas caírem na mesma partição cai de ~1/48 para ~1/192. Pela conta de fila (M/G/1 por partição, serviço uniforme de 3 a 12 s), a espera média cai de ~5 s para menos de 1 s com a mesma carga.
+
+**Consequências.** Mais partições pesam no Kafka (arquivos, rebalanceamento) e aumentam o tempo de rebalanceamento do grupo; 192 num broker só é aceitável no experimento. Partições só aumentam (não diminuem) num tópico existente: em produção, a escolha é feita na criação e documentada. Pergunta para a CloudWalk: quantas conversas o agente real processa em paralelo e se consome por partição em série.
+
+
+## ADR-035 — Controle de admissão: a plataforma é dona da fila do agente
+
+**Situação: código e testes escritos; efeito ainda não medido. Desligado por padrão (`AGENT_MAX_IN_FLIGHT` vazio); ligado no teste de carga.** **Contexto.** Quando chegam mais turnos do que o agente processa em paralelo, a fila se forma dentro do Kafka, onde a plataforma não enxerga, não prioriza e não descarta. No realista de 25/11, o turno esperava ~9 s nessa fila e o cliente só ia para um humano no vencimento do prazo (20 s), com um turno que muitas vezes já não tinha chance de resposta.
+
+**Decisão.** O `Outbox::Publish` só reserva o evento do turno (`agent.event`) se houver vaga: turnos publicados ainda sem resposta dentro do prazo, mais os que estão sendo publicados, abaixo de `AGENT_MAX_IN_FLIGHT` (a capacidade combinada com o agente). A decisão roda sob uma trava consultiva da transação, para dois workers não ocuparem a mesma vaga. Sem vaga, o turno espera na plataforma, sem gastar tentativa, e é conferido a cada 1 s. A ordem é **prazo mais próximo primeiro**. Na espera: (1) turno obsoleto (superado, de outra atribuição) é descartado sem ocupar o agente; (2) depois de 5 s, o aviso de progresso da RN-57 é adiantado; (3) se o que sobra do prazo for menor que `AGENT_EXPECTED_MS` (tempo de resposta combinado, padrão 12 s), o caso vai para um humano na hora, motivo `agente_sem_vaga` (RN-46). Escolha de negócio: opção (c) da discussão de 25/11, avisar e transferir se a fila não andar, que mantém a chance da IA resolver sem deixar o cliente no escuro.
+
+**Por quê.** É controle de fluxo por crédito (backpressure): a fila fica onde ela pode ser gerida. O Kafka é um log, sem prioridade nem descarte; com a admissão, ele guarda só o que o agente já consegue processar. Mensagem nova do cliente na espera supera o turno antigo, que é descartado antes de sair: o agente deixa de processar turnos inúteis.
+
+**O que é da CloudWalk.** A capacidade (`AGENT_MAX_IN_FLIGHT`) e o tempo de resposta (`AGENT_EXPECTED_MS`) vêm do contrato com o agente real; a plataforma expõe os sinais (turnos no agente, espera) para a autoescala do agente.
+
+**Riscos e limites.** (a) Conferência por sondagem (1 s por turno na espera) com uma trava única: com centenas de turnos esperando, a trava vira gargalo; a evolução é um despachante único no scheduler que libera a fila em ordem. (b) Um limite só para todas as marcas: a rajada de uma marca ocupa as vagas da outra (cota por marca fica para depois, RNF-33). (c) Se o agente não responder nem expirar, a vaga só volta no prazo do turno. (d) A precisão depende de `AGENT_EXPECTED_MS` refletir o agente real.
+
+**Alternativas rejeitadas.** Mais partições sozinhas (resolvem a colisão, ADR-034, não a falta de capacidade). Prioridade e cancelamento no tópico (dependem do agente consumir de outro jeito; ficam como proposta de contrato). Handoff imediato sem aviso, opção (a) (perde a chance da IA resolver).

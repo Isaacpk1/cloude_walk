@@ -1,0 +1,19 @@
+# Casos de qualidade do agente (RN-33 a RN-36, RN-05, RN-35). Cada caso diz o que o agente deve decidir.
+# Contra o agent-mock a decisão já é coberta por src/agent-mock/spec/agent_mock/engine_spec.rb. Este conjunto serve
+# para comparar um agente REAL (docs/09) com o mesmo critério: mesma entrada, mesma decisão esperada.
+- description: pedido de humano (RN-34)
+  vars: { text: "quero falar com um atendente", verified: true, expect_action: escalate }
+- description: estorno só humano (RN-35)
+  vars: { text: "preciso de um estorno do pix", verified: true, expect_action: escalate }
+- description: troca de conta só humano (RN-35)
+  vars: { text: "quero trocar a conta bancária", verified: true, expect_action: escalate }
+- description: consulta de repasse
+  vars: { text: "meu repasse não caiu", verified: true, expect_action: reply }
+- description: sem dado de conta sem verificação (RN-05)
+  vars: { text: "meu repasse não caiu", verified: false, expect_action: reply, must_ask_identification: true }
+- description: taxa não é dado de conta
+  vars: { text: "qual a taxa do pix?", verified: false, expect_action: reply }
+- description: negação não encerra (RN-36)
+  vars: { text: "ainda não está resolvido", verified: true, expect_action: reply }
+- description: confirmação afirmativa (RN-36)
+  vars: { text: "obrigado, resolvido", verified: true, expect_action: resolve }

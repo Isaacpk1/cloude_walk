@@ -31,6 +31,12 @@ threads threads_count, threads_count
 # Specifies the `port` that Puma will listen on to receive requests; default is 3000.
 port ENV.fetch("PORT", 3000)
 
+# Modo cluster (ADR-033): com o GVL, um processo Puma usa no máximo um núcleo, e o webhook do canal fica na fila
+# atrás dele. WEB_CONCURRENCY > 1 sobe vários processos; sem preload_app!, cada um sobe o app sozinho (mais memória,
+# nenhuma conexão herdada do fork). Ausente ou 1: um processo só, como antes.
+web_processes = Integer(ENV.fetch("WEB_CONCURRENCY", 1))
+workers web_processes if web_processes > 1
+
 # Allow puma to be restarted by `bin/rails restart` command.
 plugin :tmp_restart
 

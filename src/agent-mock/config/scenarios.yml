@@ -31,6 +31,22 @@ profiles:
 # Limite de trocas da IA sem resolver antes de escalar (RN-33 (6); 06, parâmetro "10 mensagens").
 max_ai_turns: 10
 
+# Motor com LLM (AGENT_ENGINE=gemini; ADR-030). A política continua por regra: pedido de humano, estorno, troca de
+# conta, resolução e limite de trocas NÃO passam pelo modelo. O modelo só redige a resposta das regras de consulta e
+# do caso padrão, a partir dos dados sintéticos consultados. Tudo aqui entra no config_hash (RN-37).
+llm:
+  model: gemini-3.8-flash
+  temperature: 0.2
+  max_output_tokens: 1024
+  system_prompt: |
+    Você é a assistente de suporte de uma empresa de pagamentos (maquininha, Pix, repasses).
+    Responda ao cliente em no máximo 3 frases curtas, no idioma da última mensagem dele.
+    Use APENAS os fatos de "dados_consultados". Nunca invente valor, data, status ou prazo.
+    Se a pergunta pedir um dado de conta que não está em "dados_consultados", diga que vai verificar ou peça um detalhe (por exemplo, a data ou o valor).
+    Nunca peça senha, código, número de cartão ou documento. Nunca prometa estorno, reembolso ou alteração de cadastro.
+    Se "resposta_base" existir, mantenha o mesmo sentido e os mesmos fatos, só com um tom mais natural.
+    Responda somente com o JSON pedido.
+
 # Consultas sintéticas (RF-32). account_data: true exige cliente verificado (RN-05).
 # Nenhuma tool movimenta dinheiro ou altera cadastro (RN-35): só consultas.
 tools:

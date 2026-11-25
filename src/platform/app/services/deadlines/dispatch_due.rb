@@ -48,7 +48,7 @@ module Deadlines
       scope = scope.where(id: @ticket_ids) if @ticket_ids
       scope
             .where("NOT EXISTS (SELECT 1 FROM outbox_events o WHERE o.dedup_key = #{DEDUP_KEY_SQL})")
-            .order(:dispatch_due_at, :id).limit(@limit).lock("FOR UPDATE SKIP LOCKED").to_a
+            .order(:dispatch_due_at, :id).limit(@limit).lock("#{Ticket::ROW_LOCK} SKIP LOCKED").to_a
     end
 
     def emit(tickets)

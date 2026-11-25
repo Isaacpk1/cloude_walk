@@ -35,7 +35,7 @@
 #    `applied` e o OutboxJob dele é acordado depois do commit; a auditoria `agent_action.applied` leva `handoff_event_id`.
 #
 # Fora do escopo aqui: o envio ao provedor (Deliveries::Send, no worker), o Escalate e o aviso de transferência
-# (Handoff::Escalate) e o encerramento da `resolve` (RN-36).
+# (Handoff::Escalate).
 module AgentActions
   class Apply
     Result = Data.define(:status, :reason, :turn)
@@ -60,7 +60,10 @@ module AgentActions
 
     def self.call(...) = new(...).call
 
-    def initialize(payload, traceparent: nil, header_event_id: nil)
+    # `broker_at`: instante em que a resposta entrou no Kafka (timestamp da mensagem). É a saída do agente medida na
+    # fronteira: o tempo interno do agente fica fora do escopo e o resto do caminho é da plataforma (RNF-03).
+    def initialize(payload, traceparent: nil, header_event_id: nil, broker_at: nil)
+      @broker_at = broker_at
       @raw = payload.is_a?(String) ? payload : JSON.generate(payload)
       @traceparent = traceparent
       @header_event_id = header_event_id
@@ -114,7 +117,7 @@ module AgentActions
 
         # Travas: processed_events (acima) e depois o atendimento. Sem ciclo: quem trava o atendimento
         # (ingestão, Turns::Open, DispatchDue) não toca processed_events, e cada ação só trava a própria chave.
-        @ticket = Ticket.lock.find_by!(id: ticket.id, brand_id: ticket.brand_id)
+        @ticket = Ticket.lock(Ticket::ROW_LOCK).find_by!(id: ticket.id, brand_id: ticket.brand_id)
         @now = DatabaseClock.now # depois do lock (condição 4)
         @turn = @ticket.ai_turns.find_by(brand_id: @ticket.brand_id, turn: action.fetch("turn"))
         judge
@@ -243,7 +246,7 @@ module AgentActions
       when "escalate"
         { handoff_event_id: request_handoff("decisao_do_agente", summary: action.dig("escalation", "summary")) }
       when "reply" then count_exchange
-      when "resolve" then reset_exchanges
+      when "resolve" then resolve_ticket
       else {}
       end
     end
@@ -262,6 +265,15 @@ module AgentActions
 
     # RN-33, item 6 ("sem resolver"): a resolve aplicada encerra a sequência de trocas.
     def reset_exchanges = { ai_turns_count: update_exchanges("ai_turns_count = 0") }
+
+    # RF-32, RN-36: a resolução é efeito da ação válida, no mesmo commit e sob o lock do atendimento.
+    def resolve_ticket
+      state_from = @ticket.state
+      TicketLifecycle::Resolve.call(ticket: @ticket, source: "agent", reason: action.dig("resolution", "reason"),
+                                    now: @now, trace_id:)
+      audit("ticket.resolved", reason: action.dig("resolution", "reason"), state_from:, state_to: "resolvido")
+      reset_exchanges
+    end
 
     def update_exchanges(assignment)
       sql = Ticket.sanitize_sql_array([ "UPDATE tickets SET #{assignment} WHERE id = ? AND brand_id = ? RETURNING ai_turns_count",
@@ -374,7 +386,7 @@ module AgentActions
           action: action.fetch("action"), tool_calls: action.fetch("tool_calls", []),
           agent: agent.slice("model", "version", "config_hash"), timing: action["timing"],
           context_until_seq: action.fetch("context_until_seq"), classification: action["classification"],
-          turn_status: @turn&.status, platform_received_at: @now.utc.iso8601(6)
+          turn_status: @turn&.status, platform_received_at: @now.utc.iso8601(6), broker_at: @broker_at&.utc&.iso8601(6)
         }.merge(content, extra).compact
       )
     end

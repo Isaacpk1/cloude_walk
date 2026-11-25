@@ -33,7 +33,7 @@ module Deadlines
         @item = OutboxEvent.find_by(id: @id)
         next Result.new(status: :skipped) unless @item
 
-        @ticket = Ticket.lock.find_by(id: @item.ticket_id, brand_id: @item.brand_id)
+        @ticket = Ticket.lock(Ticket::ROW_LOCK).find_by(id: @item.ticket_id, brand_id: @item.brand_id)
         @item.lock!
         next Result.new(status: :already_done) if @item.completed_at
 

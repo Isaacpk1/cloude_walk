@@ -1,0 +1,48 @@
+﻿== Top 15 por tempo total ==
+ calls  | total_ms | mean_ms | max_ms |  rows  |                                                                    query                                                                     
+--------+----------+---------+--------+--------+----------------------------------------------------------------------------------------------------------------------------------------------
+  48936 | 840453.2 |   17.17 |  995.5 |  48936 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 LIMIT $3 FOR UPDATE
+ 102718 |  56719.5 |    0.55 |  583.4 | 102718 | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type", "data", "trace_id", "ruleset_version", "agent_m
+   2654 |  22552.8 |    8.50 |  215.0 |   1803 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" = $1 AND "tickets"."assignee_id" IS NULL AND "tickets"."sla_alerted_at" IS NULL AN
+  30211 |  20054.9 |    0.66 |   20.0 |  29037 | INSERT INTO "outbox_events" ("brand_id","ticket_id","event_type","dedup_key","payload","trace_id","next_attempt_at","created_at") VALUES ($1
+   2653 |  15989.7 |    6.03 |  323.7 |   1476 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" = $1 AND "tickets"."assignee_id" IS NULL AND "tickets"."sla_breached" = $2 AND "ti
+   2654 |  15166.6 |    5.71 |   41.7 |   4333 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."ai_deadline_at" <= $1 AND "tickets"."first_pending_seq" IS NOT NULL AND "tickets"."state"
+ 168511 |  14705.7 |    0.09 |  582.5 | 168511 | SELECT $3 FROM ONLY "public"."tickets" x WHERE "id" OPERATOR(pg_catalog.=) $1 AND "brand_id" OPERATOR(pg_catalog.=) $2 FOR KEY SHARE OF x
+ 146173 |  12277.1 |    0.08 |   28.3 | 146173 | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 211015 |   9975.3 |    0.05 |   27.0 | 211015 | SELECT $2 FROM ONLY "public"."brands" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x
+  11142 |   9851.7 |    0.88 |   19.4 |  11142 | UPDATE tickets SET context_version = context_version + $1 WHERE id = $2 AND brand_id = $3 RETURNING context_version
+   2654 |   8538.8 |    3.22 |   31.5 |   4530 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."progress_due_at" <= $1 AND "tickets"."first_pending_seq" IS NOT NULL AND (NOT EXISTS (SEL
+  11142 |   8478.3 |    0.76 |   24.1 |  11142 | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction", "author_type", "author_id", "body", "internal",
+   2654 |   7797.3 |    2.94 |   67.2 |   4530 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."dispatch_due_at" <= $1 AND (NOT EXISTS (SELECT $3 FROM outbox_events o WHERE o.dedup_key 
+  11142 |   7282.2 |    0.65 |   19.1 |  11142 | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload", "trace_id", "created_at", "next_attempt_at", "le
+  56643 |   6754.8 |    0.12 |   22.5 |  56643 | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+(15 rows)
+
+== Top 10 por tempo m??dio (mais de 20 chamadas) ==
+ calls | mean_ms | max_ms |                                                                    query                                                                     
+-------+---------+--------+----------------------------------------------------------------------------------------------------------------------------------------------
+ 48941 |   17.19 |  995.5 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 LIMIT $3 FOR UPDATE
+  2654 |    8.50 |  215.0 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" = $1 AND "tickets"."assignee_id" IS NULL AND "tickets"."sla_alerted_at" IS NULL AN
+    75 |    8.17 |   33.5 | SELECT COUNT(*) FROM "outbox_events" WHERE "outbox_events"."published_at" IS NULL
+  2653 |    6.03 |  323.7 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" = $1 AND "tickets"."assignee_id" IS NULL AND "tickets"."sla_breached" = $2 AND "ti
+  2654 |    5.71 |   41.7 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."ai_deadline_at" <= $1 AND "tickets"."first_pending_seq" IS NOT NULL AND "tickets"."state"
+    47 |    4.84 |   14.8 | SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput, r.rngsubtype, t.typtype, t.typbasetype FROM pg_type as t LEFT JOIN pg_range as r
+    33 |    4.61 |   24.9 | SELECT a.attname, format_type(a.atttypid, a.atttypmod), pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod, c.collname, 
+  2654 |    3.22 |   31.5 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."progress_due_at" <= $1 AND "tickets"."first_pending_seq" IS NOT NULL AND (NOT EXISTS (SEL
+  2654 |    2.94 |   67.2 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."dispatch_due_at" <= $1 AND (NOT EXISTS (SELECT $3 FROM outbox_events o WHERE o.dedup_key 
+    75 |    2.36 |    6.7 | SELECT MIN("outbox_events"."created_at") FROM "outbox_events" WHERE "outbox_events"."completed_at" IS NULL
+(10 rows)
+
+== Tabelas lidas sem ??ndice (varreduras sequenciais) ==
+       relname       | seq_scan | seq_tup_read | idx_scan | n_live_tup 
+---------------------+----------+--------------+----------+------------
+ outbox_events       |     2589 |     40405532 |  3836751 |      42101
+ tickets             |     9670 |     27867493 |   516929 |       5283
+ customers           |     3133 |       396044 |    78049 |       5302
+ ai_turns            |      476 |       304494 |    67873 |       1928
+ deliveries          |      959 |       270803 |    66299 |       5859
+ team_memberships    |     4536 |        36240 |    15279 |          8
+ customer_identities |      207 |        34899 |     5107 |       5314
+ users               |     2572 |        15414 |    87995 |          6
+(8 rows)
+

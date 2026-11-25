@@ -12,6 +12,17 @@ Sidekiq.configure_server do |config|
   config.average_scheduled_poll_interval = 1
   # Recuperação do outbox enquanto o scheduler do bloco 08 não existe (07, seção 6).
   config.on(:startup) { Outbox::Sweeper.start }
+  # Aquece o esquema dos modelos na subida (ADR-031): sem isso a primeira consulta de cada modelo lê o catálogo do
+  # Postgres (`SELECT a.attname ...`, ~40 ms) no meio de uma transação com o atendimento travado.
+  config.on(:startup) do
+    ActiveRecord::Base.connection_pool.with_connection do
+      ApplicationRecord.descendants.each do |model|
+        model.load_schema unless model.abstract_class?
+      rescue StandardError => e
+        Sidekiq.logger.warn("aquecimento do esquema falhou em #{model.name}: #{e.class}")
+      end
+    end
+  end
   config.on(:shutdown) { Outbox::Sweeper.stop }
   # Sinal de vida para o healthcheck do Compose (RNF-29): renovado na subida e a cada batimento do
   # Sidekiq com o Redis (~10 s). Sem Redis, o arquivo envelhece e o worker aparece como unhealthy.

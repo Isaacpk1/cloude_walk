@@ -12,3 +12,6 @@ Thumbs.db
 
 # Dump local do Redis (redis-server rodando na pasta)
 dump.rdb
+
+# Dependências instaladas pelos roteiros de validação.
+**/node_modules/

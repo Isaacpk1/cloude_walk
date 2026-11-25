@@ -1,0 +1,47 @@
+# Prometheus, Grafana e Jaeger (traces OTLP) para o experimento (ADR-009, RNF-22, ADR-029).
+#
+#   docker compose -p helpdesk-bench -f docker-compose.yml -f docker-compose.bench.yml -f docker-compose.observability.yml up -d --wait
+#
+# Grafana: http://localhost:3001 (admin / admin)  Prometheus: http://localhost:9090  Jaeger: http://localhost:16686
+# Traces só saem se as gems do OpenTelemetry estiverem instaladas (infra/observability/README.md).
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=2d"]
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      web:
+        condition: service_started
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3101}:3000"
+    depends_on:
+      - prometheus
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686"
+  web:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: helpdesk-web
+  worker:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: helpdesk-worker
+  consumer:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_SERVICE_NAME: helpdesk-consumer

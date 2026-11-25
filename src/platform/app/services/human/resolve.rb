@@ -12,7 +12,7 @@ module Human
     def perform
       event = closing_delivery
       state_from = @ticket.state
-      @ticket.update_columns(state: "resolvido", updated_at: @now)
+      TicketLifecycle::Resolve.call(ticket: @ticket, source: "human", reason: @rest[:reason].to_s, now: @now, trace_id:)
       Distribution::Slot.release!(user_id: @user.id)
       audit("ticket.resolved", reason: @rest[:reason].to_s, state_from:, state_to: "resolvido", queue_id: @ticket.queue_id,
                                assignment_version: @ticket.assignment_version)

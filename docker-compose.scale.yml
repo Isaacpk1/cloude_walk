@@ -1,0 +1,27 @@
+# Teste de escala por processo (ADR-029): o Ruby executa uma thread por vez em cada processo (GVL), então
+# várias réplicas do worker usam mais CPUs do que mais threads no mesmo processo.
+#   .\bench\pico.ps1 -Workers 4
+services:
+  worker:
+    environment:
+      RAILS_MAX_THREADS: "${WORKER_DB_POOL:-4}"
+      SIDEKIQ_CONCURRENCY: "${WORKER_THREADS:-2}"
+      # Controle de admissão (ADR-035): a capacidade do agente simulado (AGENT_CONCURRENCY) e o teto da latência dele.
+      AGENT_MAX_IN_FLIGHT: "${ADMISSION_LIMIT:-48}"
+      AGENT_EXPECTED_MS: "${ADMISSION_EXPECTED_MS:-12000}"
+  # O consumer aplica as respostas do agente pegando a trava do atendimento; cada partição é processada em série.
+  # Várias réplicas (pico.ps1 -Consumidores) dividem as 48 partições entre processos, fora do mesmo GVL.
+  consumer:
+    environment:
+      KAFKA_CONCURRENCY: "${CONSUMER_THREADS:-4}"
+      RAILS_MAX_THREADS: "${CONSUMER_DB_POOL:-6}"
+  # Entrada HTTP (ADR-033): vários processos Puma no mesmo container; o próprio Puma distribui as conexões.
+  web:
+    environment:
+      WEB_CONCURRENCY: "${WEB_PROCESSES:-4}"
+      RAILS_MAX_THREADS: "${WEB_THREADS:-4}"
+  # Fila da integração (ADR-034): mais partições que threads do agente evitam que conversas na mesma partição esperem
+  # em série enquanto outras threads ficam paradas. A capacidade do agente (AGENT_CONCURRENCY) não muda.
+  kafka-init:
+    environment:
+      TOPIC_PARTITIONS: "${BENCH_TOPIC_PARTITIONS:-192}"

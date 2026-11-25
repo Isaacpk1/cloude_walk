@@ -29,7 +29,7 @@ module Outbox
     # com o motivo do domínio (handoff.discarded, *.timeout_discarded, progress.notice_discarded).
     # O resumo do handoff (bloco 10) é sempre de um caso que já saiu da IA: a regra genérica o daria por obsoleto.
     NEVER = %w[delivery.requested message.received handoff.requested turn.timeout cycle.timeout progress.notice
-               handoff.summary].freeze
+               handoff.summary customer.reminder customer.inactivity ticket.close].freeze
 
     module_function
 

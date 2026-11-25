@@ -110,7 +110,7 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
 
       handoff = handoff_items(turn.ticket).sole
       expect(turn.reload.status).to eq("expired")
-      expect(described_class).to have_been_enqueued.with(handoff.id).on_queue("critical")
+      expect(described_class).to have_been_enqueued.with(handoff.id).on_queue("timers")
     end
 
     it "timeout ainda não vencido pelo relógio do banco: despertador no prazo gravado" do
@@ -146,7 +146,7 @@ RSpec.describe OutboxJob, "RNF-14: o worker processa o outbox pelo ID" do
       notice = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "delivery.requested")
       summary = OutboxEvent.find_by!(ticket_id: ticket.id, event_type: "handoff.summary")
       expect(described_class).to have_been_enqueued.with(notice.id).on_queue("critical")
-      expect(described_class).to have_been_enqueued.with(summary.id).on_queue("critical")
+      expect(described_class).to have_been_enqueued.with(summary.id).on_queue("low")
     end
 
     it "RN-42: Redis fora ao acordar o aviso: o handoff já está gravado e a recuperação reoferece o item" do

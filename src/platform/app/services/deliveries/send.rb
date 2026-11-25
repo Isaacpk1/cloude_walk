@@ -65,7 +65,7 @@ module Deliveries
         next result(:skipped) unless item && item.completed_at.nil?
 
         # Invariante 6: atendimento e entrega sempre pela marca do item.
-        ticket = Ticket.lock.find_by(id: item.ticket_id, brand_id: item.brand_id)
+        ticket = Ticket.lock(Ticket::ROW_LOCK).find_by(id: item.ticket_id, brand_id: item.brand_id)
         item.lock!
         next result(:skipped) if item.completed_at
 
@@ -125,7 +125,7 @@ module Deliveries
 
     def conclude(attempt, response, duration_ms:)
       ActiveRecord::Base.transaction do
-        Ticket.lock.find_by!(id: attempt.delivery.ticket_id, brand_id: attempt.delivery.brand_id)
+        Ticket.lock(Ticket::ROW_LOCK).find_by!(id: attempt.delivery.ticket_id, brand_id: attempt.delivery.brand_id)
         delivery = Delivery.find_by!(id: attempt.delivery.id, brand_id: attempt.delivery.brand_id)
         item = OutboxEvent.lock.find_by!(id: attempt.item.id, brand_id: delivery.brand_id)
         # Outra tentativa retomou depois da reserva vencer: o resultado desta não vale mais.
@@ -174,6 +174,8 @@ module Deliveries
     def delivered(item, delivery, number, message_id, replayed:, duration_ms:)
       now = Time.current
       delivery.update!(status: "delivered", provider_message_id: message_id, delivered_at: now, lease_until: nil, last_error: nil)
+      ticket = Ticket.find_by!(id: delivery.ticket_id, brand_id: delivery.brand_id)
+      TicketLifecycle::Wait.start(ticket:, delivery:, now:)
       complete(item)
       audit(delivery, "delivery.delivered", seq: delivery.seq, attempt: number, provider_message_id: message_id, duration_ms:, replayed:)
       log(:info, "delivery.delivered", delivery, attempt: number, replayed:, duration_ms:)

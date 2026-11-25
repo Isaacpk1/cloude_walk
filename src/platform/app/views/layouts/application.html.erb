@@ -9,6 +9,12 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <%# Fontes carregadas aqui (e não por @import no CSS) para não bloquear a primeira pintura. %>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+    <meta name="turbo-prefetch" content="true">
+
     <%= yield :head %>
 
     <link rel="icon" href="/icon.png" type="image/png">
@@ -20,17 +26,22 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
+  <% signed_in = respond_to?(:current_user) && current_user.present? %>
+  <body class="<%= "body--public" unless signed_in %>">
+    <% if signed_in %>
     <header class="topbar">
-      <%= link_to "Help desk", root_path, class: "topbar__brand" %>
+      <%= link_to root_path, class: "topbar__brand", aria: { label: "CloudWalk, Help desk, início" } do %>
+        <%= render "shared/cloudwalk_logo" %>
+        <span class="topbar__product">Help desk</span>
+      <% end %>
       <nav class="nav" aria-label="Seções do painel">
-        <%= nav_link "Conversas", conversations_path, active: controller_name == "conversations" %>
-        <%= nav_link "Linha do tempo", timelines_path, active: controller_name == "timelines" %>
-        <%= nav_link "Fila humana", human_queue_path, active: controller_name == "human_queue" %>
+        <%= nav_link "Conversas", conversations_path, active: controller_name == "conversations", icon: "conversations" %>
+        <%= nav_link "Linha do tempo", timelines_path, active: controller_name == "timelines", icon: "timelines" %>
+        <%= nav_link "Fila humana", human_queue_path, active: controller_name == "human_queue", icon: "human_queue" %>
         <% if respond_to?(:current_user) && current_user&.supervisor? %>
-          <%= nav_link "Evals", evals_path, active: controller_name == "evals" %>
-          <%= nav_link "DLQ", dead_letters_path, active: controller_name == "dead_letters" %>
-          <%= nav_link "Configuração", configuration_path, active: controller_name.start_with?("configuration") %>
+          <%= nav_link "Qualidade da IA", evals_path, active: controller_name == "evals", icon: "evals" %>
+          <%= nav_link "Falhas", dead_letters_path, active: controller_name == "dead_letters", icon: "dead_letters" %>
+          <%= nav_link "Configuração", configuration_path, active: controller_name.start_with?("configuration"), icon: "configuration" %>
         <% end %>
       </nav>
       <% if respond_to?(:current_user) && current_user %>
@@ -38,6 +49,7 @@
         <%= button_to "Sair", logout_path, method: :delete, class: "topbar__logout" %>
       <% end %>
     </header>
+    <% end %>
 
     <main class="page">
       <%= yield %>

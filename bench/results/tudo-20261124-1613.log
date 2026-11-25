@@ -1,0 +1,181 @@
+﻿**********************
+Início da transcrição do Windows PowerShell
+Hora de início: 20261124161302
+Nome de Usuário: ISAAC\Inteli
+Executar como Usuário: ISAAC\Inteli
+Nome da Configuração: 
+Computador: ISAAC (Microsoft Windows NT 10.0.26200.0)
+Aplicativo Host: C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\bench\tudo.ps1
+ID do Processo: 45484
+PSVersion: 5.1.26100.9818
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9818
+BuildVersion: 10.0.26100.9818
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+
+===== Ambiente de desenvolvimento =====
+
+ok: Ambiente de desenvolvimento
+
+===== RSpec da plataforma =====
+
+FALHOU: RSpec da plataforma (cÃ³digo 1)
+
+===== RSpec dos contratos =====
+
+FALHOU: RSpec dos contratos (cÃ³digo 5)
+
+===== RSpec do broker =====
+
+ok: RSpec do broker
+
+===== RSpec do agente (inclui o motor Gemini com cliente falso) =====
+
+FALHOU: RSpec do agente (inclui o motor Gemini com cliente falso) (cÃ³digo 1)
+
+===== RSpec dos canais simulados =====
+
+FALHOU: RSpec dos canais simulados (cÃ³digo 1)
+
+===== RuboCop da plataforma =====
+
+ok: RuboCop da plataforma
+
+===== RuboCop do broker =====
+
+ok: RuboCop do broker
+
+===== RuboCop do agente =====
+
+ok: RuboCop do agente
+
+===== RuboCop dos canais =====
+
+ok: RuboCop dos canais
+
+===== Brakeman =====
+
+ok: Brakeman
+
+===== ValidaÃ§Ã£o de operaÃ§Ã£o (E2, E3, E4, E6) =====
+
+ok: ValidaÃ§Ã£o de operaÃ§Ã£o (E2, E3, E4, E6)
+
+===== Desliga o desenvolvimento (libera memÃ³ria para o perfil de produÃ§Ã£o) =====
+
+ok: Desliga o desenvolvimento (libera memÃ³ria para o perfil de produÃ§Ã£o)
+
+===== Perfil de produÃ§Ã£o com agente realista e Toxiproxy =====
+
+ok: Perfil de produÃ§Ã£o com agente realista e Toxiproxy
+
+===== Banco do experimento =====
+
+
+ok: Banco do experimento
+
+===== Falha: kafka =====
+
+== carga (perfil caos: 5 msg/s por 3 min) ==
+== falha: kafka por 30 s ==
+
+
+== falha encerrada; esperando o fim da carga ==
+== esperando a fila esvaziar (120 s) ==
+{
+  "run_id": "20261124165028-chaos",
+  "k6": {
+    "profile": "caos",
+    "mode": "independent",
+    "seed": 42,
+    "accepted_202": 952,
+    "duplicate_200": null,
+    "rejected": 0,
+    "ack_ms": {
+      "med": 70.450317,
+      "p(95)": 122.3161771499998,
+      "p(99)": 1691.5713588,
+      "max": 2333.923058
+    }
+  },
+  "stored_messages": 952,
+  "lost_messages": 0,
+  "conversations": 952,
+  "ai_turns": {
+    "total": 10,
+    "by_status": {
+      "applied": 9,
+      "eligible": 1
+    },
+    "superseded_ratio": 0.0
+  },
+  "outbox_published_after_ms": {
+    "count": 10,
+    "p50": 2034.319,
+    "p95": 2715.895,
+    "p99": 2715.895,
+    "max": 2715.895
+  },
+  "reply_delivered_after_ms": {
+    "count": 9,
+    "p50": 15201.133,
+    "p95": 19370.035,
+    "p99": 19370.035,
+    "max": 19370.035
+  },
+  "platform_overhead_ms": {
+    "count": 9,
+    "p50": 5519.308,
+    "p95": 8103.133,
+    "p99": 8103.133,
+    "max": 8103.133
+  },
+  "agent_ms": {
+    "count": 9,
+    "p50": 6901.0,
+    "p95": 11737.0,
+    "p99": 11737.0,
+    "max": 11737.0
+  },
+  "grouping_wait_ms": {
+    "count": 9,
+    "p50": 1912.0,
+    "p95": 2711.0,
+    "p99": 2711.0,
+    "max": 2711.0
+  },
+  "overhead_excluded_samples": {},
+  "messages_without_delivered_reply": 943,
+  "outbox_pending_now": 0
+}
+EvidÃªncia em bench/results/2026-11-24-chaos-kafka. Esperado: mensagens perdidas = 0 e outbox pendente = 0.
+ok: Falha: kafka
+
+===== Falha: agente-mudo =====
+
+== carga (perfil caos: 5 msg/s por 3 min) ==
+== falha: agente-mudo por 30 s ==
+
+
+== falha encerrada; esperando o fim da carga ==
+PS>TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: time="2026-11-24T19:59:48Z" level=error msg="thresholds on metrics 'http_req_duration{phase:plateau}' have been crossed""
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: time="2026-11-24T19:59:48Z" level=error msg="thresholds on metrics 'http_req_duration{phase:plateau}' have been crossed""
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: time="2026-11-24T19:59:48Z" level=error msg="thresholds on metrics 'http_req_duration{phase:plateau}' have been crossed""
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: time="2026-11-24T19:59:48Z" level=error msg="thresholds on metrics 'http_req_duration{phase:plateau}' have been crossed""
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: time="2026-11-24T19:59:48Z" level=error msg="thresholds on metrics 'http_req_duration{phase:plateau}' have been crossed""
+docker : time="2026-11-24T19:59:48Z" level=error msg="thresholds on metrics 'http_req_duration{phase:plateau}' have
+been crossed"
+No C:\Users\Inteli\Documents\Projeto_Inteli\cloude_walk\bench\chaos\run.ps1:35 caractere:1
++ docker logs $k6 *> "$dir/$run-k6.log"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (time="2026-11-2...e been crossed":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+**********************
+Fim da transcrição do Windows PowerShell
+Hora de término: 20261124165949
+**********************

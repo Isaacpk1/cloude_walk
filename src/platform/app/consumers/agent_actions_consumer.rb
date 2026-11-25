@@ -8,7 +8,8 @@ class AgentActionsConsumer < Karafka::BaseConsumer
   def consume
     messages.each do |message|
       AgentActions::Apply.call(message.raw_payload, traceparent: header(message, "traceparent"),
-                                                    header_event_id: header(message, "event_id"))
+                                                    header_event_id: header(message, "event_id"),
+                                                    broker_at: message.timestamp)
       mark_as_consumed(message)
     end
   end

@@ -1,0 +1,61 @@
+﻿docker :  Container helpdesk-redis-1 Running 
+No linha:1 caractere:1
++ docker compose run --rm -v "${PWD}/bench:/bench:ro" -e RAILS_ENV=test ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Container helpdesk-redis-1 Running :String) [], RemoteEx 
+   ception
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Container helpdesk-postgres-1 Running 
+ Container helpdesk-redis-1 Waiting 
+ Container helpdesk-postgres-1 Waiting 
+ Container helpdesk-redis-1 Healthy 
+ Container helpdesk-postgres-1 Healthy 
+ Container helpdesk-web-run-a8e69e28e415 Creating 
+ Container helpdesk-web-run-a8e69e28e415 Created 
+
+RNF-22: /metrics no formato do Prometheus
+  exp├Áe fila do outbox, turnos, entregas e falhas
+  exp├Áe o histograma de lat├¬ncia com as requisi├º├Áes j├í feitas
+  n├úo conta a pr├│pria leitura de /metrics
+  exige o token quando METRICS_TOKEN est├í definido
+
+Turns::Open RN-49, RF-33, RF-53: contexto do turno completo e verific├ível (07, se├º├úo 3.4)
+  pronto quando: o turno persistido corresponde ao contexto enviado
+    RN-49: grava context_version do atendimento e o digest do context do evento no outbox
+    RN-55, RN-49: rajada de 3 mensagens abre um turno com as 3 pendentes, e o digest confere
+    RF-54: a auditoria ai_turn.opened traz vers├úo, digest, seqs, janela do canal, canal e tamanhos
+    RN-56, ordem: mensagem gravada depois da abertura supera o turno, e o turno guarda o contexto que saiu
+    repeti├º├úo: reprocessar a a├º├úo n├úo grava outro turno nem muda o digest gravado
+  RN-49: hist├│rico at├® 20 mensagens e dentro do limite do contexto inteiro
+    sem resumo, hist├│rico + pendentes s├úo cont├¡guos do seq mais antigo inclu├¡do at├® a ├║ltima mensagem
+    corta as mais antigas at├® o contexto inteiro caber; no limite exato a mais antiga fica
+    um caractere acima do limite derruba a mais antiga do hist├│rico, mantendo a contiguidade
+  RN-49: pendentes acima do limite n├úo abrem o turno (handoff no bloco 10)
+    no limite exato (16 000 caracteres somados) o turno abre com as pendentes por inteiro
+    um caractere acima n├úo abre: ai_turn.not_opened com contexto_excede_limite, item conclu├¡do, nada sai
+    recusa terminal: zera dispatch_due_at na mesma transa├º├úo e mant├®m o ciclo (handoff e timeout nos blocos 08/10)
+    mensagem nova do cliente com o handoff j├í pedido pela recusa: nenhum turno ├® tentado (handoff_pedido)
+  RF-53, RN-49: atendimentos anteriores do mesmo cliente, na mesma marca, nos ├║ltimos 90 dias
+    leva os 3 mais recentes, do mais recente ao mais antigo, s├│ com dados gravados
+    tempo no limite: exatamente 90 dias entra; um instante depois n├úo
+    n├úo inclui o pr├│prio atendimento e omite o campo quando n├úo h├í anterior
+  concorr├¬ncia: mensagem nova gravada enquanto o turno abre
+    o turno cobre a mensagem ou fica superado; o digest sempre corresponde ao conte├║do gravado
+
+RN-57: corrida entre o aviso de progresso e a resposta aplicada
+  em todas as ordens: a resposta ├® aplicada e nenhum aviso fica depois dela nem sai ao canal
+  dois workers do mesmo item ao mesmo tempo gravam um aviso s├│ (repeti├º├úo)
+
+Finished in 59.34 seconds (files took 13.87 seconds to load)
+22 examples, 0 failures
+
+Coverage report generated for RSpec to coverage/index.html
+Line coverage: 1334 / 5286 (25.23%)
+Branch coverage: 186 / 2209 (8.42%)
+
+Cobertura (linhas): 25.23% no total
+  Dom├¡nio: 25.84% (165 arquivos)
+  Controllers: 12.0% (21 arquivos)
+  Jobs: 25.64% (2 arquivos)
+  Ungrouped: 35.59% (7 arquivos)

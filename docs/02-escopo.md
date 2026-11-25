@@ -38,4 +38,4 @@ O recorte é a plataforma de help desk e a integração dela com um atendente de
 - Nenhum acesso a sistemas internos da CloudWalk.
 - Proibido tentar identificar clientes ou casos reais a partir do material fornecido.
 - Prazo de 1 mês, com projeto individual.
-- A stack é livre, mas toda escolha deve ser justificada e coerente com a arquitetura.
+-

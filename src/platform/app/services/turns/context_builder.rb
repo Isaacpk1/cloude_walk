@@ -64,7 +64,10 @@ module Turns
       Ticket.where(brand_id: ticket.brand_id, customer_id: ticket.customer_id).where.not(id: ticket.id)
             .where(created_at: (@now - PREVIOUS_TICKETS_WINDOW)..ticket.created_at)
             .order(created_at: :desc, id: :desc).limit(PREVIOUS_TICKETS_LIMIT)
-            .map { PreviousTicket.new(id: _1.id, summary: placeholder_summary(_1)) }
+            .map do |previous|
+        saved = TicketSummary.where(brand_id: ticket.brand_id, ticket_id: previous.id).order(resolved_at: :desc, id: :desc).first
+        PreviousTicket.new(id: previous.id, summary: saved&.body || placeholder_summary(previous))
+      end
     end
 
     def placeholder_summary(previous)

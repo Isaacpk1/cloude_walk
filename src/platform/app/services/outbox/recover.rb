@@ -69,7 +69,7 @@ module Outbox
         item = OutboxEvent.find_by(id:)
         next unless item
 
-        ticket = item.ticket_id && Ticket.lock("FOR UPDATE SKIP LOCKED").find_by(id: item.ticket_id, brand_id: item.brand_id)
+        ticket = item.ticket_id && Ticket.lock("#{Ticket::ROW_LOCK} SKIP LOCKED").find_by(id: item.ticket_id, brand_id: item.brand_id)
         next if item.ticket_id && ticket.nil? # ocupado por outro processo: fica para a próxima volta
 
         item = due(OutboxEvent.where(id:)).lock.first

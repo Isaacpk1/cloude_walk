@@ -97,7 +97,7 @@ module AgentMock
         **decision.content,
         "tool_calls" => decision.tool_calls,
         "classification" => decision.classification,
-        "agent" => { "model" => MODEL, "version" => VERSION, "config_hash" => config.config_hash },
+        "agent" => { "model" => config.agent_model, "version" => VERSION, "config_hash" => config.config_hash },
         "timing" => { "received_at" => received_at.utc.iso8601(3), "responded_at" => responded_at.utc.iso8601(3),
                       "agent_ms" => ((responded_at - received_at) * 1000).round }
       }

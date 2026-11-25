@@ -15,7 +15,7 @@ module Deadlines
     def due
       scoped(Ticket.where(state: "aguardando_humano", assignee_id: nil, sla_breached: false).where(sla_due_at: ..now))
         .where("NOT EXISTS (SELECT 1 FROM outbox_events o WHERE o.dedup_key = #{KEY_SQL})")
-        .order(:sla_due_at, :id).limit(limit).lock("FOR UPDATE SKIP LOCKED").to_a.map do |ticket|
+        .order(:sla_due_at, :id).limit(limit).lock("#{Ticket::ROW_LOCK} SKIP LOCKED").to_a.map do |ticket|
         Due.new(ticket:, dedup_key: self.class.dedup_key(ticket), trace_id: SecureRandom.hex(16),
                 deadline_at: ticket.sla_due_at,
                 payload: { "ticket_id" => ticket.id, "assignment_version" => ticket.assignment_version,

@@ -45,7 +45,7 @@ module Turns
       ActiveRecord::Base.transaction do
         item = OutboxEvent.find(@outbox_event_id)
         # Ordem das travas igual à da ingestão: atendimento primeiro, depois o item. Escopo por marca (invariante 6).
-        ticket = Ticket.lock.find_by!(id: item.ticket_id, brand_id: item.brand_id)
+        ticket = Ticket.lock(Ticket::ROW_LOCK).find_by!(id: item.ticket_id, brand_id: item.brand_id)
         item.lock!
         next Result.new(status: :already_done, turn: nil) if item.completed_at
 
@@ -186,7 +186,7 @@ module Turns
       @deadline_at ||= policy.turn_deadline_at(opened_at: now, cycle_deadline_at: ticket.ai_deadline_at)
     end
 
-    def policy = @policy ||= Turns::Policy.for(ticket.brand)
+    def policy = @policy ||= Turns::Policy.for_ticket(ticket)
     def iso(time) = time&.utc&.iso8601(3)
 
     def audit(event_type, **data)

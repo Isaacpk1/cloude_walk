@@ -1,0 +1,176 @@
+﻿Bundler 4.0.20 is running, but your lockfile was generated with 4.0.18. Installing Bundler 4.0.18 and restarting using that version.
+Fetching gem metadata from https://rubygems.org/.
+Fetching bundler 4.0.18
+Installing bundler 4.0.18
+Fetching gem metadata from https://rubygems.org/.........
+Fetching bigdecimal 4.1.3
+Fetching i18n 1.15.2
+Fetching json 3.1.0
+Fetching minitest 6.1.0
+Fetching uri 1.1.2
+Fetching concurrent-ruby 1.3.8
+Fetching prism 2.1.0 (x86_64-linux-gnu)
+Fetching diff-lcs 1.6.2
+Fetching tzinfo 2.0.6
+Fetching activesupport 8.1.4.1
+Fetching connection_pool 3.0.3
+Fetching securerandom 0.4.1
+Fetching ast 2.4.3
+Fetching hana 1.3.7
+Fetching regexp_parser 2.13.4
+Fetching simpleidn 0.3.0
+Fetching language_server-protocol 3.17.0.6
+Fetching lint_roller 1.1.0
+Fetching parallel 2.3.0
+Fetching json_schemer 2.5.0
+Installing bigdecimal 4.1.3 with native extensions
+Installing json 3.1.0 with native extensions
+Fetching parser 3.3.13.0
+Fetching rainbow 3.1.1
+Fetching rack 3.2.8
+Fetching rspec-support 3.13.8
+Fetching rspec-expectations 3.13.6
+Fetching rspec-core 3.13.7
+Fetching rspec-mocks 3.13.9
+Fetching rspec 3.13.2
+Fetching rubocop-ast 1.52.0
+Fetching ruby-progressbar 1.13.0
+Fetching unicode-emoji 4.3.0
+Fetching unicode-display_width 3.3.0
+Fetching rubocop 1.92.3
+Fetching rubocop-performance 1.27.0
+Fetching rubocop-rails 2.38.0
+Fetching rubocop-rails-omakase 1.1.0
+Installing securerandom 0.4.1
+Installing connection_pool 3.0.3
+Installing uri 1.1.2
+Installing ast 2.4.3
+Installing hana 1.3.7
+Installing i18n 1.15.2
+Installing regexp_parser 2.13.4
+Installing tzinfo 2.0.6
+Installing lint_roller 1.1.0
+Installing json_schemer 2.5.0
+Installing parallel 2.3.0
+Installing minitest 6.1.0
+Installing diff-lcs 1.6.2
+Installing rspec-support 3.13.8
+Installing rainbow 3.1.1
+Installing activesupport 8.1.4.1
+Installing simpleidn 0.3.0
+Installing language_server-protocol 3.17.0.6
+Installing rspec 3.13.2
+Installing concurrent-ruby 1.3.8
+Installing rack 3.2.8
+Installing ruby-progressbar 1.13.0
+Installing rspec-expectations 3.13.6
+Installing rubocop-performance 1.27.0
+Installing unicode-display_width 3.3.0
+Installing rspec-mocks 3.13.9
+Installing rubocop-rails-omakase 1.1.0
+Installing rspec-core 3.13.7
+Installing unicode-emoji 4.3.0
+Installing rubocop-ast 1.52.0
+Installing rubocop-rails 2.38.0
+Gem::Ext::BuildError: ERROR: Failed to build gem native extension.
+System.Management.Automation.RemoteException
+    current directory: /usr/local/bundle/gems/bigdecimal-4.1.3/ext/bigdecimal
+/usr/local/bin/ruby extconf.rb
+checking for __builtin_clz()... *** extconf.rb failed ***
+Could not create Makefile due to some reason, probably lack of necessary
+libraries and/or headers.  Check the mkmf.log file for more details.  You may
+need configuration options.
+System.Management.Automation.RemoteException
+Provided configuration options:
+	--with-opt-dir
+	--without-opt-dir
+	--with-opt-include=${opt-dir}/include
+	--without-opt-include
+	--with-opt-lib=${opt-dir}/lib
+	--without-opt-lib
+	--with-make-prog
+	--without-make-prog
+	--srcdir=.
+	--curdir
+	--ruby=/usr/local/bin/$(RUBY_BASE_NAME)
+/usr/local/lib/ruby/4.0.0/mkmf.rb:528:in 'MakeMakefile#try_do': The compiler
+failed to generate an executable file. (RuntimeError)
+You have to install development tools first.
+System.Management.Automation.RemoteException
+	from /usr/local/lib/ruby/4.0.0/mkmf.rb:655:in 'MakeMakefile#try_compile'
+	from extconf.rb:6:in 'block in Object#have_builtin_func'
+from /usr/local/lib/ruby/4.0.0/mkmf.rb:1070:in 'block in
+MakeMakefile#checking_for'
+from /usr/local/lib/ruby/4.0.0/mkmf.rb:370:in 'block (2 levels) in
+MakeMakefile::Logging.postpone'
+	from /usr/local/lib/ruby/4.0.0/mkmf.rb:340:in 'MakeMakefile::Logging.open'
+from /usr/local/lib/ruby/4.0.0/mkmf.rb:370:in 'block in
+MakeMakefile::Logging.postpone'
+	from /usr/local/lib/ruby/4.0.0/mkmf.rb:340:in 'MakeMakefile::Logging.open'
+	from /usr/local/lib/ruby/4.0.0/mkmf.rb:366:in 'MakeMakefile::Logging.postpone'
+	from /usr/local/lib/ruby/4.0.0/mkmf.rb:1069:in 'MakeMakefile#checking_for'
+	from extconf.rb:5:in 'Object#have_builtin_func'
+	from extconf.rb:18:in '<main>'
+System.Management.Automation.RemoteException
+To see why this extension failed to compile, please check the mkmf.log which can
+be found here:
+System.Management.Automation.RemoteException
+  /usr/local/bundle/extensions/x86_64-linux/4.0.0/bigdecimal-4.1.3/mkmf.log
+System.Management.Automation.RemoteException
+extconf failed, exit code 1
+System.Management.Automation.RemoteException
+Gem files will remain installed in /usr/local/bundle/gems/bigdecimal-4.1.3 for
+inspection.
+Results logged to
+/usr/local/bundle/extensions/x86_64-linux/4.0.0/bigdecimal-4.1.3/gem_make.out
+System.Management.Automation.RemoteException
+/usr/local/lib/ruby/4.0.0/rubygems/ext/builder.rb:147:in
+'Gem::Ext::Builder.run'
+/usr/local/lib/ruby/4.0.0/rubygems/ext/ext_conf_builder.rb:30:in
+'Gem::Ext::ExtConfBuilder.build'
+/usr/local/lib/ruby/4.0.0/rubygems/ext/builder.rb:241:in
+'Gem::Ext::Builder#build_extension'
+/usr/local/lib/ruby/4.0.0/rubygems/ext/builder.rb:273:in 'block in
+Gem::Ext::Builder#build_extensions'
+  /usr/local/lib/ruby/4.0.0/rubygems/ext/builder.rb:272:in 'Array#each'
+/usr/local/lib/ruby/4.0.0/rubygems/ext/builder.rb:272:in
+'Gem::Ext::Builder#build_extensions'
+/usr/local/lib/ruby/4.0.0/rubygems/installer.rb:822:in
+'Gem::Installer#build_extensions'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/rubygems_gem_installer.rb:125:in
+'Bundler::RubyGemsGemInstaller#build_extensions'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/rubygems_gem_installer.rb:35:in
+'Bundler::RubyGemsGemInstaller#install'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/source/rubygems.rb:223:in
+'block in Bundler::Source::Rubygems#install'
+  /usr/local/lib/ruby/4.0.0/rubygems.rb:1053:in 'Gem.time'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/source/rubygems.rb:222:in
+'Bundler::Source::Rubygems#install'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/installer/gem_installer.rb:68:in
+'Bundler::GemInstaller#install'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/installer/gem_installer.rb:17:in
+'Bundler::GemInstaller#install_from_spec'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/installer/parallel_installer.rb:209:in
+'Bundler::ParallelInstaller#do_install'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/installer/parallel_installer.rb:179:in
+'block in Bundler::ParallelInstaller#worker_pool'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/worker.rb:70:in
+'Bundler::Worker#apply_func'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/worker.rb:65:in 'block in
+Bundler::Worker#process_queue'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/worker.rb:56:in
+'Kernel#loop'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/worker.rb:56:in
+'Bundler::Worker#process_queue'
+/usr/local/bundle/gems/bundler-4.0.18/lib/bundler/worker.rb:98:in 'block (2
+levels) in Bundler::Worker#create_threads'
+System.Management.Automation.RemoteException
+An error occurred while installing bigdecimal (4.1.3), and Bundler cannot
+continue.
+System.Management.Automation.RemoteException
+In Gemfile:
+  rubocop-rails-omakase was resolved to 1.1.0, which depends on
+    rubocop-rails was resolved to 2.38.0, which depends on
+      activesupport was resolved to 8.1.4.1, which depends on
+        bigdecimal
+exit=5

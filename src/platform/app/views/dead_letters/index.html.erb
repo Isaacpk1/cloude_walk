@@ -1,9 +1,9 @@
-<% content_for :title, "DLQ" %>
+<% content_for :title, "Falhas" %>
 <% marca = params[:marca].presence %>
 
 <div class="page-header">
   <div>
-    <h1>DLQ</h1>
+    <h1>Falhas</h1>
     <p class="page-header__subtitle">Eventos desviados para <code>helpdesk.agent.dlq.v1</code>, espelhados em <code>dead_letters</code> (RF-37, RN-45, RN-48)<% if marca %> · marca <code><%= marca %></code><% end %></p>
   </div>
   <div class="page-header__actions"><span class="badge badge--reserved" title="RF-37 é S"><%= DeadLetterView::REPROCESSING %></span></div>
@@ -26,14 +26,14 @@
     <tbody>
       <% @dead_letters.each do |dl| %>
         <tr class="dead-letters__row dead-letters__row--<%= dl.outcome || 'pendente' %>">
-          <td><%= link_to panel_time(dl.created_at), dead_letter_path(dl.id, marca:) %></td>
+          <td><%= link_to panel_time(dl.created_at), dead_letter_path(dl.id, marca:), class: "row-link" %></td>
           <td><%= dl.source_label %></td>
           <td><%= dl.reason_label %> <code class="muted small"><%= dl.reason %></code></td>
           <td><code class="small" title="<%= dl.event_id %>"><%= dl.event_id.to_s.first(8).presence || "—" %></code></td>
           <td>
             <% if dl.correlated? %>
-              <%= dl.brand_name %> · <%= link_to "atendimento #{dl.ticket_id}", conversation_path(dl.ticket_id) %>
-              <% if dl.turn %> · <%= link_to "turno #{dl.turn}", conversation_path(dl.ticket_id, anchor: "turn-#{dl.turn}") %><% end %>
+              <%= dl.brand_name %> · <%= link_to "atendimento #{dl.ticket_id}", conversation_path(dl.ticket_id), class: "row-link-extra" %>
+              <% if dl.turn %> · <%= link_to "turno #{dl.turn}", conversation_path(dl.ticket_id, anchor: "turn-#{dl.turn}"), class: "row-link-extra" %><% end %>
             <% else %>
               <%= dl.brand_name || "—" %> · <span class="badge badge--error">sem correlação</span>
             <% end %>

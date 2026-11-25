@@ -1,0 +1,1981 @@
+﻿ Container helpdesk-channels-mock-run-02d8269418db Creating 
+ Container helpdesk-channels-mock-run-02d8269418db Created 
+
+Randomized with seed 27349
+
+Provedores simulados de WhatsApp e e-mail (bloco 15; RF-02, RF-03, RF-06, ADR-018, ADR-019)
+  e-mail (Gmail)
+    RF-03: o e-mail recebido gera o push, aparece no hist├│rico e na busca da mensagem, no contrato do Gmail
+    o hist├│rico s├│ devolve o que veio depois do cursor
+    ADR-019: busca com assinatura de outra marca ├® 401
+    caixa que n├úo ├® da conta: 404
+    RF-06: recebe a resposta, extrai destino e assunto do MIME, e ├® idempotente pela chave
+  WhatsApp
+    RF-06: aceita o envio assinado e devolve o id da mensagem; repetir a chave n├úo duplica
+    ADR-019: assinatura de outra marca ├® 401, sem efeito
+    phone_number_id que n├úo ├® da conta: 404
+    falha simulada: 503 antes de qualquer efeito
+    o webhook do simulador cumpre o contrato whatsapp_webhook
+    corpo fora do contrato: 422
+  simulador (formul├írios)
+    o WhatsApp ├® entregue ├á plataforma como webhook assinado e entra no hist├│rico
+    o e-mail grava na caixa e avisa a plataforma com o push
+    a tela principal lista os formul├írios de WhatsApp e e-mail
+
+ChannelsMock::Scenarios
+  RN-55: rajada curta
+    envia tr├¬s mensagens em t=0, 0,5 s e 1,0 s, na ordem (FAILED - 1)
+  RN-51: logs JSON sem o texto da mensagem
+    registra cada passo em JSON, com trace_id, sem o texto (FAILED - 2)
+  espera real
+    n├úo dorme quando o hor├írio j├í passou
+    s├│ volta quando o rel├│gio alcan├ºa o hor├írio planejado, mesmo se o sono acordar antes
+  RN-55: rajada longa (teto de 4 s)
+    descreve o turno 1 no teto com as mensagens at├® 3,6 s e o turno 2 com todas as pendentes depois da de 4,5 s
+    envia seis mensagens a cada 0,9 s, sem empate com o teto de 4 s: a ├║ltima, aos 4,5 s, cai depois dele (FAILED - 3)
+  falha da plataforma num passo
+    registra 5xx da plataforma e segue (FAILED - 4)
+    um erro inesperado no envio vira erro do passo, sem derrubar a execu├º├úo
+    registra a falha e continua os pr├│ximos passos (FAILED - 5)
+  repeti├º├úo
+    disparar o mesmo cen├írio duas vezes gera execu├º├Áes e message_id diferentes (FAILED - 6)
+  dois cen├írios ao mesmo tempo em contas diferentes
+    intercala os envios pelo hor├írio planejado sem misturar conta, cliente nem execu├º├úo (FAILED - 7)
+  valida├º├úo na largada
+    recusa cen├írio desconhecido
+    recusa cliente fora do contrato antes de enviar qualquer passo
+    recusa conta do provedor fora da lista
+  modo thread
+    executa a execu├º├úo em segundo plano e termina com todos os passos (FAILED - 8)
+  RN-56: corrida dos 3 s
+#<Thread:0x0000742f16c77a18 /app/lib/channels_mock/scenarios.rb:138 run> terminated with exception (report_on_exception is true):
+/usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request': Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_b3da3866b7ad","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-a8106bfdea083d4d7eeb8780bdabcb67-b222c8a13876d868-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=0514c33a26185d61f465b459d516b442cb2b858edd0b4c0ebcd96489f75e75ab'} (WebMock::NetConnectNotAllowedError)
+System.Management.Automation.RemoteException
+You can stub this request with the following snippet:
+System.Management.Automation.RemoteException
+stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+  with(
+    body: "{\"message_id\":\"chat_msg_b3da3866b7ad\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+    headers: {
+	  'Accept'=>'*/*',
+	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+	  'Content-Type'=>'application/json',
+	  'Host'=>'web:3000',
+	  'Traceparent'=>'00-a8106bfdea083d4d7eeb8780bdabcb67-b222c8a13876d868-01',
+	  'User-Agent'=>'Ruby',
+	  'X-Helpdesk-Signature'=>'t=1795176000,v1=0514c33a26185d61f465b459d516b442cb2b858edd0b4c0ebcd96489f75e75ab'
+    }).
+  to_return(status: 200, body: "", headers: {})
+System.Management.Automation.RemoteException
+registered request stubs:
+System.Management.Automation.RemoteException
+stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+System.Management.Automation.RemoteException
+============================================================
+	from /app/lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+	from /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+	from /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+	from /usr/local/lib/ruby/4.0.0/net/http.rb:1064:in 'Net::HTTP.start'
+	from /app/lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+	from /app/lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+	from /app/lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+	from /app/lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+	from /app/lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+	from /app/lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+	from /app/lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+	from /app/lib/channels_mock/scenarios.rb:178:in 'ChannelsMock::Scenarios.perform_all'
+	from /app/lib/channels_mock/scenarios.rb:138:in 'block in ChannelsMock::Scenarios.start'
+    guarda o hor├írio planejado, o real, o HTTP e a mensagem no simulador, como o formul├írio (FAILED - 9)
+    assina cada envio com o segredo da conta e manda o contrato de entrada do chat (FAILED - 10)
+    n├úo envia o passo antes do hor├írio planejado (tempo no limite) (FAILED - 11)
+    usa a mesma conta do provedor, o mesmo account_id e o mesmo customer_ref em todos os passos (FAILED - 12)
+    envia "meu repasse n├úo caiu" em t=0 e "├® o de ontem, R$ 1.200" em t=3 s (FAILED - 13)
+
+Provedor do chat: POST /provider/chat/:conta/messages (RF-06, ADR-018, ADR-019)
+  07 ┬º3.2: ordem por X-Conversation-Seq
+    recusa com 409 outra chave na mesma seq j├í aceita (duas entregas na mesma posi├º├úo)
+    aceita seq maior e separa as conversas
+    trata a seq igual com a mesma chave como repeti├º├úo, n├úo 409
+    recusa com 409 uma seq anterior ├á ├║ltima aceita, com chave nova
+  RNF-28 / RN-44: contrato
+    recusa com 422 o corpo que n├úo ├® JSON
+    recusa com 422 o corpo fora do contrato, sem efeito
+  RF-06: aceite no contrato chat_send
+    aceita o envio assinado e devolve o message_id do app
+    responde 404 para conta desconhecida, sem efeito
+  RNF-15: idempot├¬ncia por Idempotency-Key
+    RNF-15: duas requisi├º├Áes simult├óneas com a mesma chave produzem um s├│ efeito
+    recusa com 400 o envio sem Idempotency-Key
+    devolve a mesma resposta gravada para a mesma chave, com Idempotent-Replayed, sem novo efeito
+    recusa com 400 o envio sem conversa ou com seq inv├ílida
+  RNF-15 / 07 ┬º6: falhas simuladas
+    recusa com 503 sem efeito, e o envio seguinte com a mesma chave ├® aceito
+    recusa definitivamente com 422 sem efeito
+    l├¬ a falha inicial do ambiente
+    troca a falha pelo endpoint de controle
+    perde a confirma├º├úo uma vez: grava o efeito, responde 504, e a retentativa recebe a confirma├º├úo gravada
+    mant├®m o 503 pelo n├║mero de vezes pedido
+  RNF-23 / ADR-019: assinatura do corpo
+    recusa com 401 o segredo de outra marca (marca errada)
+    recusa com 401 a assinatura com outro segredo
+    recusa com 401 a assinatura fora da janela de 5 minutos
+
+Simulador: cen├írios de rajada (RN-55, RN-56)
+  tela
+    mostra cada passo com hor├írio planejado, real e HTTP, e as mensagens na conversa (FAILED - 14)
+    RN-56: a corrida dos 3 s explica os dois desfechos conforme a lat├¬ncia do agente
+    mostra a falha da plataforma no passo (FAILED - 15)
+    escapa o HTML dos dados do cliente e dos erros
+    tem um bot├úo por cen├írio, com a conta e o cliente como no formul├írio
+  RN-56: corrida dos 3 s pelo endpoint de controle
+    recusa conta fora da lista e cliente fora do contrato com 422, sem enviar nada
+    responde 404 para execu├º├úo que n├úo existe
+    aceita o disparo por formul├írio e volta ├á tela com atualiza├º├úo autom├ítica
+    dispara por JSON e devolve o id da execu├º├úo; o GET mostra o estado (FAILED - 16)
+    recusa cen├írio desconhecido com 404
+    mostra o passo atual enquanto a execu├º├úo n├úo terminou
+
+RF-38: perfil escolhido pelo simulador
+  RF-38: na tela
+    mostra o perfil ativo por escopo e o que cada perfil demonstra
+    escapa o valor gravado no Redis por outro processo
+    aceita o formul├írio e volta ├á se├º├úo do agente
+  RF-38: endpoint de controle
+    recusa perfil desconhecido com 422, sem gravar
+    recusa JSON malformado com 422
+    grava o perfil global nas chaves que o agent-mock l├¬
+    Redis de controle fora do ar: 503, sem derrubar o simulador
+    padrao apaga a escolha: volta a valer o AGENT_PROFILE do agente
+    GET devolve o estado atual com o que cada perfil demonstra
+    sem AGENT_CONTROL_REDIS_URL o controle fica desligado: 503 e aviso na tela
+    com o Redis de verdade inalcan├º├ível, falha r├ípido com 503
+    grava o perfil por conta do provedor, na chave da marca, com preced├¬ncia sobre o global
+    repetir a mesma escolha n├úo muda nada (idempotente)
+    marca errada: recusa escopo fora da lista com 422, sem gravar
+    loga em JSON a troca, sem dado de cliente (RN-51)
+
+Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3)
+#<Thread:0x0000742f1746f810 /app/lib/channels_mock/status_callbacks.rb:72 run> terminated with exception (report_on_exception is true):
+/usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request': Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_61602afdb2823cf5","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-ade34a08eab894be7ffb24364dcb40da-d646bc7794af0a3f-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=08b20d9b901e7aea8dd10c77a203b55e885424f04864c432a1c5bf0b6dea8152'} (WebMock::NetConnectNotAllowedError)
+System.Management.Automation.RemoteException
+You can stub this request with the following snippet:
+System.Management.Automation.RemoteException
+stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+  with(
+    body: "{\"message_id\":\"chatmsg_61602afdb2823cf5\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+    headers: {
+	  'Accept'=>'*/*',
+	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+	  'Content-Type'=>'application/json',
+	  'Host'=>'web:3000',
+	  'Traceparent'=>'00-ade34a08eab894be7ffb24364dcb40da-d646bc7794af0a3f-01',
+	  'User-Agent'=>'Ruby',
+	  'X-Helpdesk-Signature'=>'t=1795176000,v1=08b20d9b901e7aea8dd10c77a203b55e885424f04864c432a1c5bf0b6dea8152'
+    }).
+  to_return(status: 200, body: "", headers: {})
+System.Management.Automation.RemoteException
+registered request stubs:
+System.Management.Automation.RemoteException
+stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+System.Management.Automation.RemoteException
+============================================================
+	from /app/lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+	from /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+	from /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+	from /usr/local/lib/ruby/4.0.0/net/http.rb:1064:in 'Net::HTTP.start'
+	from /app/lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+	from /app/lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+	from /app/lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+	from /app/lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+	from /app/lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+	from /app/lib/channels_mock/status_callbacks.rb:73:in 'block (3 levels) in ChannelsMock::StatusCallbacks.start_worker'
+	from /app/lib/channels_mock/status_callbacks.rb:73:in 'Kernel#loop'
+	from /app/lib/channels_mock/status_callbacks.rb:73:in 'block (2 levels) in ChannelsMock::StatusCallbacks.start_worker'
+  processa a fila numa thread no modo padr├úo, fora da requisi├º├úo (FAILED - 17)
+  RF-06: delivered depois do aceite
+    n├úo envia um segundo delivered quando a mesma chave ├® repetida (RNF-15) (FAILED - 18)
+    n├úo chama a plataforma no caminho da resposta e envia delivered assinado e no contrato depois (FAILED - 19)
+    n├úo envia status para envio recusado (503, 409, 401)
+    envia delivered tamb├®m quando a confirma├º├úo ao envio se perdeu, porque o efeito existe (FAILED - 20)
+  RF-06: read e failed pela tela
+    recusa status fora do contrato e mensagem desconhecida
+    envia read e failed pedidos no simulador para a mensagem escolhida (FAILED - 21)
+  RNF-14: retentativa quando a plataforma n├úo responde
+    desiste depois do limite de tentativas e registra o erro (FAILED - 22)
+    repete com o mesmo corpo depois de conex├úo recusada e 5xx, at├® o 202 (FAILED - 23)
+    n├úo repete um 4xx (assinatura ou contrato recusados s├úo definitivos) (FAILED - 24)
+
+ChannelsMock::Providers::Chat
+  RF-01 / ADR-018: webhook no formato do app
+    recusa texto vazio antes de enviar (RN-44)
+    usa o message_id informado, para reenviar o mesmo ID externo
+    monta um webhook que passa no contrato chat_webhook
+
+Simulador do cliente (RF-04)
+  RNF-23: com a op├º├úo de assinatura inv├ílida, mostra a recusa da plataforma (FAILED - 25)
+  n├úo envia texto vazio e mostra o motivo
+  reenvia o mesmo webhook (mesmo ID externo) e mostra a duplicata (FAILED - 26)
+  envia a mensagem como webhook do provedor e mostra a confirma├º├úo da plataforma (FAILED - 27)
+  recusa conta que n├úo est├í na lista
+  mostra o formul├írio do chat com as contas das duas marcas
+
+Simulador: pedir humano e aviso de transfer├¬ncia (ROADMAP 10; RN-34, RN-42, RF-43)
+  RN-42: aviso de transfer├¬ncia destacado
+    o aviso aparece como mensagem do sistema, ligado ao pedido, com o estado da entrega (FAILED - 28)
+    o aviso da JIM (ingl├¬s) tamb├®m
+    resposta comum continua como resposta, sem o destaque
+  bot├úo Pedir humano
+    RN-34: envia o pedido pela mesma rota do chat, no idioma da marca da conta, ignorando o texto digitado (FAILED - 29)
+    fica no formul├írio do chat, como outro envio do mesmo formul├írio
+    sem o bot├úo, o texto digitado vai como sempre (FAILED - 30)
+
+Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05)
+  atualiza a p├ígina sozinha s├│ quando pedido
+  status e falhas pela tela
+    configura a falha simulada pelo formul├írio e mostra a falha ativa
+    mostra o ├║ltimo status enviado ├á plataforma e os bot├Áes de lida e falha (FAILED - 31)
+    recusa falha desconhecida no formul├írio
+  RNF-05: tempo total percebido pelo cliente
+    mostra o tempo de cada resposta quando o envio recebe mais de uma (progresso e resposta final) (FAILED - 32)
+    liga a resposta ao envio pelo reply_to e mostra o tempo total com o rel├│gio controlado (FAILED - 33)
+    marca a repeti├º├úo da mesma Idempotency-Key, sem duplicar a resposta na conversa (RNF-15) (FAILED - 34)
+    lista ├á parte a resposta cujo reply_to n├úo corresponde a nenhum envio do simulador
+  seguran├ºa: escape de HTML
+    escapa o texto da resposta e o reply_to, que v├¬m de fora
+  RF-56: rastreio at├® a mensagem original
+    mostra o trace_id da resposta recebida (traceparent da entrega) (FAILED - 35)
+    mostra o trace_id do envio e o link para a linha do tempo do atendimento (FAILED - 36)
+
+ChannelsMock::PlatformClient
+  l├¬ o segredo da conta do ambiente quando definido
+  envia o webhook ├á URL da conta com JSON e traceparent (RF-56)
+  assina com outro segredo quando a demonstra├º├úo pede assinatura inv├ílida
+  registra a plataforma fora do ar sem quebrar o simulador
+  RNF-23 / ADR-019: assina o corpo bruto com o segredo da conta
+
+Failures:
+
+  1) ChannelsMock::Scenarios RN-55: rajada curta envia tr├¬s mensagens em t=0, 0,5 s e 1,0 s, na ordem
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_8b37847a4fa3","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"oi","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-d47b7a6a1da8ef6eaaeec98d93f3520b-f83b328aa520f51d-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=523c2354a2d133c9068ad6866956ca7984299a1228f7e7c0bbe71f0e4eebd248'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_8b37847a4fa3\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"oi\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-d47b7a6a1da8ef6eaaeec98d93f3520b-f83b328aa520f51d-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=523c2354a2d133c9068ad6866956ca7984299a1228f7e7c0bbe71f0e4eebd248'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:114:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  2) ChannelsMock::Scenarios RN-51: logs JSON sem o texto da mensagem registra cada passo em JSON, com trace_id, sem o texto
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_d210dd3512df","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-2d1dc2cd200017b4d27d7b226bfbe0f9-01a0f6e0bf8a11f2-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=16fff0ef92555b34baf5cad1ea6f1ff95c1b72bd42997ae452fc6a2dbd19b3db'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_d210dd3512df\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-2d1dc2cd200017b4d27d7b226bfbe0f9-01a0f6e0bf8a11f2-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=16fff0ef92555b34baf5cad1ea6f1ff95c1b72bd42997ae452fc6a2dbd19b3db'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:233:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  3) ChannelsMock::Scenarios RN-55: rajada longa (teto de 4 s) envia seis mensagens a cada 0,9 s, sem empate com o teto de 4 s: a ├║ltima, aos 4,5 s, cai depois dele
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_be4aaaa80354","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"oi","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-7a70d857a88d4fa17d9af4bb37eb0c52-a9ed7d4f6d47af0c-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=ab18131ff39bf1129ddabd8095c4ded9c1f7e9e1519746a1c91b794b4e858b65'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_be4aaaa80354\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"oi\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-7a70d857a88d4fa17d9af4bb37eb0c52-a9ed7d4f6d47af0c-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=ab18131ff39bf1129ddabd8095c4ded9c1f7e9e1519746a1c91b794b4e858b65'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:126:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  4) ChannelsMock::Scenarios falha da plataforma num passo registra 5xx da plataforma e segue
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_b6551a051c94","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-d9e9aed80ace1f0d363552d777a7440c-018e00e13ec7c79e-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=8977df559722aa2a9fcc248a66c508064d25937a67805dede1225e62035d5473'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_b6551a051c94\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-d9e9aed80ace1f0d363552d777a7440c-018e00e13ec7c79e-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=8977df559722aa2a9fcc248a66c508064d25937a67805dede1225e62035d5473'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:161:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  5) ChannelsMock::Scenarios falha da plataforma num passo registra a falha e continua os pr├│ximos passos
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_0df017191a36","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-ac8ae3fb1a68fb23becba1e3ada95d76-14eae66fa77e3b94-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=6c027559a94ad096a68f4b252e679f9761d63223ed9a3ccf8ebe15d2348aa6fb'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_0df017191a36\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-ac8ae3fb1a68fb23becba1e3ada95d76-14eae66fa77e3b94-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=6c027559a94ad096a68f4b252e679f9761d63223ed9a3ccf8ebe15d2348aa6fb'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:148:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  6) ChannelsMock::Scenarios repeti├º├úo disparar o mesmo cen├írio duas vezes gera execu├º├Áes e message_id diferentes
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_84b78fbe00f3","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-b386cba2bac521dc9886dc536749f148-6d599be9e5550ac1-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=4cabea2985822e33da062b75d2bcc23100f2ce399f0aca1a6295eae8a943f8de'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_84b78fbe00f3\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-b386cba2bac521dc9886dc536749f148-6d599be9e5550ac1-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=4cabea2985822e33da062b75d2bcc23100f2ce399f0aca1a6295eae8a943f8de'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:217:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  7) ChannelsMock::Scenarios dois cen├írios ao mesmo tempo em contas diferentes intercala os envios pelo hor├írio planejado sem misturar conta, cliente nem execu├º├úo
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_a11c412df011","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:01.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-438592ce259e400a8a4878e4075ebfde-75479ad62d6f518e-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176001,v1=f35f164159691a5897d387b006a52f655617bfc372943b6e72e9850e28fe8049'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_a11c412df011\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:01.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-438592ce259e400a8a4878e4075ebfde-75479ad62d6f518e-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176001,v1=f35f164159691a5897d387b006a52f655617bfc372943b6e72e9850e28fe8049'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/jim-chat-mock")
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:186:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  8) ChannelsMock::Scenarios modo thread executa a execu├º├úo em segundo plano e termina com todos os passos
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_b3da3866b7ad","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-a8106bfdea083d4d7eeb8780bdabcb67-b222c8a13876d868-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=0514c33a26185d61f465b459d516b442cb2b858edd0b4c0ebcd96489f75e75ab'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_b3da3866b7ad\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-a8106bfdea083d4d7eeb8780bdabcb67-b222c8a13876d868-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=0514c33a26185d61f465b459d516b442cb2b858edd0b4c0ebcd96489f75e75ab'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:178:in 'ChannelsMock::Scenarios.perform_all'
+     # ./lib/channels_mock/scenarios.rb:138:in 'block in ChannelsMock::Scenarios.start'
+
+  9) ChannelsMock::Scenarios RN-56: corrida dos 3 s guarda o hor├írio planejado, o real, o HTTP e a mensagem no simulador, como o formul├írio
+     Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+     WebMock::NetConnectNotAllowedError:
+       Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_7e40ba3f16c0","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.040Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-8c6fb4f1d14d86d40840c43ec0ac1148-180cfc09b8c2a045-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=d8b7b562ff12e72604d6214b9f55f362044b1d09e07fb6d236a9b60b0f8d23df'}
+
+       You can stub this request with the following snippet:
+
+       stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+         with(
+           body: "{\"message_id\":\"chat_msg_7e40ba3f16c0\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.040Z\"}",
+           headers: {
+       	  'Accept'=>'*/*',
+       	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+       	  'Content-Type'=>'application/json',
+       	  'Host'=>'web:3000',
+       	  'Traceparent'=>'00-8c6fb4f1d14d86d40840c43ec0ac1148-180cfc09b8c2a045-01',
+       	  'User-Agent'=>'Ruby',
+       	  'X-Helpdesk-Signature'=>'t=1795176000,v1=d8b7b562ff12e72604d6214b9f55f362044b1d09e07fb6d236a9b60b0f8d23df'
+           }).
+         to_return(status: 200, body: "", headers: {})
+
+       registered request stubs:
+
+       stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+       ============================================================
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+     # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+     # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+     # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+     # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+     # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+     # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+     # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+     # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+     # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+     # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+     # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+     # ./spec/scenarios_spec.rb:87:in 'block (3 levels) in <top (required)>'
+     # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  10) ChannelsMock::Scenarios RN-56: corrida dos 3 s assina cada envio com o segredo da conta e manda o contrato de entrada do chat
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_7464259a09d9","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-9b661a5bc40c38ea012775b575071ec9-9e8d11f2defd5930-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=4230db860dbe7fb2b02bdd3b72ce29a494966daebf73a7fa5c2c940e2417571b'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_7464259a09d9\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-9b661a5bc40c38ea012775b575071ec9-9e8d11f2defd5930-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=4230db860dbe7fb2b02bdd3b72ce29a494966daebf73a7fa5c2c940e2417571b'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+      # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+      # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+      # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+      # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+      # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+      # ./spec/scenarios_spec.rb:72:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  11) ChannelsMock::Scenarios RN-56: corrida dos 3 s n├úo envia o passo antes do hor├írio planejado (tempo no limite)
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_edfd42a65cfa","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-09f67dafb1beb497f8c107d5f4398742-a4699bbe2fb65b7c-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=31160f225d311152fe5363c115f33c2ecde8bf52867143c5da44e16b4bf753d3'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_edfd42a65cfa\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-09f67dafb1beb497f8c107d5f4398742-a4699bbe2fb65b7c-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=31160f225d311152fe5363c115f33c2ecde8bf52867143c5da44e16b4bf753d3'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+      # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+      # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+      # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+      # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+      # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+      # ./spec/scenarios_spec.rb:103:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  12) ChannelsMock::Scenarios RN-56: corrida dos 3 s usa a mesma conta do provedor, o mesmo account_id e o mesmo customer_ref em todos os passos
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_fbcf9a87c857","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-dcb9cc14d7e207662299c5d0e8703120-721dde58c63eafd2-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=7b13b7419b23873ea25864159a2ee1f177a542cba94535158ea13a5b085505b1'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_fbcf9a87c857\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-dcb9cc14d7e207662299c5d0e8703120-721dde58c63eafd2-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=7b13b7419b23873ea25864159a2ee1f177a542cba94535158ea13a5b085505b1'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+      # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+      # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+      # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+      # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+      # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+      # ./spec/scenarios_spec.rb:62:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  13) ChannelsMock::Scenarios RN-56: corrida dos 3 s envia "meu repasse n├úo caiu" em t=0 e "├® o de ontem, R$ 1.200" em t=3 s
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_ee51defb1548","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-bdc555959eb5d8acaa2e7cc1818d6f59-95d8b89795370d82-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=a79dde258883b7aab31490ba63e258f44bb2edeee329b1b75dfd6f183647cf34'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_ee51defb1548\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-bdc555959eb5d8acaa2e7cc1818d6f59-95d8b89795370d82-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=a79dde258883b7aab31490ba63e258f44bb2edeee329b1b75dfd6f183647cf34'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+      # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+      # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+      # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+      # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+      # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+      # ./spec/scenarios_spec.rb:48:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  14) Simulador: cen├írios de rajada (RN-55, RN-56) tela mostra cada passo com hor├írio planejado, real e HTTP, e as mensagens na conversa
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_34717fcd597c","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.040Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-a61f7081cd9c67660aea456a7804445c-566fb067ebbda76f-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=86e590b90eb3ecda5311dc8c21c9e53747a63b8d08f475c4e99057cabadc8a78'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_34717fcd597c\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.040Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-a61f7081cd9c67660aea456a7804445c-566fb067ebbda76f-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=86e590b90eb3ecda5311dc8c21c9e53747a63b8d08f475c4e99057cabadc8a78'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+      # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+      # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+      # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+      # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+      # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+      # ./spec/scenarios_app_spec.rb:100:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  15) Simulador: cen├írios de rajada (RN-55, RN-56) tela mostra a falha da plataforma no passo
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_a78f4fe324b7","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-fa1b6120630e68356a98e271a66ffcb2-2f45abe785ff44d3-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=cff7bb9211166e7fadeb388777b3516ef37a5f805216b66f57de3e53636db01e'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_a78f4fe324b7\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-fa1b6120630e68356a98e271a66ffcb2-2f45abe785ff44d3-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=cff7bb9211166e7fadeb388777b3516ef37a5f805216b66f57de3e53636db01e'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+      # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+      # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+      # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+      # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+      # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+      # ./spec/scenarios_app_spec.rb:113:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  16) Simulador: cen├írios de rajada (RN-55, RN-56) RN-56: corrida dos 3 s pelo endpoint de controle dispara por JSON e devolve o id da execu├º├úo; o GET mostra o estado
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_debc3a974de5","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-55c4812e77e76af7c8c0a2891361cdb1-fcfab10340180e09-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=f1be0ac5303d8edb6620236992987dbf5646f60b716ec63f94110940d354adec'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_debc3a974de5\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-55c4812e77e76af7c8c0a2891361cdb1-fcfab10340180e09-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=f1be0ac5303d8edb6620236992987dbf5646f60b716ec63f94110940d354adec'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./lib/channels_mock/scenarios.rb:121:in 'block (2 levels) in ChannelsMock::Scenarios.reset!'
+      # ./lib/channels_mock/scenarios.rb:197:in 'ChannelsMock::Scenarios.send_step'
+      # ./lib/channels_mock/scenarios.rb:189:in 'ChannelsMock::Scenarios.perform_step'
+      # ./lib/channels_mock/scenarios.rb:151:in 'block in ChannelsMock::Scenarios.drain!'
+      # ./lib/channels_mock/scenarios.rb:147:in 'Kernel#loop'
+      # ./lib/channels_mock/scenarios.rb:147:in 'ChannelsMock::Scenarios.drain!'
+      # ./spec/scenarios_app_spec.rb:24:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  17) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) processa a fila numa thread no modo padr├úo, fora da requisi├º├úo
+      Failure/Error: Timeout.timeout(2) { Thread.pass until ChannelsMock::ChatDeliveries.find(message_id).statuses.any? }
+
+      Timeout::Error:
+        execution expired
+      # ./spec/status_callbacks_spec.rb:132:in 'block (2 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+      # ------------------
+      # --- Caused by: ---
+      # Timeout::ExitException:
+      #   execution expired
+      #   ./spec/status_callbacks_spec.rb:132:in 'Thread.pass'
+
+  18) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: delivered depois do aceite n├úo envia um segundo delivered quando a mesma chave ├® repetida (RNF-15)
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_c21bd109b7c5b98d","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-a0c55a220d631b9108323db484f4ef65-bc4b921698426927-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=a44065216e76dfbac4749eb6740d89b3c5f7f558f8cd12f0520cc42aa4fce5c5'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+          with(
+            body: "{\"message_id\":\"chatmsg_c21bd109b7c5b98d\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-a0c55a220d631b9108323db484f4ef65-bc4b921698426927-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=a44065216e76dfbac4749eb6740d89b3c5f7f558f8cd12f0520cc42aa4fce5c5'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+      # ./lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:44:in 'ChannelsMock::StatusCallbacks.drain!'
+      # ./spec/status_callbacks_spec.rb:40:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  19) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: delivered depois do aceite n├úo chama a plataforma no caminho da resposta e envia delivered assinado e no contrato depois
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_9f6ea15d9e5721fe","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-7db73ec8ebebf05d8d652343c81f9a4d-1bf0affa0cabe227-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=f4820c9147b39de04f6486bd7f2ce73299931e94b274313aafcf1d48712213fb'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+          with(
+            body: "{\"message_id\":\"chatmsg_9f6ea15d9e5721fe\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-7db73ec8ebebf05d8d652343c81f9a4d-1bf0affa0cabe227-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=f4820c9147b39de04f6486bd7f2ce73299931e94b274313aafcf1d48712213fb'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+      # ./lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:44:in 'ChannelsMock::StatusCallbacks.drain!'
+      # ./spec/status_callbacks_spec.rb:24:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  20) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: delivered depois do aceite envia delivered tamb├®m quando a confirma├º├úo ao envio se perdeu, porque o efeito existe
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_6e6726031b59a04b","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-e41068d307bd8cef4e5e4caa6e55f0bb-cd6a9812bbea6a89-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=56a5515da7ff716f67a528b9f72cfbc3ceb5d5e802c786de118e6594b8d89d89'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+          with(
+            body: "{\"message_id\":\"chatmsg_6e6726031b59a04b\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-e41068d307bd8cef4e5e4caa6e55f0bb-cd6a9812bbea6a89-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=56a5515da7ff716f67a528b9f72cfbc3ceb5d5e802c786de118e6594b8d89d89'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+      # ./lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:44:in 'ChannelsMock::StatusCallbacks.drain!'
+      # ./spec/status_callbacks_spec.rb:50:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  21) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: read e failed pela tela envia read e failed pedidos no simulador para a mensagem escolhida
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_e3aec5eb2dde4b7d","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-4959ffabef4214defefbda035442e5e1-9eab4283f8418a7e-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=bae4771fa6e16d3815d182962f0cea3889c7ae28f18d9d7c556ced0d42c213a2'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+          with(
+            body: "{\"message_id\":\"chatmsg_e3aec5eb2dde4b7d\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-4959ffabef4214defefbda035442e5e1-9eab4283f8418a7e-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=bae4771fa6e16d3815d182962f0cea3889c7ae28f18d9d7c556ced0d42c213a2'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+      # ./lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:44:in 'ChannelsMock::StatusCallbacks.drain!'
+      # ./spec/status_callbacks_spec.rb:105:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  22) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RNF-14: retentativa quando a plataforma n├úo responde desiste depois do limite de tentativas e registra o erro
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_9f7fd14a13ed2ced","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-de97da3d7e459f5f5c03cdae671af51c-e5492c5d5d2882ca-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=9dc5cd6f094468ec6f1754a8ef18ae10be32a820f7dd3c3aca8dc98582e17a9b'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+          with(
+            body: "{\"message_id\":\"chatmsg_9f7fd14a13ed2ced\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-de97da3d7e459f5f5c03cdae671af51c-e5492c5d5d2882ca-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=9dc5cd6f094468ec6f1754a8ef18ae10be32a820f7dd3c3aca8dc98582e17a9b'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+      # ./lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:44:in 'ChannelsMock::StatusCallbacks.drain!'
+      # ./spec/status_callbacks_spec.rb:85:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  23) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RNF-14: retentativa quando a plataforma n├úo responde repete com o mesmo corpo depois de conex├úo recusada e 5xx, at├® o 202
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_e3bf752a5da65ec3","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-36986e0e7fae06a240e30b19a6796e3d-d8034d84e3534772-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=0f3cbf625a84f71a58db91d5753eb75835a246f3b09d076c6f958c72cb44d481'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+          with(
+            body: "{\"message_id\":\"chatmsg_e3bf752a5da65ec3\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-36986e0e7fae06a240e30b19a6796e3d-d8034d84e3534772-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=0f3cbf625a84f71a58db91d5753eb75835a246f3b09d076c6f958c72cb44d481'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+      # ./lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:44:in 'ChannelsMock::StatusCallbacks.drain!'
+      # ./spec/status_callbacks_spec.rb:72:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  24) Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RNF-14: retentativa quando a plataforma n├úo responde n├úo repete um 4xx (assinatura ou contrato recusados s├úo definitivos)
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock/status with body '{"message_id":"chatmsg_3a1e018bdf9a1012","status":"delivered","timestamp":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-0d1c2cd17a38fa5d273208f658f99b93-aa3e36364385f418-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=43e7cf71b735bf5c3d8fe806e2f053a0359c17b2bcfa966a51b98490dee40f7c'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock/status").
+          with(
+            body: "{\"message_id\":\"chatmsg_3a1e018bdf9a1012\",\"status\":\"delivered\",\"timestamp\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-0d1c2cd17a38fa5d273208f658f99b93-aa3e36364385f418-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=43e7cf71b735bf5c3d8fe806e2f053a0359c17b2bcfa966a51b98490dee40f7c'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:25:in 'ChannelsMock::PlatformClient#deliver_status'
+      # ./lib/channels_mock/status_callbacks.rb:52:in 'block in ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'Kernel#loop'
+      # ./lib/channels_mock/status_callbacks.rb:50:in 'ChannelsMock::StatusCallbacks.perform'
+      # ./lib/channels_mock/status_callbacks.rb:44:in 'ChannelsMock::StatusCallbacks.drain!'
+      # ./spec/status_callbacks_spec.rb:95:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  25) Simulador do cliente (RF-04) RNF-23: com a op├º├úo de assinatura inv├ílida, mostra a recusa da plataforma
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_7f5961858c3b","account_id":"acc_1","customer_ref":"cus_1","text":"oi","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-252116ce1877513b036e2357f8236177-f0063a9c36b5474b-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=54d356356f52d2f4fad041bd2ba0c13a30cc2abf617f39861b7ecf2567a45faf'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_7f5961858c3b\",\"account_id\":\"acc_1\",\"customer_ref\":\"cus_1\",\"text\":\"oi\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-252116ce1877513b036e2357f8236177-f0063a9c36b5474b-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=54d356356f52d2f4fad041bd2ba0c13a30cc2abf617f39861b7ecf2567a45faf'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "/http:\/\/localhost:3000\/webhooks\/chat\/infinitepay-chat-mock/")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/app_spec.rb:46:in 'block (2 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  26) Simulador do cliente (RF-04) reenvia o mesmo webhook (mesmo ID externo) e mostra a duplicata
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_9ef1b29f7a1f","account_id":"acc_1","customer_ref":"cus_1","text":"oi","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-0b5d298d6e58c78c53cdf6ec38f17b1e-511f59c2fe63f7c7-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=f8ef0607843a4195d55fa37ccc5848bc6acc854b0d6e36720e79c32e1ee769e8'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_9ef1b29f7a1f\",\"account_id\":\"acc_1\",\"customer_ref\":\"cus_1\",\"text\":\"oi\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-0b5d298d6e58c78c53cdf6ec38f17b1e-511f59c2fe63f7c7-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=f8ef0607843a4195d55fa37ccc5848bc6acc854b0d6e36720e79c32e1ee769e8'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "/http:\/\/localhost:3000\/webhooks\/chat\/infinitepay-chat-mock/")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/app_spec.rb:31:in 'block (2 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  27) Simulador do cliente (RF-04) envia a mensagem como webhook do provedor e mostra a confirma├º├úo da plataforma
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_006977717e1b","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-ec431f9275702ac75d68572508176d80-751a4a371998389f-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=ea32f6fdf75632c06db23614232db34ecf1000efa02507c0785ca0eae52657d6'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_006977717e1b\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-ec431f9275702ac75d68572508176d80-751a4a371998389f-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=ea32f6fdf75632c06db23614232db34ecf1000efa02507c0785ca0eae52657d6'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "/http:\/\/localhost:3000\/webhooks\/chat\/infinitepay-chat-mock/")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/app_spec.rb:19:in 'block (2 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  28) Simulador: pedir humano e aviso de transfer├¬ncia (ROADMAP 10; RN-34, RN-42, RF-43) RN-42: aviso de transfer├¬ncia destacado o aviso aparece como mensagem do sistema, ligado ao pedido, com o estado da entrega
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_c0c9d206df2f","account_id":"acc_1","customer_ref":"cus_1","text":"Quero falar com um atendente","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-d8015d3d94da63e515fda683341fe63d-18595089aa3d9ddd-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=057180a7c9c939149bb2a188ca1a25da9f235e27bca2a2ec520a95f9e89b443b'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_c0c9d206df2f\",\"account_id\":\"acc_1\",\"customer_ref\":\"cus_1\",\"text\":\"Quero falar com um atendente\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-d8015d3d94da63e515fda683341fe63d-18595089aa3d9ddd-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=057180a7c9c939149bb2a188ca1a25da9f235e27bca2a2ec520a95f9e89b443b'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/jim-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/jim-chat-mock")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/human_request_spec.rb:46:in 'RSpec::ExampleGroups::SimuladorPedirHumanoEAvisoDeTransferNciaROADMAP10RN34RN42RF43::RN42AvisoDeTransferNciaDestacado#customer_sends'
+      # ./spec/human_request_spec.rb:51:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  29) Simulador: pedir humano e aviso de transfer├¬ncia (ROADMAP 10; RN-34, RN-42, RF-43) bot├úo Pedir humano RN-34: envia o pedido pela mesma rota do chat, no idioma da marca da conta, ignorando o texto digitado
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_e43b75410e33","account_id":"acc_1","customer_ref":"cus_1","text":"Quero falar com um atendente","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-db496633f65db1bddeff82859b05418f-f7e770cf45efdd40-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=94d91245637750bf7d9fed01f63cc003ac3a1e6b2f24ff96c21f31c5f8f9a257'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_e43b75410e33\",\"account_id\":\"acc_1\",\"customer_ref\":\"cus_1\",\"text\":\"Quero falar com um atendente\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-db496633f65db1bddeff82859b05418f-f7e770cf45efdd40-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=94d91245637750bf7d9fed01f63cc003ac3a1e6b2f24ff96c21f31c5f8f9a257'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/jim-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/jim-chat-mock")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/human_request_spec.rb:28:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  30) Simulador: pedir humano e aviso de transfer├¬ncia (ROADMAP 10; RN-34, RN-42, RF-43) bot├úo Pedir humano sem o bot├úo, o texto digitado vai como sempre
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_46a874325141","account_id":"acc_1","customer_ref":"cus_1","text":"oi","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-2175c988db98803fb338a9c251548b86-a574a95930a957f2-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=bf926f2de5e569d8429837cd5e71eab6ec1567c3f865bb4e70424991a0d3fc55'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_46a874325141\",\"account_id\":\"acc_1\",\"customer_ref\":\"cus_1\",\"text\":\"oi\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-2175c988db98803fb338a9c251548b86-a574a95930a957f2-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=bf926f2de5e569d8429837cd5e71eab6ec1567c3f865bb4e70424991a0d3fc55'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/jim-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/jim-chat-mock")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/human_request_spec.rb:38:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  31) Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) status e falhas pela tela mostra o ├║ltimo status enviado ├á plataforma e os bot├Áes de lida e falha
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_320bdd6f94a3","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-ce8af1e7f8d221148318f3447378186c-64a8177e2060a610-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=d4c11f89ec66e5904efba0bb4545fa37bb8530197901ae4103126cd451ae2ff3'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_320bdd6f94a3\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-ce8af1e7f8d221148318f3447378186c-64a8177e2060a610-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=d4c11f89ec66e5904efba0bb4545fa37bb8530197901ae4103126cd451ae2ff3'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/simulator_replies_spec.rb:14:in 'RSpec::ExampleGroups::SimuladorRespostasRecebidasPeloProvedorRF04RNF05ROADMAP05#customer_sends'
+      # ./spec/simulator_replies_spec.rb:98:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  32) Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RNF-05: tempo total percebido pelo cliente mostra o tempo de cada resposta quando o envio recebe mais de uma (progresso e resposta final)
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_4284feca563a","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-6606b88f54610d6d72599db9900fd746-4dea1ba8e6fa08f0-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=4362bdfb5f9646e00dd129b1913b4be80f2423219c52f508e08a26caea04ea9b'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_4284feca563a\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-6606b88f54610d6d72599db9900fd746-4dea1ba8e6fa08f0-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=4362bdfb5f9646e00dd129b1913b4be80f2423219c52f508e08a26caea04ea9b'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/simulator_replies_spec.rb:14:in 'RSpec::ExampleGroups::SimuladorRespostasRecebidasPeloProvedorRF04RNF05ROADMAP05#customer_sends'
+      # ./spec/simulator_replies_spec.rb:38:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  33) Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RNF-05: tempo total percebido pelo cliente liga a resposta ao envio pelo reply_to e mostra o tempo total com o rel├│gio controlado
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_656ddd40a8f2","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-3c427c03d68504cbe8fd2a349e826c26-bf8d463b566b60a9-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=48c45a9cf2ca887506e11f3254c4aa8762ce8061269c54194f67344c3b444869'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_656ddd40a8f2\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-3c427c03d68504cbe8fd2a349e826c26-bf8d463b566b60a9-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=48c45a9cf2ca887506e11f3254c4aa8762ce8061269c54194f67344c3b444869'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/simulator_replies_spec.rb:14:in 'RSpec::ExampleGroups::SimuladorRespostasRecebidasPeloProvedorRF04RNF05ROADMAP05#customer_sends'
+      # ./spec/simulator_replies_spec.rb:23:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  34) Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RNF-05: tempo total percebido pelo cliente marca a repeti├º├úo da mesma Idempotency-Key, sem duplicar a resposta na conversa (RNF-15)
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_5bc6ae01041a","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-1660b4836ed51cd82f2a8802a4776a65-cc7ae5ea2453354f-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=f6884a328bf1a688e233a48665033ae38ca5061609ee9012f2051165a6404f9b'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_5bc6ae01041a\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-1660b4836ed51cd82f2a8802a4776a65-cc7ae5ea2453354f-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=f6884a328bf1a688e233a48665033ae38ca5061609ee9012f2051165a6404f9b'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/simulator_replies_spec.rb:14:in 'RSpec::ExampleGroups::SimuladorRespostasRecebidasPeloProvedorRF04RNF05ROADMAP05#customer_sends'
+      # ./spec/simulator_replies_spec.rb:50:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  35) Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RF-56: rastreio at├® a mensagem original mostra o trace_id da resposta recebida (traceparent da entrega)
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_38edd519990b","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-80c941cad3c3eb08e7be4991f7a37d16-8595a077208490d5-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=3b600edf823c74086ab26775a6050baf6330c1d220f5cfe645236db932415bef'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_38edd519990b\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-80c941cad3c3eb08e7be4991f7a37d16-8595a077208490d5-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=3b600edf823c74086ab26775a6050baf6330c1d220f5cfe645236db932415bef'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/simulator_replies_spec.rb:14:in 'RSpec::ExampleGroups::SimuladorRespostasRecebidasPeloProvedorRF04RNF05ROADMAP05#customer_sends'
+      # ./spec/simulator_replies_spec.rb:78:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+  36) Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RF-56: rastreio at├® a mensagem original mostra o trace_id do envio e o link para a linha do tempo do atendimento
+      Failure/Error: response = Net::HTTP.start(uri.host, uri.port, open_timeout: TIMEOUT, read_timeout: TIMEOUT) { _1.request(request) }
+
+      WebMock::NetConnectNotAllowedError:
+        Real HTTP connections are disabled. Unregistered request: POST http://web:3000/webhooks/chat/infinitepay-chat-mock with body '{"message_id":"chat_msg_8e454069a619","account_id":"acc_infinitepay_000021","customer_ref":"cus_ref_000021","text":"meu repasse n├úo caiu","sent_at":"2026-11-20T12:00:00.000Z"}' with headers {'Accept'=>'*/*', 'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3', 'Content-Type'=>'application/json', 'Host'=>'web:3000', 'Traceparent'=>'00-86b1226a0b12a850bbc4070b2927ad38-7def20cf5542670f-01', 'User-Agent'=>'Ruby', 'X-Helpdesk-Signature'=>'t=1795176000,v1=484971d90adeab4566afb22b76d9069c11541b645831d8eb2e342850c197b0bd'}
+
+        You can stub this request with the following snippet:
+
+        stub_request(:post, "http://web:3000/webhooks/chat/infinitepay-chat-mock").
+          with(
+            body: "{\"message_id\":\"chat_msg_8e454069a619\",\"account_id\":\"acc_infinitepay_000021\",\"customer_ref\":\"cus_ref_000021\",\"text\":\"meu repasse n├úo caiu\",\"sent_at\":\"2026-11-20T12:00:00.000Z\"}",
+            headers: {
+        	  'Accept'=>'*/*',
+        	  'Accept-Encoding'=>'gzip;q=1.0,deflate;q=0.6,identity;q=0.3',
+        	  'Content-Type'=>'application/json',
+        	  'Host'=>'web:3000',
+        	  'Traceparent'=>'00-86b1226a0b12a850bbc4070b2927ad38-7def20cf5542670f-01',
+        	  'User-Agent'=>'Ruby',
+        	  'X-Helpdesk-Signature'=>'t=1795176000,v1=484971d90adeab4566afb22b76d9069c11541b645831d8eb2e342850c197b0bd'
+            }).
+          to_return(status: 200, body: "", headers: {})
+
+        registered request stubs:
+
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock/status")
+        stub_request(:post, "http://localhost:3000/webhooks/chat/infinitepay-chat-mock")
+
+        ============================================================
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:137:in 'Net::HTTP#request'
+      # ./lib/channels_mock/platform_client.rb:39:in 'block in ChannelsMock::PlatformClient#post'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:147:in 'Net::HTTP#start_without_connect'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/http_lib_adapters/net_http.rb:175:in 'Net::HTTP#start'
+      # ./lib/channels_mock/platform_client.rb:39:in 'ChannelsMock::PlatformClient#post'
+      # ./lib/channels_mock/platform_client.rb:21:in 'ChannelsMock::PlatformClient#deliver'
+      # ./lib/channels_mock/chat_sender.rb:22:in 'ChannelsMock::ChatSender.deliver'
+      # ./lib/channels_mock/chat_sender.rb:16:in 'ChannelsMock::ChatSender.call'
+      # ./app.rb:228:in 'ChannelsMock::App#send_chat'
+      # ./app.rb:192:in 'block (3 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:551:in 'Roda::RodaPlugins::Base::RequestMethods#always'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:194:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_is1'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:138:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#_verb'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:274:in 'Roda::RodaPlugins::Base::RequestMethods#post'
+      # ./app.rb:186:in 'block (2 levels) in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/request.rb:672:in 'Roda::RodaPlugins::Base::RequestMethods#if_match'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/_optimized_matching.rb:125:in 'Roda::RodaPlugins::OptimizedMatching::RequestMethods#on'
+      # ./app.rb:185:in 'block in <class:App>'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:526:in 'block in Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Kernel#catch'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda.rb:524:in 'Roda::RodaPlugins::Base::InstanceMethods#_roda_handle_main_route'
+      # /usr/local/bundle/ruby/4.0.0/gems/roda-3.110.0/lib/roda/plugins/direct_call.rb:23:in 'Roda::RodaPlugins::DirectCall::ClassMethods#call'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:375:in 'Rack::Test::Session#process_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:163:in 'Rack::Test::Session#custom_request'
+      # /usr/local/bundle/ruby/4.0.0/gems/rack-test-2.3.0/lib/rack/test.rb:112:in 'Rack::Test::Session#post'
+      # ./spec/simulator_replies_spec.rb:14:in 'RSpec::ExampleGroups::SimuladorRespostasRecebidasPeloProvedorRF04RNF05ROADMAP05#customer_sends'
+      # ./spec/simulator_replies_spec.rb:70:in 'block (3 levels) in <top (required)>'
+      # /usr/local/bundle/ruby/4.0.0/gems/webmock-3.35.0/lib/webmock/rspec.rb:39:in 'block (2 levels) in <top (required)>'
+
+Finished in 3.17 seconds (files took 3.45 seconds to load)
+122 examples, 36 failures
+System.Management.Automation.RemoteException
+
+Failed examples:
+
+rspec ./spec/scenarios_spec.rb:110 # ChannelsMock::Scenarios RN-55: rajada curta envia tr├¬s mensagens em t=0, 0,5 s e 1,0 s, na ordem
+rspec ./spec/scenarios_spec.rb:229 # ChannelsMock::Scenarios RN-51: logs JSON sem o texto da mensagem registra cada passo em JSON, com trace_id, sem o texto
+rspec ./spec/scenarios_spec.rb:122 # ChannelsMock::Scenarios RN-55: rajada longa (teto de 4 s) envia seis mensagens a cada 0,9 s, sem empate com o teto de 4 s: a ├║ltima, aos 4,5 s, cai depois dele
+rspec ./spec/scenarios_spec.rb:157 # ChannelsMock::Scenarios falha da plataforma num passo registra 5xx da plataforma e segue
+rspec ./spec/scenarios_spec.rb:142 # ChannelsMock::Scenarios falha da plataforma num passo registra a falha e continua os pr├│ximos passos
+rspec ./spec/scenarios_spec.rb:214 # ChannelsMock::Scenarios repeti├º├úo disparar o mesmo cen├írio duas vezes gera execu├º├Áes e message_id diferentes
+rspec ./spec/scenarios_spec.rb:179 # ChannelsMock::Scenarios dois cen├írios ao mesmo tempo em contas diferentes intercala os envios pelo hor├írio planejado sem misturar conta, cliente nem execu├º├úo
+rspec ./spec/scenarios_spec.rb:267 # ChannelsMock::Scenarios modo thread executa a execu├º├úo em segundo plano e termina com todos os passos
+rspec ./spec/scenarios_spec.rb:81 # ChannelsMock::Scenarios RN-56: corrida dos 3 s guarda o hor├írio planejado, o real, o HTTP e a mensagem no simulador, como o formul├írio
+rspec ./spec/scenarios_spec.rb:68 # ChannelsMock::Scenarios RN-56: corrida dos 3 s assina cada envio com o segredo da conta e manda o contrato de entrada do chat
+rspec ./spec/scenarios_spec.rb:99 # ChannelsMock::Scenarios RN-56: corrida dos 3 s n├úo envia o passo antes do hor├írio planejado (tempo no limite)
+rspec ./spec/scenarios_spec.rb:58 # ChannelsMock::Scenarios RN-56: corrida dos 3 s usa a mesma conta do provedor, o mesmo account_id e o mesmo customer_ref em todos os passos
+rspec ./spec/scenarios_spec.rb:44 # ChannelsMock::Scenarios RN-56: corrida dos 3 s envia "meu repasse n├úo caiu" em t=0 e "├® o de ontem, R$ 1.200" em t=3 s
+rspec ./spec/scenarios_app_spec.rb:96 # Simulador: cen├írios de rajada (RN-55, RN-56) tela mostra cada passo com hor├írio planejado, real e HTTP, e as mensagens na conversa
+rspec ./spec/scenarios_app_spec.rb:110 # Simulador: cen├írios de rajada (RN-55, RN-56) tela mostra a falha da plataforma no passo
+rspec ./spec/scenarios_app_spec.rb:17 # Simulador: cen├írios de rajada (RN-55, RN-56) RN-56: corrida dos 3 s pelo endpoint de controle dispara por JSON e devolve o id da execu├º├úo; o GET mostra o estado
+rspec ./spec/status_callbacks_spec.rb:127 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) processa a fila numa thread no modo padr├úo, fora da requisi├º├úo
+rspec ./spec/status_callbacks_spec.rb:36 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: delivered depois do aceite n├úo envia um segundo delivered quando a mesma chave ├® repetida (RNF-15)
+rspec ./spec/status_callbacks_spec.rb:17 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: delivered depois do aceite n├úo chama a plataforma no caminho da resposta e envia delivered assinado e no contrato depois
+rspec ./spec/status_callbacks_spec.rb:45 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: delivered depois do aceite envia delivered tamb├®m quando a confirma├º├úo ao envio se perdeu, porque o efeito existe
+rspec ./spec/status_callbacks_spec.rb:102 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RF-06: read e failed pela tela envia read e failed pedidos no simulador para a mensagem escolhida
+rspec ./spec/status_callbacks_spec.rb:81 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RNF-14: retentativa quando a plataforma n├úo responde desiste depois do limite de tentativas e registra o erro
+rspec ./spec/status_callbacks_spec.rb:65 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RNF-14: retentativa quando a plataforma n├úo responde repete com o mesmo corpo depois de conex├úo recusada e 5xx, at├® o 202
+rspec ./spec/status_callbacks_spec.rb:91 # Callback de status do chat (07 ┬º5.0; interface do bloco 05, se├º├úo 3) RNF-14: retentativa quando a plataforma n├úo responde n├úo repete um 4xx (assinatura ou contrato recusados s├úo definitivos)
+rspec ./spec/app_spec.rb:43 # Simulador do cliente (RF-04) RNF-23: com a op├º├úo de assinatura inv├ílida, mostra a recusa da plataforma
+rspec ./spec/app_spec.rb:27 # Simulador do cliente (RF-04) reenvia o mesmo webhook (mesmo ID externo) e mostra a duplicata
+rspec ./spec/app_spec.rb:14 # Simulador do cliente (RF-04) envia a mensagem como webhook do provedor e mostra a confirma├º├úo da plataforma
+rspec ./spec/human_request_spec.rb:50 # Simulador: pedir humano e aviso de transfer├¬ncia (ROADMAP 10; RN-34, RN-42, RF-43) RN-42: aviso de transfer├¬ncia destacado o aviso aparece como mensagem do sistema, ligado ao pedido, com o estado da entrega
+rspec ./spec/human_request_spec.rb:27 # Simulador: pedir humano e aviso de transfer├¬ncia (ROADMAP 10; RN-34, RN-42, RF-43) bot├úo Pedir humano RN-34: envia o pedido pela mesma rota do chat, no idioma da marca da conta, ignorando o texto digitado
+rspec ./spec/human_request_spec.rb:37 # Simulador: pedir humano e aviso de transfer├¬ncia (ROADMAP 10; RN-34, RN-42, RF-43) bot├úo Pedir humano sem o bot├úo, o texto digitado vai como sempre
+rspec ./spec/simulator_replies_spec.rb:97 # Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) status e falhas pela tela mostra o ├║ltimo status enviado ├á plataforma e os bot├Áes de lida e falha
+rspec ./spec/simulator_replies_spec.rb:37 # Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RNF-05: tempo total percebido pelo cliente mostra o tempo de cada resposta quando o envio recebe mais de uma (progresso e resposta final)
+rspec ./spec/simulator_replies_spec.rb:22 # Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RNF-05: tempo total percebido pelo cliente liga a resposta ao envio pelo reply_to e mostra o tempo total com o rel├│gio controlado
+rspec ./spec/simulator_replies_spec.rb:49 # Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RNF-05: tempo total percebido pelo cliente marca a repeti├º├úo da mesma Idempotency-Key, sem duplicar a resposta na conversa (RNF-15)
+rspec ./spec/simulator_replies_spec.rb:77 # Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RF-56: rastreio at├® a mensagem original mostra o trace_id da resposta recebida (traceparent da entrega)
+rspec ./spec/simulator_replies_spec.rb:69 # Simulador: respostas recebidas pelo provedor (RF-04, RNF-05, ROADMAP 05) RF-56: rastreio at├® a mensagem original mostra o trace_id do envio e o link para a linha do tempo do atendimento
+
+Randomized with seed 27349
+
+exit=1

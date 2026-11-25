@@ -10,8 +10,10 @@ module AgentMock
     DEFAULT_PATH = File.expand_path("../../config/scenarios.yml", __dir__)
     Latency = Data.define(:min, :max)
     Invalid = Class.new(ArgumentError)
+    ENGINES = %w[rules gemini].freeze
 
-    attr_reader :profile, :seed, :latency, :failure_rate, :mute, :max_ai_turns, :tools, :rules, :replies
+    attr_reader :profile, :seed, :latency, :failure_rate, :mute, :max_ai_turns, :tools, :rules, :replies,
+                :engine, :llm, :llm_limits
 
     def self.load(path: DEFAULT_PATH, env: ENV) = new(YAML.safe_load_file(path), env:)
 
@@ -32,7 +34,11 @@ module AgentMock
       # Regra inválida derruba a subida aqui, não no primeiro evento.
       @rules.each { Scenarios::Rule.new(_1) }
       @replies = raw.fetch("replies")
+      load_engine(raw, env)
     end
+
+    # Modelo registrado na ação (RN-37): o do LLM, ou o mock determinístico.
+    def agent_model = engine == "gemini" ? llm.fetch("model") : MODEL
 
     def profile_names = @raw.fetch("profiles").keys
 
@@ -40,12 +46,14 @@ module AgentMock
     def with_profile(name) = name == profile ? self : self.class.new(@raw, env: @env, profile: name)
 
     def effective
-      {
+      base = {
         "version" => @raw.fetch("version"), "profile" => profile, "seed" => seed,
         "latency_ms" => { "min" => latency.min, "max" => latency.max },
         "failure_rate" => failure_rate, "mute" => mute, "max_ai_turns" => max_ai_turns,
         "tools" => tools, "rules" => rules, "replies" => replies
       }
+      # O hash do motor por regras não muda; o do LLM inclui modelo, temperatura e prompt (RN-37).
+      engine == "gemini" ? base.merge("engine" => engine, "llm" => llm) : base
     end
 
     def config_hash = @config_hash ||= "sha256:#{Digest::SHA256.hexdigest(JSON.generate(canonical(effective)))}"
@@ -58,6 +66,32 @@ module AgentMock
       when Array then value.map { canonical(_1) }
       else value
       end
+    end
+
+    # AGENT_ENGINE (rules ou gemini) e as configurações do LLM. A chave GEMINI_API_KEY nunca entra aqui nem no hash.
+    # Limites de operação (tempo, simultaneidade, teto de chamadas) não mudam a decisão e ficam fora do hash.
+    def load_engine(raw, env)
+      @engine = env.fetch("AGENT_ENGINE", "rules")
+      raise Invalid, "AGENT_ENGINE inválido: #{@engine.inspect} (use #{ENGINES.join(' ou ')})" unless ENGINES.include?(@engine)
+
+      llm = raw.fetch("llm")
+      @llm = {
+        "model" => env.fetch("GEMINI_MODEL", llm.fetch("model")),
+        "temperature" => temperature(env.fetch("GEMINI_TEMPERATURE", llm.fetch("temperature"))),
+        "max_output_tokens" => integer(llm.fetch("max_output_tokens"), "max_output_tokens"),
+        "system_prompt" => llm.fetch("system_prompt")
+      }.freeze
+      @llm_limits = {
+        timeout_s: integer(env.fetch("GEMINI_TIMEOUT_S", 8), "GEMINI_TIMEOUT_S"),
+        max_concurrency: integer(env.fetch("GEMINI_MAX_CONCURRENCY", 4), "GEMINI_MAX_CONCURRENCY"),
+        max_calls: integer(env.fetch("GEMINI_MAX_CALLS", 500), "GEMINI_MAX_CALLS")
+      }.freeze
+    end
+
+    def temperature(value)
+      Float(value)
+    rescue ArgumentError, TypeError
+      raise Invalid, "GEMINI_TEMPERATURE inválida: #{value.inspect}"
     end
 
     # 200, "200", "1000-3000" ou { min:, max: }.

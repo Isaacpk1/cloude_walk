@@ -55,7 +55,7 @@ module Turns
       return Result.new(status: :already_done) unless item && item.completed_at.nil?
 
       # Invariante 6: o atendimento pela marca do item. Ordem das travas: atendimento, depois o item.
-      @ticket = Ticket.lock.find_by(id: item.ticket_id, brand_id: item.brand_id)
+      @ticket = Ticket.lock(Ticket::ROW_LOCK).find_by(id: item.ticket_id, brand_id: item.brand_id)
       item.lock!
       return Result.new(status: :already_done) if item.completed_at
       return missing_ticket(item) unless @ticket
@@ -138,7 +138,7 @@ module Turns
       Result.new(status: :sent)
     end
 
-    def text = Turns::Policy.for(ticket.brand).progress_notice_text(ticket.brand.locale)
+    def text = Turns::Policy.for_ticket(ticket).progress_notice_text(ticket.brand.locale)
 
     def last_customer_message
       Message.where(ticket_id: ticket.id, brand_id: ticket.brand_id, direction: "inbound", author_type: "customer")

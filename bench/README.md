@@ -72,7 +72,9 @@ semente e sem configuração não conta como evidência.
    experimento rodar no Compose da máquina de referência. Até lá, nenhuma meta acima está comprovada.
 2. **Ambiente de desenvolvimento.** O `make up` monta `src/platform` e roda em modo `development`. No Docker Desktop do
    Windows a pasta montada somou cerca de 1,5 s por passo no bloco 03. Para números que representem a plataforma, rode
-   com `RAILS_ENV=production`, código na imagem e sem a pasta montada. Esse perfil ainda não existe no Compose.
+   com `RAILS_ENV=production`, código na imagem e sem a pasta montada. O perfil existe em `docker-compose.bench.yml`
+   (`docker compose -p helpdesk-bench -f docker-compose.yml -f docker-compose.bench.yml up -d --build --wait`, banco
+   `helpdesk_benchmark` separado). Ele ainda não foi construído nem usado numa medição, e o `make bench` ainda não o aplica.
 3. **Carga só no chat.** O k6 exercita o webhook do chat. WhatsApp e e-mail passam pelo mesmo núcleo de ingestão, mas o
    e-mail ainda faz chamadas à API do provedor simulado, então sua latência de ack é maior e não está medida.
 4. **Agente mock.** A latência do agente é configurada (2 s), então a latência percebida do cliente mostra a plataforma,
@@ -85,3 +87,69 @@ semente e sem configuração não conta como evidência.
    e tipo de carga são diferentes.
 8. **Segurança e isolamento (E6), resiliência (E2) e filas (E3)** têm testes automatizados, não carga: ficam fora deste
    script.
+
+## Validação realista (ADR-029, docs/12)
+
+Agente com latência e falhas, falhas de rede, observabilidade, consultas lentas e telas: `bench\negocio\run.ps1`, `bench\chaos\run.ps1`, `bench\ui\run.ps1`. Perfis k6 novos: `negocio` e `caos`. Nada foi medido ainda.
+
+## Rodadas de 24 e 25/11: scripts e leitura dos resultados
+
+O que mudou e por quê está no [docs/12](../docs/12-validacao-realista.md); a ordem dos testes, no [docs/13](../docs/13-roteiro-de-testes.md).
+
+### Script principal: `pico.ps1`
+
+```powershell
+.\bench\pico.ps1 -Ajustado -Perfil realista                     # aceite (~20 min)
+.\bench\pico.ps1 -Ajustado -Perfil estresse                     # onde quebra (~12 min)
+.\bench\pico.ps1 -Ajustado                                      # rajada de diagnóstico (~10 min)
+$env:PLATEAU="30m"; .\bench\pico.ps1 -Ajustado -Perfil realista  # referência oficial do RNF-09
+```
+
+| Parâmetro | Padrão | O que faz |
+|---|---|---|
+| `-Perfil` | `pico` | Perfil do k6 (`realista`, `estresse`, `pico`) |
+| `-Workers` / `-Threads` | 8 / 2 | Processos e threads do Sidekiq (ADR-032) |
+| `-Consumidores` | 4 | Réplicas do consumer das respostas do agente |
+| `-Ajustado` | — | Liga `docker-compose.tuned.yml` |
+
+O `docker-compose.scale.yml` entra sempre: Puma com 4 processos (ADR-033), tópicos com 192 partições (ADR-034) e controle de admissão com 48 vagas no agente (ADR-035). Para comparar sem um deles, mude a variável (`WEB_PROCESSES=1`, `BENCH_TOPIC_PARTITIONS=48`, `ADMISSION_LIMIT=0`) antes do comando.
+
+Antes da carga, o script **confere que os serviços essenciais estão no ar** (agente e consumer incluídos) e aborta se faltar algum: sem o agente, todo turno expira e o resultado não vale.
+
+### Perfis
+
+| Perfil | Unidade | Formato | Para quê |
+|---|---|---|---|
+| `realista` | conversa | 1 conversa/s por 1 min, 2,5/s por 5 min (`PLATEAU`), 12/s por 60 s, 2,5/s por 2 min; 2 a 6 mensagens por conversa com pausa de 10 a 40 s | Aceite contra RNF-09 e RNF-10 |
+| `estresse` | mensagem | degraus de 60 s a 1, 2, 4, 6, 8, 12, 16 e 24 msg/s | Achar o ponto de quebra |
+| `pico` | mensagem | 2 msg/s, 5 msg/s e rajada de 30 msg/s | Diagnóstico de trava e fila |
+
+### Evidências gravadas
+
+| Arquivo | Conteúdo |
+|---|---|
+| `*-k6.json` | Ack por fase, rejeições, iterações descartadas |
+| `*-db.json` | Reconciliação: perdas, turnos por status e `fronteiras_ms` (ida, agente, fila da integração, volta, `overhead_com_fila`) |
+| `*-turnos.txt` | Turnos por minuto (abertos, aplicados, expirados) e motivos de handoff |
+| `*-cpu.txt` | CPU e memória por container a cada ~3 s |
+| `*-locks.txt` | Sessões esperando trava no Postgres a cada ~2 s |
+| `*-consultas.txt` | Consultas mais pesadas (`pg_stat_statements`) |
+| `*-kafka-lag.txt` | Atraso dos grupos de consumidores |
+| `*-pendentes.txt` | Outbox pendente por tipo, ao fim |
+
+### Filas de execução
+
+| Script | O que roda |
+|---|---|
+| `fila-pico.ps1` | Specs da trava (ADR-031) e o pico em 4 × 8 e 8 × 2 |
+| `fila-jobs.ps1` | Specs dos jobs (ADR-032) e o realista |
+| `fila-admissao.ps1` | Specs da admissão (ADR-035) e o realista com tudo ligado |
+
+Todas param se os specs falharem.
+
+### Como ler
+
+- **Overhead da plataforma (RNF-03):** `fronteiras_ms.overhead_com_fila`. Meta: p95 ≤ 1 s no patamar.
+- **Ack (RNF-01):** `http_req_duration{phase:plateau}` no `*-k6.json`. Meta: p95 ≤ 200 ms.
+- **`lost_messages` negativo:** o k6 desistiu da requisição (60 s) e a plataforma gravou depois. Não é perda, mas o cliente ficou sem confirmação: conta como erro do ack.
+- **Turnos expirados:** veja `*-turnos.txt`. Com o agente cheio, o esperado é `agente_sem_vaga` nos motivos de handoff, não `prazo_do_turno`.

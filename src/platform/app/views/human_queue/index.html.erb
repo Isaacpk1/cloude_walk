@@ -62,9 +62,9 @@
           <tr class="human-queue__row" id="queue-ticket-<%= entry.ticket_id %>">
             <td class="human-queue__position"><%= index + 1 %></td>
             <td>
-              <%= link_to "##{entry.ticket_id}", conversation_path(entry.ticket_id) %> · <%= entry.brand_name %>
+              <%= link_to "##{entry.ticket_id}", conversation_path(entry.ticket_id), class: "row-link" %> · <%= entry.brand_name %>
               <div><%= entry.title %></div>
-              <div class="muted"><%= entry.customer_name %> · <%= link_to "linha do tempo", timeline_path(entry.ticket_id) %></div>
+              <div class="muted"><%= entry.customer_name %> · <%= link_to "linha do tempo", timeline_path(entry.ticket_id), class: "row-link-extra" %></div>
             </td>
             <td><span class="human-queue__category"><%= entry.category_label %></span></td>
             <td><%= entry.queue_label %></td>

@@ -13,7 +13,7 @@ module Handoff
     EVENT_TYPE = "handoff.requested".freeze
     # Bloco 10: pedido_do_cliente (RN-34), decisao_do_agente (RN-33, item 1) e limite_de_trocas (item 6).
     REASONS = %w[prazo_do_turno teto_do_ciclo publicacao_falhou contexto_excede_limite falha_de_integracao
-                 limite_de_trocas pedido_do_cliente decisao_do_agente].freeze
+                 limite_de_trocas pedido_do_cliente decisao_do_agente agente_sem_vaga].freeze
     SOURCES = %w[scheduler outbox turns dlq ingestion agent].freeze
 
     def self.call(...) = new(...).call

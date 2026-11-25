@@ -21,7 +21,7 @@ module Deadlines
                              .where("offline.status = 'offline' AND offline.status_changed_at <= ?", now - OFFLINE_AFTER)
                              .select("tickets.*", "offline.status_changed_at AS offline_since"))
                 .where("NOT EXISTS (SELECT 1 FROM outbox_events o WHERE o.dedup_key = #{KEY_SQL})")
-                .order("offline.status_changed_at", :id).limit(limit).lock("FOR UPDATE OF tickets SKIP LOCKED").to_a
+                .order("offline.status_changed_at", :id).limit(limit).lock("#{Ticket::ROW_LOCK} OF tickets SKIP LOCKED").to_a
       tickets.map do |ticket|
         since = ticket.offline_since
         Due.new(ticket:, dedup_key: self.class.dedup_key(ticket), trace_id: SecureRandom.hex(16),

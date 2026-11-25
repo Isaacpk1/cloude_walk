@@ -23,7 +23,7 @@ module Deadlines
               .order(:deadline_at, :id).limit(limit).to_a
       return [] if turns.empty?
 
-      tickets = Ticket.where(id: turns.map(&:ticket_id)).lock("FOR UPDATE SKIP LOCKED").index_by(&:id)
+      tickets = Ticket.where(id: turns.map(&:ticket_id)).lock("#{Ticket::ROW_LOCK} SKIP LOCKED").index_by(&:id)
       traces = OutboxEvent.where(id: turns.map(&:event_id)).pluck(:id, :trace_id).to_h
       turns.filter_map do |turn|
         ticket = tickets[turn.ticket_id]

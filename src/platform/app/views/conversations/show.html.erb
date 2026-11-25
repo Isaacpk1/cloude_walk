@@ -73,7 +73,8 @@
         <ul>
           <% @history.each do |entry| %>
             <li data-ticket-id="<%= entry.ticket_id %>"><%= link_to "Conversa #{entry.ticket_id}", conversation_path(entry.ticket_id) %>
-              · <%= entry.channel %> · <%= entry.state %> · <%= l(entry.created_at, format: :short) %></li>
+              · <%= entry.channel %> · <%= entry.state %> · <%= l(entry.created_at, format: :short) %>
+              <% if entry.summary.present? %><p><%= entry.summary %></p><% end %></li>
           <% end %>
         </ul>
       <% end %>

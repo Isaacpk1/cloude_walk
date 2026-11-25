@@ -20,8 +20,11 @@ RSpec.describe Turns::Open, "RN-49, RF-33, RF-53: contexto do turno completo e v
                     trace_id: SecureRandom.hex(16), received_at: Time.current)
   end
 
+  # O turno lê a política congelada no atendimento (Policy.for_ticket); `for` cobre quem ainda lê a da marca.
   def policy_with(**limits)
-    allow(Turns::Policy).to receive(:for).and_return(Turns::Policy::DEFAULT.with(**limits))
+    policy = Turns::Policy::DEFAULT.with(**limits)
+    allow(Turns::Policy).to receive(:for).and_return(policy)
+    allow(Turns::Policy).to receive(:for_ticket).and_return(policy)
   end
 
   describe "pronto quando: o turno persistido corresponde ao contexto enviado" do

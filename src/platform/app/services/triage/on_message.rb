@@ -27,7 +27,7 @@ module Triage
         next Result.new(status: :not_found, reason: nil) unless item
 
         # Escopo por marca (invariante 6): o item e o atendimento são da mesma marca (chave estrangeira composta).
-        ticket = Ticket.lock.find_by!(id: item.ticket_id, brand_id: item.brand_id)
+        ticket = Ticket.lock(Ticket::ROW_LOCK).find_by!(id: item.ticket_id, brand_id: item.brand_id)
         item.lock!
         next Result.new(status: :already_done, reason: nil) if item.completed_at
 

@@ -1,0 +1,67 @@
+﻿opentelemetry indispon├¡vel: cannot load such file -- opentelemetry/sdk
+{
+  "run_id": "20261124230128-pico",
+  "k6": {
+    "profile": "pico",
+    "mode": "independent",
+    "seed": 42,
+    "accepted_202": 920,
+    "duplicate_200": null,
+    "rejected": 361,
+    "ack_ms": {
+      "med": 22721.261217,
+      "p(95)": 60026.705143,
+      "p(99)": 60133.5416168,
+      "max": 60893.915943
+    }
+  },
+  "stored_messages": 1023,
+  "lost_messages": -103,
+  "conversations": 1023,
+  "ai_turns": {
+    "total": 879,
+    "by_status": {
+      "applied": 6,
+      "expired": 873
+    },
+    "superseded_ratio": 0.0
+  },
+  "outbox_published_after_ms": {
+    "count": 225,
+    "p50": 11641.404,
+    "p95": 15949.339,
+    "p99": 18292.506,
+    "max": 20052.236
+  },
+  "reply_delivered_after_ms": {
+    "count": 6,
+    "p50": 44818.011,
+    "p95": 67950.722,
+    "p99": 67950.722,
+    "max": 67950.722
+  },
+  "platform_overhead_ms": {
+    "count": 6,
+    "p50": 36330.011,
+    "p95": 59426.722,
+    "p99": 59426.722,
+    "max": 59426.722
+  },
+  "agent_ms": {
+    "count": 6,
+    "p50": 3861.0,
+    "p95": 6219.0,
+    "p99": 6219.0,
+    "max": 6219.0
+  },
+  "grouping_wait_ms": {
+    "count": 6,
+    "p50": 2205.0,
+    "p95": 6392.0,
+    "p99": 6392.0,
+    "max": 6392.0
+  },
+  "overhead_excluded_samples": {},
+  "messages_without_delivered_reply": 1017,
+  "outbox_pending_now": 0
+}

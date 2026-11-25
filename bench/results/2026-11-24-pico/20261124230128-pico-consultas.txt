@@ -1,0 +1,58 @@
+﻿== Top 15 por tempo total ==
+ calls | total_ms  | mean_ms | max_ms  | rows  |                                                                    query                                                                     
+-------+-----------+---------+---------+-------+----------------------------------------------------------------------------------------------------------------------------------------------
+ 12135 | 1015516.8 |   83.68 | 12598.5 | 12135 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 LIMIT $3 FOR UPDATE
+ 23786 |  140712.9 |    5.92 |  6530.9 | 23786 | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type", "data", "trace_id", "ruleset_version", "agent_m
+ 39939 |   65825.9 |    1.65 |  6525.4 | 39939 | SELECT $3 FROM ONLY "public"."tickets" x WHERE "id" OPERATOR(pg_catalog.=) $1 AND "brand_id" OPERATOR(pg_catalog.=) $2 FOR KEY SHARE OF x
+ 35447 |   52234.8 |    1.47 |   920.6 | 35447 | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 48866 |   41708.2 |    0.85 |  1087.0 | 48866 | SELECT $2 FROM ONLY "public"."brands" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x
+ 15797 |   33060.1 |    2.09 |   979.1 | 15797 | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+  2921 |   32179.9 |   11.02 |  1199.9 |  2921 | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction", "author_type", "author_id", "body", "internal",
+  1023 |   27833.8 |   27.21 |  1782.6 |  1023 | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priority", "queue_id", "queue_version", "ruleset_version"
+  6321 |   26800.7 |    4.24 |   669.0 |  5638 | INSERT INTO "outbox_events" ("brand_id","ticket_id","event_type","dedup_key","payload","trace_id","next_attempt_at","created_at") VALUES ($1
+  2921 |   26619.5 |    9.11 |   645.1 |  2921 | UPDATE tickets SET context_version = context_version + $1 WHERE id = $2 AND brand_id = $3 RETURNING context_version
+  1898 |   26215.4 |   13.81 |   998.5 |  1898 | INSERT INTO "deliveries" ("brand_id", "ticket_id", "message_id", "seq", "channel", "provider_account", "kind", "ai_assignment_version", "ai_
+  2921 |   24386.1 |    8.35 |   776.7 |  2921 | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload", "trace_id", "created_at", "next_attempt_at", "le
+  6548 |   17635.0 |    2.69 |   709.0 |  6548 | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+   879 |   17460.6 |   19.86 |  2362.0 |   879 | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_version", "context", "event_id", "status", "deadli
+   879 |   16354.7 |   18.61 |   923.3 |   879 | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = $3, "first_pending_at" = $4, "dispatch_due_at" = $
+(15 rows)
+
+== Top 10 por tempo m??dio (mais de 20 chamadas) ==
+ calls | mean_ms | max_ms  |                                                                    query                                                                     
+-------+---------+---------+----------------------------------------------------------------------------------------------------------------------------------------------
+ 12136 |   83.68 | 12598.5 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 LIMIT $3 FOR UPDATE
+    85 |   36.93 |  1623.6 | SELECT a.attname, format_type(a.atttypid, a.atttypmod), pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod, c.collname, 
+    53 |   27.39 |   363.3 | SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput, r.rngsubtype, t.typtype, t.typbasetype FROM pg_type as t LEFT JOIN pg_range as r
+  1023 |   27.21 |  1782.6 | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priority", "queue_id", "queue_version", "ruleset_version"
+    79 |   22.40 |   906.3 | UPDATE "ai_turns" SET response = COALESCE(response, $3::jsonb), response_received_at = COALESCE(response_received_at, $4), updated_at = $5 W
+   879 |   19.86 |  2362.0 | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_version", "context", "event_id", "status", "deadli
+   879 |   18.61 |   923.3 | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = $3, "first_pending_at" = $4, "dispatch_due_at" = $
+   879 |   17.23 |   612.3 | UPDATE "tickets" SET "state" = $1, "assignee_id" = $2, "queue_id" = $3, "queue_version" = $4 WHERE "tickets"."id" = $5 AND "tickets"."lock_v
+   144 |   16.86 |  1005.3 | UPDATE "tickets" SET "category" = $1, "priority" = $2, "tags" = $3, "updated_at" = $4 WHERE "tickets"."id" = $5 AND "tickets"."lock_version"
+    58 |   15.95 |   259.0 | UPDATE "tickets" SET "sla_breached" = $1 WHERE "tickets"."id" = $2 AND "tickets"."lock_version" = $3
+(10 rows)
+
+== Tabelas lidas sem ??ndice (varreduras sequenciais) ==
+     relname      | seq_scan | seq_tup_read | idx_scan | n_live_tup 
+------------------+----------+--------------+----------+------------
+ outbox_events    |      485 |      2296498 |   126795 |       9435
+ tickets          |     1740 |      1203123 |   122032 |       1023
+ ai_turns         |      403 |       289943 |    16929 |        879
+ team_memberships |      885 |         7032 |     1245 |          8
+ users            |      431 |         2568 |    12234 |          6
+(5 rows)
+
+== Consultas pesadas por chamada em outbox_events (blocos lidos por execu????o) ==
+ calls | mean_ms | blocos_por_chamada |                                                     query                                                      
+-------+---------+--------------------+----------------------------------------------------------------------------------------------------------------
+   491 |    5.40 |                308 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."ai_deadline_at" <= $1 AND "tickets"."first_pending_seq" IS 
+   491 |    9.58 |                201 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" = $1 AND "tickets"."assignee_id" IS NULL AND "ticket
+   490 |    3.18 |                191 | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."status" = $1 AND "ai_turns"."deadline_at" <= $2 AND (NOT
+   491 |    3.58 |                120 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."progress_due_at" <= $1 AND "tickets"."first_pending_seq" IS
+   490 |    5.00 |                 96 | SELECT "tickets".* FROM "tickets" WHERE "tickets"."dispatch_due_at" <= $1 AND (NOT EXISTS (SELECT $3 FROM outb
+   396 |    0.69 |                 27 | SELECT "outbox_events"."id" FROM "outbox_events" WHERE "outbox_events"."event_type" IN ($1, $2, $3, $4, $5, $6
+  2921 |    8.35 |                 27 | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload", "trace_id", "creat
+  6322 |    4.24 |                 26 | INSERT INTO "outbox_events" ("brand_id","ticket_id","event_type","dedup_key","payload","trace_id","next_attemp
+(8 rows)
+

@@ -4,6 +4,7 @@ Rails.application.routes.draw do
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
+  get "metrics" => "metrics#show", as: :metrics
 
   # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
@@ -38,6 +39,8 @@ Rails.application.routes.draw do
   # Bloco 12 (RF-13 a RF-18, RF-22, RF-58): configuração pelo supervisor. ?marca=<slug> (ou o campo marca do formulário).
   get "configuracao" => "configuration#index", as: :configuration
   scope "configuracao", as: :configuration do
+    resources :brands, path: "marcas", controller: "configuration_brands", only: :create
+    put "tempos-ia" => "configuration_ai_policies#update", as: :ai_policy
     resources :queues, path: "filas", controller: "configuration_queues", only: %i[create update destroy] do
       post "ativar", on: :member, action: :activate
       post "desativar", on: :member, action: :deactivate

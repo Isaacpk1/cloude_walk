@@ -1,0 +1,107 @@
+﻿opentelemetry indispon├¡vel: cannot load such file -- opentelemetry/sdk
+{
+  "run_id": "20261125011435-realista",
+  "k6": {
+    "profile": "realista",
+    "mode": "independent",
+    "seed": 42,
+    "accepted_202": 6613,
+    "duplicate_200": null,
+    "rejected": 325,
+    "ack_ms": {
+      "med": 2805.8510845,
+      "p(95)": 59705.306750749995,
+      "p(99)": 59998.07045125,
+      "max": 60035.619662
+    }
+  },
+  "stored_messages": 6863,
+  "lost_messages": -250,
+  "conversations": 1778,
+  "ai_turns": {
+    "total": 2247,
+    "by_status": {
+      "superseded": 389,
+      "applied": 373,
+      "expired": 1485
+    },
+    "superseded_ratio": 0.1731
+  },
+  "outbox_published_after_ms": {
+    "count": 2247,
+    "p50": 144.893,
+    "p95": 1218.924,
+    "p99": 1809.792,
+    "max": 5990.41
+  },
+  "reply_delivered_after_ms": {
+    "count": 432,
+    "p50": 19539.373,
+    "p95": 36610.536,
+    "p99": 47784.314,
+    "max": 54597.607
+  },
+  "platform_overhead_ms": {
+    "count": 323,
+    "p50": 10000.159,
+    "p95": 16161.558,
+    "p99": 18508.26,
+    "max": 20207.038
+  },
+  "agent_ms": {
+    "count": 432,
+    "p50": 6036.0,
+    "p95": 11070.0,
+    "p99": 11869.0,
+    "max": 12012.0
+  },
+  "fronteiras_ms": {
+    "ida": {
+      "count": 432,
+      "p50": 577.11,
+      "p95": 4171.063,
+      "p99": 7462.187,
+      "max": 8574.316
+    },
+    "agente_caixa_preta": {
+      "count": 432,
+      "p50": 15326.108,
+      "p95": 18987.474,
+      "p99": 19366.189,
+      "max": 19592.937
+    },
+    "volta_consumo": {
+      "count": 432,
+      "p50": 580.328,
+      "p95": 1310.351,
+      "p99": 1857.52,
+      "max": 2257.775
+    },
+    "volta_entrega": {
+      "count": 432,
+      "p50": 299.366,
+      "p95": 1089.006,
+      "p99": 2137.679,
+      "max": 4478.11
+    },
+    "plataforma_ida_mais_volta": {
+      "count": 432,
+      "p50": 1601.184,
+      "p95": 5642.853,
+      "p99": 8827.304,
+      "max": 11508.943000000001
+    }
+  },
+  "grouping_wait_ms": {
+    "count": 432,
+    "p50": 1905.0,
+    "p95": 19779.0,
+    "p99": 30915.0,
+    "max": 38912.0
+  },
+  "overhead_excluded_samples": {
+    "contexto_agrupado_ou_sem_turno": 109
+  },
+  "messages_without_delivered_reply": 6431,
+  "outbox_pending_now": 0
+}

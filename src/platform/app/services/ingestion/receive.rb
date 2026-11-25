@@ -97,7 +97,8 @@ module Ingestion
 
     # RN-03: um atendimento aberto por cliente e canal. A linha fica travada até o commit.
     def lock_or_open_ticket(brand, customer)
-      ticket = Ticket.open.lock.find_by(customer:, channel:)
+      ticket = Ticket.open.lock(Ticket::ROW_LOCK).find_by(customer:, channel:)
+      ticket = TicketLifecycle::Reopen.call(ticket:, text: @msg.dig("content", "text"), now: Time.current, trace_id:) if ticket
       return [ ticket, false ] if ticket
 
       created = ActiveRecord::Base.transaction(requires_new: true) do
@@ -106,7 +107,7 @@ module Ingestion
       end
       [ created, true ]
     rescue ActiveRecord::RecordNotUnique
-      [ Ticket.open.lock.find_by!(customer:, channel:), false ]
+      [ Ticket.open.lock(Ticket::ROW_LOCK).find_by!(customer:, channel:), false ]
     end
 
     # ADR-023, item 5: o atendimento aberto por uma conta de eval da marca nasce marcado, no mesmo commit da
@@ -122,6 +123,7 @@ module Ingestion
     end
 
     def record(ticket, opened)
+      TicketLifecycle::Wait.finish(ticket:, now: Time.current, trace_id:)
       seq = ticket.messages.maximum(:seq).to_i + 1
       message = ticket.messages.create!(
         brand_id: ticket.brand_id, provider_account: @msg.fetch("provider_account"), channel:, direction: "inbound",
@@ -189,7 +191,10 @@ module Ingestion
     # RN-55 (ADR-020): a janela do canal na política da marca. Canal sem parâmetro é erro (KeyError), não
     # janela padrão. Caso fora da IA não usa janela.
     def window_for(ticket)
-      Turns::Policy.for(ticket.brand).window_for(ticket.channel) if ticket.with_ai?
+      return unless ticket.with_ai?
+
+      @cycle_policy = Turns::Policy.for_ticket(ticket)
+      @cycle_policy.window_for(ticket.channel)
     end
 
     # RN-55, RN-46, RN-57 (07, seção 3.4; ADR-016, ADR-020): com a linha travada, a mensagem abre o ciclo pendente
@@ -199,12 +204,13 @@ module Ingestion
       return {} unless window
 
       now = Time.current
-      policy = Turns::Policy.for(ticket.brand)
+      policy = @cycle_policy || Turns::Policy.for_ticket(ticket)
       cycle = if ticket.first_pending_seq
         {}
       else
         # RN-57: o aviso de progresso tem um prazo por ciclo, gravado só na abertura.
-        { first_pending_seq: seq, first_pending_at: now, ai_deadline_at: Turns::Window.ai_deadline_at(first_pending_at: now, policy:),
+        { first_pending_seq: seq, first_pending_at: now, ai_policy_snapshot: policy.to_snapshot,
+          ai_deadline_at: Turns::Window.ai_deadline_at(first_pending_at: now, policy:),
           progress_due_at: now + policy.progress_notice }
       end
       first_pending_at = cycle.fetch(:first_pending_at, ticket.first_pending_at)
@@ -215,7 +221,7 @@ module Ingestion
     def ceiling_at(ticket)
       return unless ticket.with_ai? && ticket.first_pending_at
 
-      (ticket.first_pending_at + Turns::Policy.for(ticket.brand).ceiling).utc.iso8601(3)
+      (ticket.first_pending_at + Turns::Policy.for_ticket(ticket).ceiling).utc.iso8601(3)
     end
 
     # RN-56, invariante 4: no mesmo commit, todo turno elegível que não cobre esta mensagem perde a

@@ -1,0 +1,240 @@
+﻿ Container helpdesk-agent-mock-run-440e6c6e17e5 Creating 
+ Container helpdesk-agent-mock-run-440e6c6e17e5 Created 
+
+Randomized with seed 25083
+
+AgentMock::Scenarios::Engine
+  ADR-008, RF-38: regras configur├íveis
+    tipo de regra desconhecido falha na subida (RN-35: nada fora do cat├ílogo)
+    regra do tipo reply responde com o texto fixo da regra
+    consulta fora do cat├ílogo falha na subida (RN-35)
+    vale a primeira regra que casar, na ordem do arquivo
+  RN-36, ADR-008: negation_window e ignore_questions s├úo gen├®ricos e validados na subida
+    configura├º├úo inv├ílida derruba a subida (Config, n├úo s├│ o Engine)
+    mudar a janela ou ignore_questions muda o config_hash (RN-37)
+    termo com nega├º├úo at├® N palavras antes n├úo casa; al├®m da janela casa
+    ignore_questions desconsidera o termo dentro de uma pergunta
+  RN-36: resolve s├│ com confirma├º├úo afirmativa do cliente
+    "Obrigado, resolvido!" encerra com resolve
+    "N├úo foi totalmente resolvido" n├úo encerra o atendimento
+    "resolveu sim" encerra com resolve
+    "nunca deu certo" n├úo encerra o atendimento
+    "ainda n├úo est├í resolvido" n├úo encerra o atendimento
+    "n├úo foi resolvido" n├úo encerra o atendimento
+    "funcionou!" encerra com resolve
+    "nem funcionou" n├úo encerra o atendimento
+    "isso nao funcionou" n├úo encerra o atendimento
+    "obrigado, resolvido" encerra com resolve
+    "n├úo resolveu ainda" n├úo encerra o atendimento
+    "J├í resolveu? Obrigado" n├úo encerra o atendimento
+    pergunta numa mensagem e confirma├º├úo noutra: vale a confirma├º├úo
+    "deu certo, obrigado" encerra com resolve
+    "Resolveu? Sim, resolveu." encerra com resolve
+    "N├úo resolveu, obrigado" n├úo encerra o atendimento
+    "nada foi resolvido" n├úo encerra o atendimento
+    "resolveu?" n├úo encerra o atendimento
+    "j├í resolvido, obrigado" encerra com resolve
+    nega├º├úo no fim de uma mensagem n├úo alcan├ºa o termo da mensagem seguinte al├®m da janela
+
+AgentMock::Profiles
+  RF-38: perfil escolhido pelo simulador
+    usa as chaves de controle combinadas com o simulador
+    o perfil global vale para todas as marcas e o da marca tem preced├¬ncia
+    l├¬ a cada resolu├º├úo: a troca vale no evento seguinte, sem reiniciar
+    perfil desconhecido gravado ├® recusado: vale o padr├úo e loga, sem expor nada do cliente
+    valida todos os perfis na subida e as sobreposi├º├Áes do ambiente valem em qualquer perfil
+    sem perfil gravado vale o AGENT_PROFILE (perfil padr├úo)
+  RN-37: config_hash do perfil efetivo
+    o config_hash muda com o perfil escolhido e ├® igual ao do mesmo perfil pelo ambiente
+  RF-38; 07, se├º├úo 6: fonte do perfil fora do ar
+    com o Redis de verdade inalcan├º├ível, o cliente falha r├ípido e cai no padr├úo
+    sem AGENT_CONTROL_REDIS_URL n├úo h├í fonte: vale s├│ o AGENT_PROFILE, sem tentar conectar
+    Redis fora: cai no perfil padr├úo, loga e n├úo levanta erro
+
+InboundConsumer
+  07, se├º├úo 6: Kafka n├úo confirma a a├º├úo
+    levanta o erro para o Karafka n├úo confirmar o offset do evento que falhou
+  ADR-008, RF-32: consome agent.inbound e publica a a├º├úo em agent.outbound
+    traduz a mensagem do Kafka (corpo bruto e cabe├ºalhos) e publica com chave e cabe├ºalhos
+    processa o lote inteiro, um evento por vez
+  RF-38: perfil escolhido pelo simulador
+    o mesmo consumidor passa a usar o perfil gravado no lote seguinte, sem reiniciar
+  RF-38: modo mudo
+    consome e n├úo publica nada
+  invariante 10: evento inv├ílido vai para a DLQ e o consumo segue
+    publica na DLQ, n├úo responde e processa o pr├│ximo do lote
+
+AgentMock::Log
+  invariante 13, RNF-20: logs em JSON com trace_id
+    o logger do Karafka tamb├®m sai em JSON
+    extrai o trace_id de um traceparent W3C v├ílido e ignora o inv├ílido
+
+AgentMock::Kafka
+  07 se├º├úo 7, RNF-03: vaz├úo do agente com AGENT_CONCURRENCY
+    valor inv├ílido derruba a subida
+    aceita inteiro >= 1 por ENV
+    n├úo entra no config_hash: muda a vaz├úo, n├úo a decis├úo (RN-37)
+    padr├úo 48 (uma thread por parti├º├úo: ~24 turnos/s com o agente a 2 s) e aplicado no Karafka
+  ADR-008: consumidor em grupo pr├│prio
+    consome helpdesk.agent.inbound.v1 no grupo agent-mock, separado do consumer da plataforma
+  ADR-004, 07 se├º├úo 6: produtor com acks=all e idempot├¬ncia
+    configura acks=all, idempot├¬ncia, brokers e timeout por ENV
+
+AgentMock::Scenarios::GeminiEngine
+  ADR-030: a pol├¡tica fica nas regras
+    "preciso de um estorno do pix" ├® decidido pelas regras, sem chamar o modelo (FAILED - 1)
+    cliente n├úo verificado recebe o pedido de identifica├º├úo das regras (RN-05)
+    "quero falar com um atendente" ├® decidido pelas regras, sem chamar o modelo (FAILED - 2)
+    limite de trocas escala sem chamar o modelo (RN-33)
+    "quero trocar a conta banc├íria" ├® decidido pelas regras, sem chamar o modelo (FAILED - 3)
+    "obrigado, resolvido" ├® decidido pelas regras, sem chamar o modelo (FAILED - 4)
+  RN-37: configura├º├úo registrada
+    a chave da API nunca entra na configura├º├úo efetiva
+    sem GEMINI_API_KEY o cliente real derruba a subida
+    o hash do motor Gemini difere do das regras e muda com o modelo
+    motor desconhecido derruba a subida
+  o modelo redige a resposta
+    usa o texto do modelo e mant├®m as consultas sint├®ticas da decis├úo
+    manda ao modelo os dados consultados, o texto do cliente e o modelo e a temperatura da configura├º├úo
+    n├úo manda identificador, nome nem contato do cliente ao modelo (RN-51)
+  degrada├º├úo: nunca fica sem resposta
+    sa├¡da inv├ílida ("{}") cai nas regras
+    devolve a vaga de simultaneidade mesmo quando o modelo falha
+    erro do provedor devolve a resposta das regras e registra agent.llm_fallback
+    teto de chamadas atingido cai nas regras, sem chamar o modelo (custo)
+    sa├¡da inv├ílida ("n├úo ├® json") cai nas regras
+    sa├¡da inv├ílida ("{\"text\":42}") cai nas regras
+    sa├¡da inv├ílida ("{\"text\":\"   \"}") cai nas regras
+
+AgentMock::Tools
+  RNF-30, invariante 12: resultados sint├®ticos e determin├¡sticos
+    a semente muda o resultado
+    cada chamada vira um item de tool_calls v├ílido
+    mesmos argumentos e mesma semente d├úo o mesmo resultado e a mesma dura├º├úo
+  RF-32, RN-35: cat├ílogo fechado de consultas
+    toda tool do config/scenarios.yml existe no cat├ílogo
+    tool fora do cat├ílogo n├úo existe
+    s├│ tem consultas: repasse, transa├º├úo e taxa
+
+AgentMock::Config
+  RF-38: perfis rapido, lento e mudo
+    usa o perfil padr├úo (rapido) sem AGENT_PROFILE
+    perfil desconhecido falha na subida, n├úo em produ├º├úo silenciosa
+    lento passa do aviso de progresso (15 s, RN-57) e fica abaixo do prazo do turno (20 s, RN-46); mudo n├úo responde
+  RF-38: vari├íveis de ambiente sobrep├Áem o perfil
+    recusa valores inv├ílidos
+    AGENT_LATENCY_MS fixa ou em faixa, AGENT_FAILURE_RATE, AGENT_MUTE e AGENT_SEED
+  RN-37: config_hash da configura├º├úo efetiva
+    muda quando muda o perfil, a semente, a lat├¬ncia, a taxa de falha ou as regras
+    n├úo depende da ordem das chaves no YAML
+    ├® sha256 est├ível para a mesma configura├º├úo
+
+AgentMock::Responder
+  RF-32: sem regra que case, reply padr├úo
+    responde com o texto padr├úo, sem consulta
+  RF-32, RF-33: pedido de repasse vira consulta + reply
+    l├¬ todas as pending_messages, n├úo s├│ a ├║ltima
+    consulta get_settlement_status e responde com o resultado, no contrato agent_outbound
+  RF-38: modos de falha
+    lat├¬ncia que passa do prazo ainda publica: quem rejeita a resposta tardia ├® a plataforma (RN-46)
+    lat├¬ncia injetada pelo rel├│gio entra em timing.agent_ms, sem sleep real
+    taxa de falha com semente: a a├º├úo n├úo sai e o resultado se repete na mesma semente
+    agent_ms ├® determin├¡stico: a mesma entrada d├í o mesmo agent_ms (RNF-30)
+    agent_ms cobre a execu├º├úo simulada inteira: lat├¬ncia + duration_ms das consultas, coerente com o rel├│gio
+    taxa de falha 1.0 nunca publica
+    modo mudo consome e n├úo publica nada
+  RN-47: evento repetido (mesmo event_id)
+    responde de novo com outro event_id de a├º├úo: a idempot├¬ncia ├® da plataforma
+  RN-36: resolve s├│ com confirma├º├úo do cliente
+    "nada foi resolvido" n├úo encerra: publica reply, n├úo resolve
+    'obrigado' sozinho n├úo ├® confirma├º├úo
+    "n├úo resolveu ainda" n├úo encerra: publica reply, n├úo resolve
+    "resolveu sim" encerra com resolve
+    "deu certo, obrigado" encerra com resolve
+    "ainda n├úo est├í resolvido" n├úo encerra: publica reply, n├úo resolve
+    "n├úo foi resolvido" n├úo encerra: publica reply, n├úo resolve
+    'obrigado, resolvido' vira resolve com resolution.reason
+    "resolveu?" n├úo encerra: publica reply, n├úo resolve
+    'n├úo resolveu' n├úo encerra
+  RN-05: cliente n├úo verificado
+    n├úo consulta dados de conta e pede identifica├º├úo
+    consulta que n├úo ├® dado de conta (taxa) segue liberada
+  RN-35, invariante 10: a├º├úo gerada fora do contrato agent_outbound
+    n├úo publica em outbound e manda para a DLQ como acao_invalida
+  RN-51, invariante 13: logs em JSON com trace_id e sem PII
+    loga trace_id, event_id, conversation_id, decis├úo e dura├º├úo, sem texto nem display_name
+  07, se├º├úo 5.3; RN-37: correla├º├úo, agent e timing
+    devolve a correla├º├úo do evento, agent com modelo, vers├úo e config_hash, e timing
+  RF-32: consultas de transa├º├úo e de taxa
+    status de transa├º├úo vira get_transaction_status + reply
+    taxa vira get_fee com o meio de pagamento do texto
+  RF-38: perfil escolhido pelo simulador
+    o config_hash da a├º├úo reflete o perfil efetivo (RN-37)
+    lento responde depois do aviso de progresso (15 s) e antes do prazo do turno (20 s), com semente
+    Redis fora: responde no perfil padr├úo e loga, sem derrubar o consumo
+    marca errada: o perfil de uma marca n├úo vale para a outra
+    lento ├® determin├¡stico: o mesmo evento d├í a mesma lat├¬ncia (RNF-30)
+    usa o perfil gravado no evento seguinte, sem reiniciar o agente
+    mudo n├úo publica nada, nem na DLQ
+  RN-35: dinheiro e cadastro s├úo de humanos
+    pedido de estorno ├® escalado, nunca executado
+  RN-33: limite de 10 trocas da IA
+    com ai_turns = 10 escala, mesmo com regra de consulta casando
+    com ai_turns = 9 ainda responde
+  invariante 10, RN-44: evento fora do contrato agent_inbound
+    vai para a DLQ com o corpo original e os cabe├ºalhos, sem resposta
+    RN-45: sem event_id nem traceparent nos cabe├ºalhos, a mensagem segue o contrato dead_letter
+    JSON malformado tamb├®m vai para a DLQ, com a chave do event_id do cabe├ºalho
+  RF-30, RF-56: chave e cabe├ºalhos da publica├º├úo
+    publica em outbound com chave conversation_id e cabe├ºalhos event_id da a├º├úo, traceparent recebido e schema
+    sem traceparent no evento, publica sem o cabe├ºalho (a plataforma usa o trace do turno)
+  RNF-30: determinismo
+    mesma entrada, mesma configura├º├úo e mesma semente d├úo a mesma a├º├úo (exceto event_id e timing)
+    outra semente muda o resultado da consulta e o config_hash
+  RN-46; 07, se├º├úo 6: evento vencido ├® descartado
+    um instante antes do prazo, responde
+    um instante depois do prazo, descarta e loga sem PII
+    no limite exato do deadline_at, descarta
+  RN-34, RN-39: cliente pede humano
+    escala com reason e o resumo com os cinco campos, sem PII
+    palavra inteira: 'pessoal' n├úo ├® pedido de humano
+  07, se├º├úo 6: Kafka n├úo confirma a publica├º├úo
+    propaga o erro (o Karafka n├úo confirma o offset e o evento volta)
+    tamb├®m propaga quando a DLQ n├úo confirma
+
+Failures:
+
+  1) AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "preciso de um estorno do pix" ├® decidido pelas regras, sem chamar o modelo
+     Failure/Error: expect(decision.action).to be_in(%w[escalate resolve])
+       expected "escalate" to respond to `in?`
+     # ./spec/agent_mock/gemini_engine_spec.rb:36:in 'block (4 levels) in <top (required)>'
+
+  2) AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "quero falar com um atendente" ├® decidido pelas regras, sem chamar o modelo
+     Failure/Error: expect(decision.action).to be_in(%w[escalate resolve])
+       expected "escalate" to respond to `in?`
+     # ./spec/agent_mock/gemini_engine_spec.rb:36:in 'block (4 levels) in <top (required)>'
+
+  3) AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "quero trocar a conta banc├íria" ├® decidido pelas regras, sem chamar o modelo
+     Failure/Error: expect(decision.action).to be_in(%w[escalate resolve])
+       expected "escalate" to respond to `in?`
+     # ./spec/agent_mock/gemini_engine_spec.rb:36:in 'block (4 levels) in <top (required)>'
+
+  4) AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "obrigado, resolvido" ├® decidido pelas regras, sem chamar o modelo
+     Failure/Error: expect(decision.action).to be_in(%w[escalate resolve])
+       expected "resolve" to respond to `in?`
+     # ./spec/agent_mock/gemini_engine_spec.rb:36:in 'block (4 levels) in <top (required)>'
+
+Finished in 2.23 seconds (files took 3.71 seconds to load)
+138 examples, 4 failures
+
+Failed examples:
+
+rspec './spec/agent_mock/gemini_engine_spec.rb[1:1:2]' # AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "preciso de um estorno do pix" ├® decidido pelas regras, sem chamar o modelo
+rspec './spec/agent_mock/gemini_engine_spec.rb[1:1:1]' # AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "quero falar com um atendente" ├® decidido pelas regras, sem chamar o modelo
+rspec './spec/agent_mock/gemini_engine_spec.rb[1:1:3]' # AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "quero trocar a conta banc├íria" ├® decidido pelas regras, sem chamar o modelo
+rspec './spec/agent_mock/gemini_engine_spec.rb[1:1:4]' # AgentMock::Scenarios::GeminiEngine ADR-030: a pol├¡tica fica nas regras "obrigado, resolvido" ├® decidido pelas regras, sem chamar o modelo
+
+Randomized with seed 25083
+
+System.Management.Automation.RemoteException
+exit=1

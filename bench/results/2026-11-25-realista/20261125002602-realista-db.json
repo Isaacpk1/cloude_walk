@@ -1,0 +1,70 @@
+﻿opentelemetry indispon├¡vel: cannot load such file -- opentelemetry/sdk
+{
+  "run_id": "20261125002602-realista",
+  "k6": {
+    "profile": "realista",
+    "mode": "independent",
+    "seed": 42,
+    "accepted_202": 7010,
+    "duplicate_200": null,
+    "rejected": 0,
+    "ack_ms": {
+      "med": 3798.592755,
+      "p(95)": 53544.457221699995,
+      "p(99)": 56992.16171554,
+      "max": 58500.000672
+    }
+  },
+  "stored_messages": 7010,
+  "lost_messages": 0,
+  "conversations": 1779,
+  "ai_turns": {
+    "total": 2191,
+    "by_status": {
+      "superseded": 347,
+      "applied": 364,
+      "expired": 1480
+    },
+    "superseded_ratio": 0.1584
+  },
+  "outbox_published_after_ms": {
+    "count": 2191,
+    "p50": 121.979,
+    "p95": 565.948,
+    "p99": 1191.631,
+    "max": 2198.341
+  },
+  "reply_delivered_after_ms": {
+    "count": 409,
+    "p50": 19137.868,
+    "p95": 34757.579,
+    "p99": 48916.398,
+    "max": 53927.898
+  },
+  "platform_overhead_ms": {
+    "count": 325,
+    "p50": 9388.563,
+    "p95": 16119.931,
+    "p99": 17391.666,
+    "max": 19814.558
+  },
+  "agent_ms": {
+    "count": 409,
+    "p50": 6116.0,
+    "p95": 11033.0,
+    "p99": 11852.0,
+    "max": 11925.0
+  },
+  "grouping_wait_ms": {
+    "count": 409,
+    "p50": 1891.0,
+    "p95": 17489.0,
+    "p99": 31730.0,
+    "max": 41806.0
+  },
+  "overhead_excluded_samples": {
+    "contexto_agrupado_ou_sem_turno": 84
+  },
+  "messages_without_delivered_reply": 6601,
+  "outbox_pending_now": 0
+}

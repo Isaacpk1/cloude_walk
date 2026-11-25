@@ -1,0 +1,1027 @@
+﻿ hora | pid | espera | evento | seg | bloqueado_por | consulta 
+------+-----+--------+--------+-----+---------------+----------
+(0 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:03:33 | 267 | Client | ClientRead | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+(1 row)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:03:54 | 276 | Lock   | transactionid | 1.3 | {388}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:54 | 422 | Lock   | transactionid | 0.5 | {438}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:54 | 230 | Client | ClientRead    | 0.4 | {}            | SELECT "customer_identities".* FROM "customer_identities" WHERE "customer_identities"."bra
+ 02:03:54 | 293 | Client | ClientRead    | 0.3 | {}            | SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attn
+ 02:03:54 | 409 | Client | ClientRead    | 0.2 | {}            | SELECT "ai_policy_versions".* FROM "ai_policy_versions" WHERE "ai_policy_versions"."brand_
+ 02:03:54 | 379 | Client | ClientRead    | 0.2 | {}            | SAVEPOINT active_record_1
+ 02:03:54 | 388 | Client | ClientRead    | 0.2 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:03:54 | 431 | Client | ClientRead    | 0.2 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:03:54 | 438 | Client | ClientRead    | 0.2 | {}            | SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attn
+ 02:03:54 | 408 | Client | ClientRead    | 0.1 | {}            | SAVEPOINT active_record_1
+ 02:03:54 | 404 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "outbox_events" ("id", "brand_id", "ticket_id", "event_type", "dedup_key", "pa
+ 02:03:54 | 406 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:03:59 | 422 | Lock   | transactionid | 5.6 | {438}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 441 | Lock   | transactionid | 4.9 | {436}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 454 | Lock   | tuple         | 4.8 | {422}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 440 | Lock   | transactionid | 4.8 | {452}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 426 | Lock   | transactionid | 4.5 | {276}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 456 | Lock   | transactionid | 4.4 | {432}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 455 | Lock   | transactionid | 3.9 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 458 | Lock   | transactionid | 3.4 | {439}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 457 | Lock   | tuple         | 3.2 | {441}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 467 | Lock   | tuple         | 2.8 | {426}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 468 | Lock   | tuple         | 2.6 | {455}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:03:59 | 293 | Lock   | transactionid | 2.4 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:04:04 | 468 | Lock   | transactionid | 6.7 | {455}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:04 | 436 | Lock   | transactionid | 1.4 | {452}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:04 | 445 | Lock   | transactionid | 1.0 | {276}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:04 | 467 | Lock   | transactionid | 0.7 | {405}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:04 | 431 | Lock   | transactionid | 0.7 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:04 | 421 | Lock   | transactionid | 0.4 | {293}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:04 | 441 | Lock   | transactionid | 0.3 | {432}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:04 | 433 | Client | ClientRead    | 0.1 | {}            | SELECT a.attname, format_type(a.atttypid, a.atttypmod), pg_get_expr(d.adbin, d.adrelid), a
+ 02:04:04 | 415 | Client | ClientRead    | 0.1 | {}            | BEGIN
+ 02:04:04 | 417 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:04 | 379 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:04:04 | 408 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:04:13 | 445 | Lock   | transactionid | 9.9 | {276}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:13 | 441 | Lock   | transactionid | 9.3 | {432}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:13 | 456 | Lock   | transactionid | 8.0 | {438}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:13 | 431 | Lock   | transactionid | 6.9 | {458}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:13 | 404 | Lock   | transactionid | 6.5 | {454}         | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:04:13 | 443 | Lock   | transactionid | 6.5 | {284}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(6 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:04:21 | 284 | Lock   | transactionid | 3.6 | {388}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:21 | 457 | Client | ClientRead    | 3.5 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:21 | 422 | Lock   | transactionid | 3.2 | {293}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:21 | 452 | Lock   | transactionid | 2.8 | {405}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:21 | 526 | Client | ClientRead    | 0.2 | {}            | SELECT a.attname, format_type(a.atttypid, a.atttypmod), pg_get_expr(d.adbin, d.adrelid), a
+ 02:04:21 | 433 | Client | ClientRead    | 0.2 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:04:21 | 404 | Client | ClientRead    | 0.0 | {}            | BEGIN
+ 02:04:21 | 411 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:04:21 | 403 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:04:21 | 410 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:04:21 | 409 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:21 | 379 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:04:27 | 468 | Lock   | transactionid |  1.7 | {436}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:27 | 436 | Client | ClientRead    |  0.3 | {}            | INSERT INTO "handoff_summaries" ("brand_id","ticket_id","from_assignment_version","source"
+ 02:04:27 | 404 | Lock   | transactionid |  0.1 | {267}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:27 | 417 | Client | ClientRead    |  0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:04:27 | 412 | Client | ClientRead    |  0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 115 AND brand_id = 1 R
+ 02:04:27 | 388 | Client | ClientRead    |  0.0 | {}            | UPDATE "tickets" SET "state" = $1, "assignee_id" = $2, "queue_id" = $3, "queue_version" = 
+ 02:04:27 | 432 |        |               |  0.0 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+ 02:04:27 | 409 | Client | ClientRead    | -0.1 | {}            | SAVEPOINT active_record_1
+ 02:04:27 | 415 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:27 | 284 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:27 | 414 |        |               | -0.1 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."ticket_id" = $1
+ 02:04:27 | 421 |        |               | -0.1 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:04:32 | 437 | Client | ClientRead | 0.4 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:32 | 467 | Client | ClientRead | 0.4 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:32 | 276 | Client | ClientRead | 0.3 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:32 | 388 | Client | ClientRead | 0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:04:32 | 460 | Client | ClientRead | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:32 | 404 | Client | ClientRead | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:04:32 | 403 | Client | ClientRead | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."ticket_id" = $1 AND "messages"."bran
+ 02:04:32 | 292 | Client | ClientRead | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:04:32 | 415 | Client | ClientRead | 0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:04:32 | 410 | Client | ClientRead | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:04:32 | 412 | Client | ClientRead | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:04:32 | 409 | Client | ClientRead | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:04:35 | 230 | Client | ClientRead | 0.1 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 160 AND brand_id = 1 R
+ 02:04:35 | 408 | Client | ClientRead | 0.1 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:04:35 | 407 | Client | ClientRead | 0.1 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 156 AND brand_id = 1 R
+ 02:04:35 | 276 | Client | ClientRead | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+ 02:04:35 | 293 | Client | ClientRead | 0.0 | {}            | INSERT INTO "deliveries" ("brand_id", "ticket_id", "message_id", "seq", "channel", "provid
+ 02:04:35 | 388 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:35 | 292 | Client | ClientRead | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:04:35 | 404 | Client | ClientRead | 0.0 | {}            | SAVEPOINT active_record_1
+ 02:04:35 | 405 | Client | ClientRead | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:04:35 | 406 | Client | ClientRead | 0.0 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:04:35 | 403 | Client | ClientRead | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+ 02:04:35 | 284 |        |            | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:04:39 | 436 | Lock   | transactionid | 0.7 | {293}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:39 | 404 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:39 | 388 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:39 | 411 |        |               | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:04:39 | 406 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:04:39 | 407 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:39 | 410 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:39 | 408 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:39 | 403 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:04:39 | 415 | Client | ClientRead    | 0.0 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."ticket_id" = $1
+ 02:04:39 | 412 |        |               | 0.0 | {}            | SAVEPOINT active_record_1
+ 02:04:39 | 379 | Client | ClientRead    | 0.0 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."ticket_id" = $1
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:04:44 | 404 | Lock   | transactionid |  0.8 | {457}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:44 | 426 | Lock   | transactionid |  0.0 | {422}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:44 | 423 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:04:44 | 276 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:44 | 440 | Client | ClientRead    | -0.1 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+ 02:04:44 | 439 | Client | ClientRead    | -0.2 | {}            | SELECT "routing_rulesets"."id", "routing_rulesets"."version", "routing_rulesets"."created_
+ 02:04:44 | 411 | Client | ClientRead    | -0.3 | {}            | SAVEPOINT active_record_1
+ 02:04:44 | 403 | Client | ClientRead    | -0.3 | {}            | INSERT INTO "deliveries" ("brand_id", "ticket_id", "message_id", "seq", "channel", "provid
+ 02:04:44 | 409 | Client | ClientRead    | -0.3 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+ 02:04:44 | 408 | Client | ClientRead    | -0.3 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."customer_id" = $1 AND "tickets"."channe
+ 02:04:44 | 379 | Client | ClientRead    | -0.3 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:04:44 | 407 | Client | ClientRead    | -0.3 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:04:50 | 443 | Lock   | transactionid |  1.3 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:50 | 468 | Lock   | transactionid |  1.0 | {405}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:50 | 432 | Lock   | transactionid |  0.4 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:50 | 440 | Lock   | transactionid |  0.2 | {404}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:04:50 | 439 | Client | ClientRead    |  0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:04:50 | 404 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "handoff_summaries" ("brand_id","ticket_id","from_assignment_version","source"
+ 02:04:50 | 418 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:04:50 | 409 | Client | ClientRead    |  0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:04:50 | 230 | Client | ClientRead    |  0.0 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+ 02:04:50 | 407 | Client | ClientRead    | -0.1 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:04:50 | 415 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+ 02:04:50 | 406 | Client | ClientRead    | -0.1 | {}            | SELECT "customer_identities".* FROM "customer_identities" WHERE "customer_identities"."bra
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:04:58 | 416 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:58 | 460 | Client | ClientRead | 0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:04:58 | 230 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:58 | 412 | Client | ClientRead | 0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:04:58 | 418 | Client | ClientRead | 0.1 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+ 02:04:58 | 458 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:58 | 406 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:04:58 | 379 | Client | ClientRead | 0.1 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:04:58 | 388 | Client | ClientRead | 0.1 | {}            | SELECT "customers".* FROM "customers" WHERE "customers"."id" = $1 LIMIT $2
+ 02:04:58 | 411 | Client | ClientRead | 0.1 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:04:58 | 293 | Client | ClientRead | 0.1 | {}            | SELECT "provider_accounts".* FROM "provider_accounts" WHERE "provider_accounts"."brand_id"
+ 02:04:58 | 467 | Client | ClientRead | 0.1 | {}            | UPDATE "outbox_events" SET "lease_until" = $1, "completed_at" = $2 WHERE "outbox_events"."
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:05:04 | 419 | Client | ClientRead |  0.4 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:05:04 | 379 | Client | ClientRead | -0.2 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."customer_id" = $1 AND "tickets"."channe
+ 02:05:04 | 406 | Client | ClientRead | -0.3 | {}            | SAVEPOINT active_record_1
+ 02:05:04 | 407 | Client | ClientRead | -0.3 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 275 AND brand_id = 1 R
+ 02:05:04 | 408 | Client | ClientRead | -0.3 | {}            | SAVEPOINT active_record_1
+ 02:05:04 | 409 | Client | ClientRead | -0.3 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:05:04 | 411 | Client | ClientRead | -0.3 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:05:04 | 414 | Client | ClientRead | -0.3 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:05:04 | 230 | Client | ClientRead | -0.3 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+ 02:05:04 | 403 | Client | ClientRead | -0.3 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 141 AND brand_id = 1 R
+ 02:05:04 | 418 | Client | ClientRead | -0.3 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:05:04 | 416 | Client | ClientRead | -0.5 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:05:11 | 426 | Lock   | transactionid |  0.7 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:11 | 293 | Lock   | transactionid |  0.3 | {458}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:11 | 419 |        |               |  0.1 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 292 AND brand_id = 1 R
+ 02:05:11 | 432 | Client | ClientRead    | -0.5 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:05:11 | 441 |        |               | -0.5 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:11 | 403 | Client | ClientRead    | -0.6 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+ 02:05:11 | 436 |        |               | -0.6 | {}            | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_
+ 02:05:11 | 445 |        |               | -0.7 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:05:11 | 230 | Client | ClientRead    | -0.7 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:05:11 | 456 | Client | ClientRead    | -0.7 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:05:11 | 408 | Client | ClientRead    | -0.7 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."ticket_id" = $1
+ 02:05:11 | 409 | Client | ClientRead    | -0.7 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:05:17 | 424 | Lock   | transactionid | 0.1 | {276}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:17 | 457 | Lock   | transactionid | 0.1 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:17 | 293 | Client | ClientRead    | 0.0 | {}            | UPDATE "tickets" SET "dispatch_due_at" = $1 WHERE "tickets"."id" = $2 AND "tickets"."lock_
+ 02:05:17 | 419 | Client | ClientRead    | 0.0 | {}            | SAVEPOINT active_record_1
+ 02:05:17 | 405 | Client | ClientRead    | 0.0 | {}            | BEGIN
+ 02:05:17 | 406 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:05:17 | 408 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:05:17 | 407 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+ 02:05:17 | 409 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:17 | 410 | Client | ClientRead    | 0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 322 AND brand_id = 1 R
+ 02:05:17 | 421 | Client | ClientRead    | 0.0 | {}            | SELECT "routing_rulesets"."id", "routing_rulesets"."version", "routing_rulesets"."created_
+ 02:05:17 | 379 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:05:22 | 422 | Lock   | transactionid | 0.7 | {455}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:22 | 403 | Client | ClientRead    | 0.5 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:22 | 416 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:05:22 | 412 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:22 | 417 | Client | ClientRead    | 0.1 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 345 AND brand_id = 1 R
+ 02:05:22 | 408 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:05:22 | 411 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:22 | 414 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:05:22 | 419 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:05:22 | 407 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:05:22 | 406 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:22 | 415 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id","ticket_id","event_type","dedup_key","payload","tr
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:05:27 | 442 | Lock   | transactionid | 1.1 | {431}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:27 | 410 | Client | ClientRead    | 0.1 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:05:27 | 388 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:05:27 | 416 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:05:27 | 407 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:05:27 | 408 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:27 | 411 | Client | ClientRead    | 0.0 | {}            | SAVEPOINT active_record_1
+ 02:05:27 | 230 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:27 | 406 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+ 02:05:27 | 421 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_
+ 02:05:27 | 419 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:05:27 | 417 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:05:34 | 458 | Lock   | transactionid | 0.8 | {422}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:34 | 419 | Client | ClientRead    | 0.8 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+ 02:05:34 | 409 | Client | ClientRead    | 0.6 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+ 02:05:34 | 408 |        |               | 0.4 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:05:34 | 407 | Client | ClientRead    | 0.3 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:05:34 | 417 | Client | ClientRead    | 0.2 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:05:34 | 230 | Client | ClientRead    | 0.2 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+ 02:05:34 | 292 | Client | ClientRead    | 0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:05:34 | 416 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:05:34 | 405 | Client | ClientRead    | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:34 | 412 | Client | ClientRead    | 0.1 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:05:34 | 410 | Client | ClientRead    | 0.1 | {}            | SELECT "customer_identities".* FROM "customer_identities" WHERE "customer_identities"."bra
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:05:59 | 456 | Lock   | transactionid | 0.7 | {437}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:59 | 424 | Lock   | transactionid | 0.7 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:59 | 454 | Lock   | transactionid | 0.7 | {284}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:59 | 388 | Client | ClientRead    | 0.3 | {}            | INSERT INTO "deliveries" ("brand_id", "ticket_id", "message_id", "seq", "channel", "provid
+ 02:05:59 | 468 | Client | ClientRead    | 0.3 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:59 | 452 | Client | ClientRead    | 0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:05:59 | 403 | Client | ClientRead    | 0.0 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:05:59 | 410 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:05:59 | 292 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:05:59 | 409 | Client | ClientRead    | 0.0 | {}            | SAVEPOINT active_record_1
+ 02:05:59 | 408 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_policy_versions".* FROM "ai_policy_versions" WHERE "ai_policy_versions"."brand_
+ 02:05:59 | 379 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:04 | 438 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:04 | 423 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:04 | 419 | Client | ClientRead | 0.1 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:06:04 | 418 | Client | ClientRead | 0.1 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."brand_id" = $1 AND "deliveries
+ 02:06:04 | 412 | Client | ClientRead | 0.1 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:06:04 | 415 | Client | ClientRead | 0.1 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+ 02:06:04 | 230 | Client | ClientRead | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."customer_id" = $1 AND "tickets"."channe
+ 02:06:04 | 407 | Client | ClientRead | 0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:04 | 408 | Client | ClientRead | 0.1 | {}            | SAVEPOINT active_record_1
+ 02:06:04 | 284 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:04 | 403 | Client | ClientRead | 0.0 | {}            | UPDATE "tickets" SET "state" = $1, "assignee_id" = $2, "queue_id" = $3, "queue_version" = 
+ 02:06:04 | 409 | Client | ClientRead | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:10 | 460 | Lock   | transactionid | 0.5 | {432}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:10 | 458 | Lock   | transactionid | 0.4 | {293}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:10 | 419 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:06:10 | 379 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+ 02:06:10 | 426 | Lock   | transactionid | 0.1 | {457}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:10 | 404 | Lock   | transactionid | 0.0 | {453}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:10 | 403 |        |               | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:06:10 | 292 | Client | ClientRead    | 0.0 | {}            | SELECT payload->>'reason' FROM "outbox_events" WHERE "outbox_events"."brand_id" = $1 AND "
+ 02:06:10 | 412 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:10 | 415 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."customer_id" = $1 AND "tickets"."channe
+ 02:06:10 | 414 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:06:10 | 267 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:17 | 276 | Lock   | transactionid | 0.2 | {433}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:17 | 441 | Lock   | transactionid | 0.1 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:17 | 412 | Client | ClientRead    | 0.1 | {}            | SAVEPOINT active_record_1
+ 02:06:17 | 453 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:17 | 403 | Client | ClientRead    | 0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 436 AND brand_id = 1 R
+ 02:06:17 | 230 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_policy_versions".* FROM "ai_policy_versions" WHERE "ai_policy_versions"."brand_
+ 02:06:17 | 437 | Client | ClientRead    | 0.0 | {}            | SELECT "queue_versions".* FROM "queue_versions" WHERE "queue_versions"."id" IN ($1, $2, $3
+ 02:06:17 | 424 |        |               | 0.0 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:06:17 | 379 | Client | ClientRead    | 0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 564 AND brand_id = 1 R
+ 02:06:17 | 432 | Client | ClientRead    | 0.0 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."ticket_id" = $1 AND "messag
+ 02:06:17 | 425 | Lock   | transactionid | 0.0 | {404}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:17 | 454 | Client | ClientRead    | 0.0 | {}            | SELECT payload->>'reason' FROM "outbox_events" WHERE "outbox_events"."brand_id" = $1 AND "
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:06:22 | 284 | Lock   | transactionid |  1.1 | {276}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:22 | 424 | Lock   | transactionid |  0.5 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:22 | 454 | Client | ClientRead    |  0.4 | {}            | UPDATE "deliveries" SET "status" = $1, "last_error" = $2, "updated_at" = $3 WHERE "deliver
+ 02:06:22 | 457 | Lock   | transactionid |  0.4 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:22 | 412 |        |               |  0.2 | {}            | SAVEPOINT active_record_1
+ 02:06:22 | 415 | Client | ClientRead    |  0.1 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 593 AND brand_id = 1 R
+ 02:06:22 | 230 |        |               | -0.1 | {}            | SAVEPOINT active_record_1
+ 02:06:22 | 419 | Client | ClientRead    | -0.1 | {}            | SAVEPOINT active_record_1
+ 02:06:22 | 442 |        |               | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:22 | 468 |        |               | -0.2 | {}            | BEGIN
+(10 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:06:27 | 453 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "outbox_events" ("id", "brand_id", "ticket_id", "event_type", "dedup_key", "pa
+ 02:06:27 | 436 | Client | ClientRead    |  0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:27 | 456 | Lock   | transactionid |  0.0 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:27 | 415 | Client | ClientRead    |  0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:27 | 404 | Client | ClientRead    | -0.1 | {}            | UPDATE "ai_turns" SET "status" = $1, "updated_at" = $2 WHERE 1=0 AND "ai_turns"."status" =
+ 02:06:27 | 405 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:27 | 276 | Client | ClientRead    | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:06:27 | 409 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:27 | 379 | Client | ClientRead    | -0.1 | {}            | SELECT "customer_identities".* FROM "customer_identities" WHERE "customer_identities"."bra
+ 02:06:27 | 410 | Client | ClientRead    | -0.1 | {}            | SAVEPOINT active_record_1
+ 02:06:27 | 408 | Client | ClientRead    | -0.1 | {}            | SELECT "customer_identities".* FROM "customer_identities" WHERE "customer_identities"."bra
+ 02:06:27 | 406 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:32 | 417 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:32 | 440 | Client | ClientRead | 0.0 | {}            | UPDATE "deliveries" SET "status" = $1, "last_error" = $2, "updated_at" = $3 WHERE "deliver
+ 02:06:32 | 415 | Client | ClientRead | 0.0 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:06:32 | 419 | Client | ClientRead | 0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 646 AND brand_id = 1 R
+ 02:06:32 | 418 | Client | ClientRead | 0.0 | {}            | SELECT MAX("ai_turns"."turn") FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_tu
+ 02:06:32 | 425 | Client | ClientRead | 0.0 | {}            | UPDATE "outbox_events" SET "lease_until" = $1, "completed_at" = $2 WHERE "outbox_events"."
+ 02:06:32 | 230 | Client | ClientRead | 0.0 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+ 02:06:32 | 406 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:32 | 412 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:32 | 414 | Client | ClientRead | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:06:32 | 411 | Client | ClientRead | 0.0 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:06:32 | 438 | Client | ClientRead | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:36 | 421 | Lock   | transactionid | 0.5 | {442}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:36 | 456 | Lock   | transactionid | 0.3 | {433}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:36 | 409 | Client | ClientRead    | 0.2 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:06:36 | 379 | Client | ClientRead    | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:06:36 | 445 | Lock   | transactionid | 0.1 | {468}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:36 | 410 | Client | ClientRead    | 0.1 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:06:36 | 406 | Client | ClientRead    | 0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:06:36 | 404 | Client | ClientRead    | 0.0 | {}            | SELECT data->>'context_until_seq' FROM "audit_events" WHERE "audit_events"."brand_id" = $1
+ 02:06:36 | 388 | Client | ClientRead    | 0.0 | {}            | SELECT data->>'context_until_seq' FROM "audit_events" WHERE "audit_events"."brand_id" = $1
+ 02:06:36 | 292 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:36 | 408 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:36 | 407 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:40 | 457 | Lock   | transactionid | 1.1 | {445}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:40 | 422 | Lock   | transactionid | 0.8 | {292}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:40 | 436 | Lock   | transactionid | 0.1 | {453}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:40 | 292 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:40 | 388 | Lock   | transactionid | 0.0 | {468}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:40 | 405 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:40 | 379 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:40 | 408 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:06:40 | 409 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:06:40 | 410 | Client | ClientRead    | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."brand_id" = $1 AND "deliveries
+ 02:06:40 | 411 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:06:40 | 407 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:44 | 423 | Client | ClientRead | 0.1 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:06:44 | 467 | Client | ClientRead | 0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:06:44 | 415 | Client | ClientRead | 0.1 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:06:44 | 412 | Client | ClientRead | 0.1 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:06:44 | 458 | Client | ClientRead | 0.1 | {}            | SELECT clock_timestamp()
+ 02:06:44 | 460 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:44 | 406 | Client | ClientRead | 0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:06:44 | 407 | Client | ClientRead | 0.1 | {}            | SELECT MAX("ai_turns"."turn") FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_tu
+ 02:06:44 | 409 | Client | ClientRead | 0.1 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:06:44 | 410 | Client | ClientRead | 0.1 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:06:44 | 457 | Client | ClientRead | 0.1 | {}            | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_
+ 02:06:44 | 468 | Client | ClientRead | 0.1 | {}            | SELECT 1 AS one FROM "handoff_summaries" WHERE "handoff_summaries"."brand_id" = $1 AND "ha
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:48 | 434 | Lock   | transactionid | 0.6 | {424}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:48 | 379 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:06:48 | 407 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:48 | 403 |        |               | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:06:48 | 405 | Client | ClientRead    | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+ 02:06:48 | 406 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:06:48 | 388 |        |               | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:48 | 408 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:06:48 | 409 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:06:48 | 410 |        |               | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:48 | 411 | Client | ClientRead    | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:06:48 | 230 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."customer_id" = $1 AND "tickets"."channe
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:06:54 | 284 | Lock   | transactionid | 1.2 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:54 | 405 | Lock   | transactionid | 0.7 | {457}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:54 | 433 | Lock   | transactionid | 0.3 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:54 | 434 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:06:54 | 431 | Client | ClientRead    | 0.1 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:06:54 | 423 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:54 | 414 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:54 | 419 | Client | ClientRead    | 0.1 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "lock_version" = $3 WH
+ 02:06:54 | 379 | Client | ClientRead    | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:06:54 | 417 | Client | ClientRead    | 0.1 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 776 AND brand_id = 1 R
+ 02:06:54 | 425 | Client | ClientRead    | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:54 | 441 | Client | ClientRead    | 0.1 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 325 AND brand_id = 1 R
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:06:58 | 452 | Lock   | transactionid |  0.1 | {456}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:58 | 388 | Lock   | transactionid |  0.1 | {432}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:06:58 | 457 | Client | ClientRead    |  0.0 | {}            | UPDATE "tickets" SET "progress_due_at" = $1 WHERE "tickets"."id" = $2 AND "tickets"."lock_
+ 02:06:58 | 405 | Client | ClientRead    | -0.1 | {}            | UPDATE "deliveries" SET "status" = $1, "lease_until" = $2, "provider_message_id" = $3, "de
+ 02:06:58 | 411 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:06:58 | 406 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:06:58 | 404 | Client | ClientRead    | -0.1 | {}            | SELECT clock_timestamp()
+ 02:06:58 | 408 | Client | ClientRead    | -0.1 | {}            | BEGIN
+ 02:06:58 | 409 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:06:58 | 410 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+ 02:06:58 | 407 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:06:58 | 403 |        |               | -0.1 | {}            | INSERT INTO "deliveries" ("brand_id", "ticket_id", "message_id", "seq", "channel", "provid
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:04 | 415 | Client | ClientRead | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."customer_id" = $1 AND "tickets"."channe
+ 02:07:04 | 406 | Client | ClientRead | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:07:04 | 418 | Client | ClientRead | 0.1 | {}            | SAVEPOINT active_record_1
+ 02:07:04 | 414 | Client | ClientRead | 0.1 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:07:04 | 407 | Client | ClientRead | 0.1 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:07:04 | 408 |        |            | 0.1 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:07:04 | 405 | Client | ClientRead | 0.1 | {}            | SELECT payload->>'reason' FROM "outbox_events" WHERE "outbox_events"."brand_id" = $1 AND "
+ 02:07:04 | 410 | Client | ClientRead | 0.1 | {}            | INSERT INTO "customers" ("brand_id", "display_name", "verified", "created_at", "updated_at
+ 02:07:04 | 284 | Client | ClientRead | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."id" = $1 AND "messages"."brand_id" =
+ 02:07:04 | 411 | Client | ClientRead | 0.0 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."ticket_id" = $1
+ 02:07:04 | 409 | Client | ClientRead | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."provi
+ 02:07:04 | 276 | Client | ClientRead | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:07:10 | 457 | Lock   | transactionid |  0.9 | {442}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:10 | 424 | Lock   | transactionid |  0.7 | {437}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:10 | 405 | Lock   | transactionid |  0.6 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:10 | 276 | Lock   | transactionid |  0.0 | {436}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:10 | 443 | Lock   | transactionid | -0.2 | {440}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:10 | 415 | Client | ClientRead    | -0.2 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+ 02:07:10 | 379 | Client | ClientRead    | -0.3 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:10 | 410 | Client | ClientRead    | -0.3 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 857 AND brand_id = 1 R
+ 02:07:10 | 414 | Client | ClientRead    | -0.3 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:07:10 | 409 | Client | ClientRead    | -0.3 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 860 AND brand_id = 1 R
+ 02:07:10 | 408 | Client | ClientRead    | -0.3 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 861 AND brand_id = 1 R
+ 02:07:10 | 230 | Client | ClientRead    | -0.3 | {}            | SELECT "customer_identities".* FROM "customer_identities" WHERE "customer_identities"."bra
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:07:14 | 431 | Lock   | transactionid |  0.1 | {276}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:14 | 437 | Lock   | transactionid |  0.1 | {443}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:14 | 409 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+ 02:07:14 | 230 | Client | ClientRead    |  0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:07:14 | 388 | Lock   | transactionid |  0.0 | {425}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:14 | 432 | Lock   | transactionid |  0.0 | {293}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:14 | 406 | Client | ClientRead    | -0.1 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:07:14 | 293 | Client | ClientRead    | -0.1 | {}            | UPDATE "outbox_events" SET "next_attempt_at" = $1, "lease_until" = $2, "attempts" = $3 WHE
+ 02:07:14 | 419 | Client | ClientRead    | -0.1 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:07:14 | 421 | Client | ClientRead    | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:07:14 | 423 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:14 | 414 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:18 | 439 | Lock   | transactionid | 0.3 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:18 | 403 | Client | ClientRead    | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:18 | 436 | Lock   | transactionid | 0.1 | {431}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:18 | 405 | Lock   | transactionid | 0.1 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:18 | 293 | Lock   | transactionid | 0.1 | {438}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:18 | 379 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+ 02:07:18 | 406 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "customer_identities" ("brand_id", "customer_id", "channel", "external_id", "c
+ 02:07:18 | 276 |        |               | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:18 | 404 | Client | ClientRead    | 0.0 | {}            | BEGIN
+ 02:07:18 | 292 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:07:18 | 388 | Client | ClientRead    | 0.0 | {}            | UPDATE "tickets" SET "category" = $1, "priority" = $2, "tags" = $3, "ruleset_version" = $4
+ 02:07:18 | 284 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:22 | 455 | Lock   | transactionid | 0.2 | {441}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:22 | 425 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "outbox_events" ("id", "brand_id", "ticket_id", "event_type", "dedup_key", "pa
+ 02:07:22 | 404 | Client | ClientRead    | 0.1 | {}            | SELECT MAX("ai_turns"."turn") FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1
+ 02:07:22 | 230 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "provider_accounts" WHERE "provider_accounts"."brand_id" = $1 AND "pr
+ 02:07:22 | 405 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:22 | 406 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:07:22 | 284 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:07:22 | 408 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+ 02:07:22 | 407 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:07:22 | 410 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+ 02:07:22 | 388 | Lock   | transactionid | 0.0 | {468}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:22 | 416 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:26 | 276 | Client | ClientRead | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 LIMIT $2
+ 02:07:26 | 292 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:26 | 293 | Client | ClientRead | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 LIMIT $2
+ 02:07:26 | 379 | Client | ClientRead | 0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:07:26 | 388 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:26 | 403 | Client | ClientRead | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:07:26 | 404 | Client | ClientRead | 0.0 | {}            | SELECT "queue_versions".* FROM "queue_versions" WHERE "queue_versions"."id" = $1 LIMIT $2
+ 02:07:26 | 406 | Client | ClientRead | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:07:26 | 407 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:26 | 411 | Client | ClientRead | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."state" != $1 AND "tickets"."customer_id
+ 02:07:26 | 412 | Client | ClientRead | 0.0 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:07:26 | 230 | Client | ClientRead | 0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 961 AND brand_id = 1 R
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:07:31 | 441 | Lock   | transactionid |  0.3 | {424}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:31 | 455 | Lock   | transactionid |  0.2 | {422}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:31 | 293 | Lock   | transactionid |  0.0 | {436}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:31 | 439 | Client | ClientRead    |  0.0 | {}            | SELECT "customers".* FROM "customers" WHERE "customers"."id" = $1 LIMIT $2
+ 02:07:31 | 292 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "outbox_events" ("id", "brand_id", "ticket_id", "event_type", "dedup_key", "pa
+ 02:07:31 | 404 | Client | ClientRead    |  0.0 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."bran
+ 02:07:31 | 422 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "handoff_summaries" ("brand_id","ticket_id","from_assignment_version","source"
+ 02:07:31 | 415 | Client | ClientRead    |  0.0 | {}            | UPDATE "tickets" SET "latest_customer_seq" = $1, "updated_at" = $2, "first_pending_seq" = 
+ 02:07:31 | 424 |        |               |  0.0 | {}            | INSERT INTO "handoff_summaries" ("brand_id","ticket_id","from_assignment_version","source"
+ 02:07:31 | 417 | Client | ClientRead    |  0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 988 AND brand_id = 1 R
+ 02:07:31 | 410 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:07:31 | 403 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "outbox_events" ("brand_id","ticket_id","event_type","dedup_key","payload","tr
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:35 | 434 | Lock   | transactionid | 0.4 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:35 | 468 | Lock   | transactionid | 0.3 | {442}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:35 | 414 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:35 | 438 | Lock   | transactionid | 0.1 | {403}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:35 | 416 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:35 | 409 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:07:35 | 426 |        |               | 0.1 | {}            | UPDATE "tickets" SET "dispatch_due_at" = $1 WHERE "tickets"."id" = $2 AND "tickets"."lock_
+ 02:07:35 | 292 | Client | ClientRead    | 0.1 | {}            | UPDATE "tickets" SET "state" = $1, "assignee_id" = $2, "queue_id" = $3, "queue_version" = 
+ 02:07:35 | 441 | Client | ClientRead    | 0.1 | {}            | UPDATE "tickets" SET "dispatch_due_at" = $1 WHERE "tickets"."id" = $2 AND "tickets"."lock_
+ 02:07:35 | 408 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_turns"."turn" FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns".
+ 02:07:35 | 407 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "tickets" ("brand_id", "customer_id", "channel", "state", "category", "priorit
+ 02:07:35 | 379 | Client | ClientRead    | 0.0 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."ticket_id" = $1
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:39 | 443 | Client | ClientRead    | 0.1 | {}            | UPDATE "outbox_events" SET "next_attempt_at" = $1, "lease_until" = $2, "attempts" = $3 WHE
+ 02:07:39 | 433 | Client | ClientRead    | 0.1 | {}            | UPDATE "outbox_events" SET "lease_until" = $1, "completed_at" = $2 WHERE "outbox_events"."
+ 02:07:39 | 440 | Lock   | transactionid | 0.1 | {452}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:39 | 456 | Client | ClientRead    | 0.1 | {}            | UPDATE "outbox_events" SET "lease_until" = $1, "completed_at" = $2 WHERE "outbox_events"."
+ 02:07:39 | 437 | Client | ClientRead    | 0.1 | {}            | SELECT "queues".* FROM "queues" WHERE "queues"."brand_id" = $1 AND (queues.id IN ($2, $3, 
+ 02:07:39 | 432 | Client | ClientRead    | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:39 | 422 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:07:39 | 424 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:07:39 | 418 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:39 | 425 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:39 | 431 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."id" = $1 AND "messages"."brand_id" =
+ 02:07:39 | 434 | Client | ClientRead    | 0.0 | {}            | SELECT "provider_accounts".* FROM "provider_accounts" WHERE "provider_accounts"."brand_id"
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:43 | 284 | Client | ClientRead | 0.0 | {}            | INSERT INTO "messages" ("brand_id", "ticket_id", "provider_account", "channel", "direction
+ 02:07:43 | 292 | Client | ClientRead | 0.0 | {}            | BEGIN
+ 02:07:43 | 293 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:43 | 388 |        |            | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:07:43 | 403 | Client | ClientRead | 0.0 | {}            | UPDATE "tickets" SET "state" = $1, "assignee_id" = $2, "queue_id" = $3, "queue_version" = 
+ 02:07:43 | 404 | Client | ClientRead | 0.0 | {}            | UPDATE "tickets" SET "category" = $1, "priority" = $2, "tags" = $3, "ruleset_version" = $4
+ 02:07:43 | 405 | Client | ClientRead | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:43 | 422 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:43 | 424 | Client | ClientRead | 0.0 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:07:43 | 431 | Client | ClientRead | 0.0 | {}            | SELECT "queues".* FROM "queues" WHERE "queues"."id" = $1 AND "queues"."brand_id" = $2 LIMI
+ 02:07:43 | 426 | Client | ClientRead | 0.0 | {}            | SELECT MAX("messages"."seq") FROM "messages" WHERE "messages"."brand_id" = $1 AND "message
+ 02:07:43 | 439 | Client | ClientRead | 0.0 | {}            | UPDATE "tickets" SET "state" = $1, "queue_id" = $2, "queue_version" = $3, "assignee_id" = 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:48 | 468 | Client | ClientRead    | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1, "lease_until" = $2 WHERE "outbox_events"."
+ 02:07:48 | 292 |        |               | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:07:48 | 293 |        |               | 0.0 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+ 02:07:48 | 404 |        |               | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:07:48 | 405 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:07:48 | 421 | Client | ClientRead    | 0.0 | {}            | SELECT payload->>'reason' FROM "outbox_events" WHERE "outbox_events"."brand_id" = $1 AND "
+ 02:07:48 | 425 | Client | ClientRead    | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1, "lease_until" = $2, "last_error" = $3 WHER
+ 02:07:48 | 431 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:07:48 | 434 |        |               | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:07:48 | 440 |        |               | 0.0 | {}            | SELECT clock_timestamp()
+ 02:07:48 | 467 |        |               | 0.0 | {}            | SELECT "queues".* FROM "queues" WHERE "queues"."id" = $1 AND "queues"."brand_id" = $2 LIMI
+ 02:07:48 | 284 | Lock   | transactionid | 0.0 | {458}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:52 | 439 | Lock   | transactionid | 0.5 | {468}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:52 | 455 | Lock   | transactionid | 0.4 | {424}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:52 | 422 | Lock   | transactionid | 0.2 | {442}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:52 | 452 | Lock   | transactionid | 0.2 | {443}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:52 | 453 | Lock   | transactionid | 0.2 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(5 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:56 | 455 | Lock   | transactionid | 0.2 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:56 | 457 | Lock   | transactionid | 0.1 | {437}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:56 | 436 | Lock   | transactionid | 0.1 | {433}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:56 | 425 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_
+ 02:07:56 | 431 | Client | ClientRead    | 0.0 | {}            | SELECT "queue_versions".* FROM "queue_versions" WHERE "queue_versions"."id" IN ($1, $2, $3
+ 02:07:56 | 426 | Client | ClientRead    | 0.0 | {}            | UPDATE "tickets" SET "dispatch_due_at" = $1 WHERE "tickets"."id" = $2 AND "tickets"."lock_
+ 02:07:56 | 432 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:07:56 | 433 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:07:56 | 434 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:56 | 439 | Client | ClientRead    | 0.0 | {}            | SELECT "provider_accounts".* FROM "provider_accounts" WHERE "provider_accounts"."brand_id"
+ 02:07:56 | 437 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."id" = $1 AND "messages"."brand_id" =
+ 02:07:56 | 443 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:07:59 | 436 | Lock   | transactionid | 0.3 | {284}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:59 | 441 | Lock   | transactionid | 0.2 | {437}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:59 | 439 | Lock   | transactionid | 0.2 | {458}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:59 | 404 | Lock   | transactionid | 0.2 | {388}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:59 | 431 | Lock   | transactionid | 0.1 | {454}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:59 | 455 | Lock   | transactionid | 0.1 | {442}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:07:59 | 424 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "handoff_summaries" WHERE "handoff_summaries"."brand_id" = $1 AND "ha
+ 02:07:59 | 388 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:07:59 | 433 | Client | ClientRead    | 0.0 | {}            | SELECT "users".* FROM "users" INNER JOIN "team_memberships" ON "team_memberships"."user_id
+ 02:07:59 | 432 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:07:59 | 434 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:07:59 | 426 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:03 | 457 | Client | ClientRead | 0.9 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:03 | 284 | Client | ClientRead | 0.1 | {}            | SELECT data->>'context_until_seq' FROM "audit_events" WHERE "audit_events"."brand_id" = $1
+ 02:08:03 | 443 | Client | ClientRead | 0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:08:03 | 442 | Client | ClientRead | 0.1 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 LIMIT $2
+ 02:08:03 | 436 |        |            | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:08:03 | 433 | Client | ClientRead | 0.0 | {}            | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_
+ 02:08:03 | 440 | Client | ClientRead | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:03 | 437 | Client | ClientRead | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:08:03 | 468 | Client | ClientRead | 0.0 | {}            | UPDATE "ai_turns" SET "status" = $1, "updated_at" = $2 WHERE "ai_turns"."id" = $3 AND "ai_
+ 02:08:03 | 388 | Client | ClientRead | 0.0 | {}            | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_
+ 02:08:03 | 431 | Client | ClientRead | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:03 | 426 | Client | ClientRead | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:07 | 431 | Lock   | transactionid | 0.4 | {440}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:07 | 437 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:07 | 403 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:07 | 432 | Client | ClientRead    | 0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:08:07 | 405 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "ai_turns" ("brand_id", "ticket_id", "turn", "context_until_seq", "assignment_
+ 02:08:07 | 404 | Client | ClientRead    | 0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:08:07 | 454 | Client | ClientRead    | 0.1 | {}            | INSERT INTO "outbox_events" ("brand_id", "ticket_id", "event_type", "dedup_key", "payload"
+ 02:08:07 | 421 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:08:07 | 292 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:07 | 425 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:07 | 424 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:07 | 422 | Client | ClientRead    | 0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 913 AND brand_id = 1 R
+(12 rows)
+
+   hora   | pid | espera |   evento   | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:11 | 434 | Client | ClientRead | 0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:08:11 | 440 | Client | ClientRead | 0.1 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:08:11 | 433 | Client | ClientRead | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:11 | 405 | Client | ClientRead | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:11 | 425 | Client | ClientRead | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:11 | 431 | Client | ClientRead | 0.0 | {}            | BEGIN
+ 02:08:11 | 426 | Client | ClientRead | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:11 | 436 | Client | ClientRead | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."ticket_id" = $1 AND "messages"."bran
+ 02:08:11 | 438 | Client | ClientRead | 0.0 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."bran
+ 02:08:11 | 441 | Client | ClientRead | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:11 | 445 | Client | ClientRead | 0.0 | {}            | SELECT clock_timestamp()
+ 02:08:11 | 452 | Client | ClientRead | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1, "lease_until" = $2 WHERE "outbox_events"."
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:15 | 405 | Lock   | transactionid | 0.2 | {433}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:15 | 445 | Lock   | transactionid | 0.2 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:15 | 293 | Client | ClientRead    | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliv
+ 02:08:15 | 388 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:15 | 431 | Client | ClientRead    | 0.0 | {}            | BEGIN
+ 02:08:15 | 436 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:15 | 434 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:15 | 440 | Client | ClientRead    | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliv
+ 02:08:15 | 438 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:15 | 452 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:08:15 | 454 |        |               | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:08:15 | 456 | Client | ClientRead    | 0.0 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:19 | 292 | Lock   | transactionid | 0.2 | {457}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:19 | 404 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:19 | 422 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:19 | 403 |        |               | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 LIMIT $2
+ 02:08:19 | 426 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:19 | 405 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:08:19 | 293 | Client | ClientRead    | 0.0 | {}            | BEGIN
+ 02:08:19 | 418 |        |               | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 LIMIT $2
+ 02:08:19 | 425 | Client | ClientRead    | 0.0 | {}            | SELECT "provider_accounts".* FROM "provider_accounts" WHERE "provider_accounts"."brand_id"
+ 02:08:19 | 431 | Client | ClientRead    | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."brand_id" = $1 AND "deliveries
+ 02:08:19 | 284 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:19 | 276 | Client | ClientRead    | 0.0 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:24 | 442 | Lock   | transactionid | 0.3 | {457}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:24 | 438 | Client | ClientRead    | 0.2 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:24 | 405 | Client | ClientRead    | 0.1 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+ 02:08:24 | 403 | Client | ClientRead    | 0.1 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 AND "deliveries"."bra
+ 02:08:24 | 422 | Client | ClientRead    | 0.1 | {}            | SELECT MAX("ai_turns"."turn") FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_tu
+ 02:08:24 | 421 | Client | ClientRead    | 0.1 | {}            | SELECT "queue_versions".* FROM "queue_versions" INNER JOIN "queues" ON "queues"."id" = "qu
+ 02:08:24 | 404 | Client | ClientRead    | 0.0 | {}            | UPDATE "ai_turns" SET "status" = $1, "updated_at" = $2 WHERE 1=0 AND "ai_turns"."status" =
+ 02:08:24 | 293 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id","ticket_id","event_type","dedup_key","payload","tr
+ 02:08:24 | 418 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "processed_events" ("consumer","event_id") VALUES ('chat_status', '3570f154-3a
+ 02:08:24 | 424 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:08:24 | 425 | Client | ClientRead    | 0.0 | {}            | SELECT "queues".* FROM "queues" WHERE "queues"."brand_id" = $1 AND "queues"."active" = $2 
+ 02:08:24 | 388 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:29 | 293 | Client | ClientRead    | 0.5 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:29 | 437 | Lock   | transactionid | 0.3 | {276}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:29 | 388 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:08:29 | 403 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:08:29 | 421 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:08:29 | 426 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:08:29 | 436 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "outbox_events" ("brand_id","ticket_id","event_type","dedup_key","payload","tr
+ 02:08:29 | 433 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:29 | 434 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:29 | 439 | Client | ClientRead    | 0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."id" = $1 AND "messages"."brand_id" =
+ 02:08:29 | 440 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:29 | 443 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:08:33 | 425 | Lock   | transactionid |  0.0 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:33 | 426 |        |               |  0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:33 | 405 | Client | ClientRead    |  0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 AND "deliveries"."bra
+ 02:08:33 | 421 | Client | ClientRead    |  0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:33 | 404 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:33 | 441 | Lock   | transactionid |  0.0 | {468}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:33 | 424 | Client | ClientRead    |  0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:33 | 452 | Client | ClientRead    | -0.1 | {}            | UPDATE "ai_turns" SET "status" = $1, "updated_at" = $2 WHERE 1=0 AND "ai_turns"."status" =
+ 02:08:33 | 453 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:33 | 456 | Client | ClientRead    | -0.1 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+ 02:08:33 | 455 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:33 | 457 | Client | ClientRead    | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:08:39 | 457 | Lock   | transactionid |  0.1 | {426}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:39 | 443 | Client | ClientRead    |  0.0 | {}            | BEGIN
+ 02:08:39 | 421 | Client | ClientRead    | -0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:08:39 | 424 | Client | ClientRead    | -0.1 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 AND "deliveries"."bra
+ 02:08:39 | 431 | Client | ClientRead    | -0.1 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliv
+ 02:08:39 | 432 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:39 | 436 |        |               | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:08:39 | 440 | Client | ClientRead    | -0.1 | {}            | SELECT "ai_turns".* FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."stat
+ 02:08:39 | 438 | Client | ClientRead    | -0.1 | {}            | SELECT clock_timestamp()
+ 02:08:39 | 437 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:08:39 | 445 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:39 | 453 |        |               | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:08:44 | 405 |        |               | 0.4 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:44 | 456 | Lock   | transactionid | 0.3 | {437}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:44 | 452 | Lock   | transactionid | 0.2 | {458}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:44 | 426 | Lock   | transactionid | 0.1 | {421}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:44 | 433 | Client | ClientRead    | 0.1 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:08:44 | 421 | Client | ClientRead    | 0.0 | {}            | SELECT data->>'context_until_seq' FROM "audit_events" WHERE "audit_events"."brand_id" = $1
+ 02:08:44 | 431 |        |               | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:44 | 432 | Client | ClientRead    | 0.0 | {}            | SELECT "users".* FROM "users" WHERE "users"."id" = $1 LIMIT $2
+ 02:08:44 | 436 |        |               | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:44 | 440 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:44 | 437 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "handoff_summaries" ("brand_id","ticket_id","from_assignment_version","source"
+ 02:08:44 | 442 | Client | ClientRead    | 0.0 | {}            | SELECT "deliveries"."seq", "deliveries"."kind", "deliveries"."status" FROM "deliveries" WH
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:08:50 | 456 | Lock   | transactionid |  0.5 | {468}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:50 | 433 | Lock   | transactionid |  0.3 | {440}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:50 | 424 | Lock   | transactionid |  0.0 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:50 | 421 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:50 | 425 | Client | ClientRead    | -0.1 | {}            | SELECT MAX("ai_turns"."turn") FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_tu
+ 02:08:50 | 440 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:50 | 437 | Client | ClientRead    | -0.1 | {}            | UPDATE "deliveries" SET "status" = $1, "attempts" = $2, "lease_until" = $3, "updated_at" =
+ 02:08:50 | 442 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:50 | 458 | Client | ClientRead    | -0.1 | {}            | SELECT MAX("ai_turns"."turn") FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_tu
+ 02:08:50 | 276 |        |               | -0.1 | {}            | UPDATE "tickets" SET "sla_started_at" = $1, "sla_due_at" = $2 WHERE "tickets"."id" = $3 AN
+ 02:08:50 | 467 | Client | ClientRead    | -0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:08:50 | 293 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:08:55 | 403 | Lock   | transactionid |  0.0 | {292}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:55 | 458 | Lock   | transactionid |  0.0 | {424}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:55 | 432 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:55 | 293 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:55 | 455 | Client | ClientRead    | -0.1 | {}            | BEGIN
+ 02:08:55 | 457 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:55 | 431 | Client | ClientRead    | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:08:55 | 467 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:55 | 442 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:08:55 | 443 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:08:55 | 445 | Client | ClientRead    | -0.2 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:08:55 | 453 | Client | ClientRead    | -0.2 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:09:00 | 443 | Client | ClientRead    | 0.4 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:00 | 403 | Lock   | transactionid | 0.1 | {445}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:00 | 388 | Client | ClientRead    | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+ 02:09:00 | 404 | Client | ClientRead    | 0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:00 | 405 | Client | ClientRead    | 0.0 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."brand_id" = $1 AND "deliveries
+ 02:09:00 | 422 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:09:00 | 425 | Client | ClientRead    | 0.0 | {}            | BEGIN
+ 02:09:00 | 431 | Client | ClientRead    | 0.0 | {}            | UPDATE "outbox_events" SET "completed_at" = $1 WHERE "outbox_events"."id" = $2
+ 02:09:00 | 426 | Client | ClientRead    | 0.0 | {}            | UPDATE "ai_turns" SET "status" = $1, "updated_at" = $2 WHERE 1=0 AND "ai_turns"."status" =
+ 02:09:00 | 433 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:09:00 | 434 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:09:00 | 439 | Lock   | transactionid | 0.0 | {433}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:09:05 | 404 | Lock   | transactionid | 0.4 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:05 | 452 | Lock   | transactionid | 0.3 | {425}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:05 | 443 | Lock   | transactionid | 0.2 | {405}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:05 | 425 | Client | ClientRead    | 0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:09:05 | 457 | Client | ClientRead    | 0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:05 | 436 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:09:05 | 433 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:09:05 | 434 | Client | ClientRead    | 0.0 | {}            | SELECT 1 AS one FROM "ai_turns" WHERE "ai_turns"."ticket_id" = $1 AND "ai_turns"."brand_id
+ 02:09:05 | 437 | Client | ClientRead    | 0.0 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:09:05 | 441 | Client | ClientRead    | 0.0 | {}            | SELECT "queues".* FROM "queues" WHERE "queues"."brand_id" = $1 AND "queues"."active" = $2 
+ 02:09:05 | 445 | Client | ClientRead    | 0.0 | {}            | SELECT "queue_versions".* FROM "queue_versions" WHERE "queue_versions"."id" = $1 LIMIT $2
+ 02:09:05 | 453 | Client | ClientRead    | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:09:10 | 456 | Lock   | transactionid |  0.6 | {421}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:10 | 441 | Lock   | transactionid |  0.5 | {438}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:10 | 460 | Lock   | transactionid |  0.0 | {436}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:10 | 433 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+ 02:09:10 | 388 | Client | ClientRead    | -0.1 | {}            | BEGIN
+ 02:09:10 | 436 | Client | ClientRead    | -0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:09:10 | 276 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:10 | 434 | Client | ClientRead    | -0.1 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 AND "deliveries"."bra
+ 02:09:10 | 440 | Client | ClientRead    | -0.1 | {}            | SELECT clock_timestamp()
+ 02:09:10 | 438 | Client | ClientRead    | -0.1 | {}            | RELEASE SAVEPOINT active_record_1
+ 02:09:10 | 453 | Client | ClientRead    | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 AND "outbox_
+ 02:09:10 | 424 | Client | ClientRead    | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:09:18 | 425 | Lock   | transactionid |  0.6 | {439}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:18 | 434 | Lock   | transactionid |  0.2 | {455}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:18 | 443 | Lock   | transactionid |  0.2 | {437}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:18 | 421 | Lock   | transactionid |  0.2 | {467}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:18 | 436 | Client | ClientRead    |  0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:09:18 | 456 | Lock   | transactionid |  0.0 | {431}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:18 | 433 | Client | ClientRead    |  0.0 | {}            | UPDATE "outbox_events" SET "lease_until" = $1, "completed_at" = $2 WHERE "outbox_events"."
+ 02:09:18 | 422 | Client | ClientRead    | -0.1 | {}            | BEGIN
+ 02:09:18 | 388 | Client | ClientRead    | -0.1 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:18 | 426 | Client | ClientRead    | -0.1 | {}            | SELECT "deliveries".* FROM "deliveries" WHERE "deliveries"."id" = $1 LIMIT $2
+ 02:09:18 | 431 | Client | ClientRead    | -0.1 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:09:18 | 404 | Client | ClientRead    | -0.1 | {}            | UPDATE "tickets" SET "state" = $1, "queue_id" = $2, "queue_version" = $3, "assignee_id" = 
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+-----+---------------+--------------------------------------------------------------------------------------------
+ 02:09:24 | 454 | Client | ClientRead    | 0.3 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:24 | 452 | Client | ClientRead    | 0.3 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:24 | 404 | Lock   | transactionid | 0.1 | {434}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:24 | 276 | Lock   | transactionid | 0.1 | {431}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:24 | 426 | Lock   | transactionid | 0.1 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:24 | 424 | Client | ClientRead    | 0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:09:24 | 421 |        |               | 0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:09:24 | 293 | Client | ClientRead    | 0.0 | {}            | UPDATE tickets SET context_version = context_version + 1 WHERE id = 1015 AND brand_id = 1 
+ 02:09:24 | 433 | Lock   | transactionid | 0.0 | {424}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:24 | 436 | Client | ClientRead    | 0.0 | {}            | UPDATE "tickets" SET "sla_started_at" = $1, "sla_due_at" = $2 WHERE "tickets"."id" = $3 AN
+ 02:09:24 | 434 | Client | ClientRead    | 0.0 | {}            | SELECT data->>'context_until_seq' FROM "audit_events" WHERE "audit_events"."brand_id" = $1
+ 02:09:24 | 432 | Client | ClientRead    | 0.0 | {}            | UPDATE "tickets" SET "sla_started_at" = $1, "sla_due_at" = $2 WHERE "tickets"."id" = $3 AN
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:09:29 | 455 | Client | ClientRead    |  0.3 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:29 | 439 | Client | ClientRead    |  0.2 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:29 | 436 | Lock   | transactionid |  0.1 | {432}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:29 | 421 | Client | ClientRead    |  0.0 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+ 02:09:29 | 460 | Client | ClientRead    |  0.0 | {}            | SELECT "provider_accounts".* FROM "provider_accounts" WHERE "provider_accounts"."brand_id"
+ 02:09:29 | 276 | Client | ClientRead    |  0.0 | {}            | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:29 | 284 | Lock   | transactionid |  0.0 | {404}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:29 | 434 | Lock   | transactionid |  0.0 | {437}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:29 | 438 | Client | ClientRead    |  0.0 | {}            | SELECT clock_timestamp()
+ 02:09:29 | 453 | Client | ClientRead    |  0.0 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2 FOR
+ 02:09:29 | 422 | Client | ClientRead    | -0.1 | {}            | SELECT "outbox_events".* FROM "outbox_events" WHERE "outbox_events"."id" = $1 LIMIT $2
+ 02:09:29 | 440 |        |               | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(12 rows)
+
+   hora   | pid | espera |    evento     | seg  | bloqueado_por |                                          consulta                                          
+----------+-----+--------+---------------+------+---------------+--------------------------------------------------------------------------------------------
+ 02:09:33 | 403 | Lock   | transactionid |  0.2 | {454}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:33 | 425 | Lock   | transactionid |  0.1 | {460}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:33 | 388 | Lock   | transactionid |  0.1 | {458}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:33 | 292 | Client | ClientRead    |  0.0 | {}            | SELECT "messages".* FROM "messages" WHERE "messages"."brand_id" = $1 AND "messages"."ticke
+ 02:09:33 | 439 | Lock   | transactionid |  0.0 | {442}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:33 | 422 | Lock   | transactionid |  0.0 | {421}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:33 | 293 | Lock   | transactionid |  0.0 | {292}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:33 | 426 | Lock   | transactionid |  0.0 | {405}         | SELECT "tickets".* FROM "tickets" WHERE "tickets"."id" = $1 AND "tickets"."brand_id" = $2 
+ 02:09:33 | 456 | Client | ClientRead    |  0.0 | {}            | SELECT 1 AS one FROM "deliveries" WHERE "deliveries"."status" IN ($1, $2) AND "deliveries"
+ 02:09:33 | 445 | Client | ClientRead    | -0.1 | {}            | BEGIN
+ 02:09:33 | 452 | Client | ClientRead    | -0.1 | {}            | UPDATE "outbox_events" SET "lease_until" = $1, "completed_at" = $2 WHERE "outbox_events"."
+ 02:09:33 | 454 | Client | ClientRead    | -0.1 | {}            | INSERT INTO "audit_events" ("brand_id", "ticket_id", "actor_type", "actor_id", "event_type
+(12 rows)
+
+ hora | pid | espera | evento | seg | bloqueado_por | consulta 
+------+-----+--------+--------+-----+---------------+----------
+(0 rows)
+
+   hora   | pid | espera | evento | seg  | bloqueado_por |                             consulta                              
+----------+-----+--------+--------+------+---------------+-------------------------------------------------------------------
+ 02:09:43 | 409 |        |        | -0.1 | {}            | SELECT "brands".* FROM "brands" WHERE "brands"."id" = $1 LIMIT $2
+(1 row)
+

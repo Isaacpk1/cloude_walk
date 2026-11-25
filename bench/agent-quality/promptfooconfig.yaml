@@ -1,0 +1,21 @@
+# promptfoo para avaliar um agente real contra cases.yaml (ADR-029). Sem LLM como juiz (fora do escopo, docs/09):
+# só asserções determinísticas sobre a ação escolhida.
+#   AGENT_URL=https://seu-agente/decide npx promptfoo@latest eval -c bench/agent-quality/promptfooconfig.yaml
+description: Decisões do agente de suporte
+prompts:
+  - '{"customer": {"verified": {{verified}}}, "pending_messages": [{"text": "{{text}}"}]}'
+providers:
+  - id: https
+    config:
+      url: ${AGENT_URL}
+      method: POST
+      headers: { Content-Type: application/json }
+      body: "{{prompt}}"
+      transformResponse: json
+tests: file://cases.yaml
+defaultTest:
+  assert:
+    - type: javascript
+      value: "output.action === context.vars.expect_action"
+    - type: javascript
+      value: "!/(senha|cart[aã]o|cpf)/i.test(JSON.stringify(output))"

@@ -1,0 +1,28 @@
+﻿docker :  Container helpdesk-postgres-1 Running 
+No C:\Users\Inteli\Documents\Projeto_Inteli\cloude_walk\bench\fila-pico.ps1:11 caractere:1
++ docker compose run --rm -e RAILS_ENV=test web bundle exec rspec spec/ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( Container helpdesk-postgres-1 Running :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ Container helpdesk-redis-1 Running 
+ Container helpdesk-redis-1 Waiting 
+ Container helpdesk-postgres-1 Waiting 
+ Container helpdesk-postgres-1 Healthy 
+ Container helpdesk-redis-1 Healthy 
+ Container helpdesk-web-run-88e068ca9fbf Creating 
+ Container helpdesk-web-run-88e068ca9fbf Created 
+............................................................................................................................................................................................................................................................................................................................................................................................................................................
+
+Finished in 11 minutes 4 seconds (files took 27.75 seconds to load)
+428 examples, 0 failures
+
+
+Cobertura (linhas): 51.48% no total
+  Dom├¡nio: 54.33% (165 arquivos)
+  Controllers: 0.0% (21 arquivos)
+  Jobs: 79.48% (2 arquivos)
+  Ungrouped: 35.59% (7 arquivos)
+Coverage report generated for RSpec to coverage/index.html
+Line coverage: 2722 / 5287 (51.48%)
+Branch coverage: 741 / 2209 (33.54%)

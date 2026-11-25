@@ -1,0 +1,20 @@
+﻿     event_type     | total | pendentes | seg_mais_antigo 
+--------------------+-------+-----------+-----------------
+ delivery.requested |  2088 |         0 |                
+ sla.breach         |    10 |         0 |                
+ message.received   |  1310 |         0 |                
+ cycle.timeout      |  1044 |         0 |                
+ sla.alert          |    98 |         0 |                
+ handoff.summary    |  1310 |         0 |                
+ agent.event        |  1124 |         0 |                
+ turn.timeout       |  1117 |         0 |                
+ turn.dispatch      |  1124 |         0 |                
+ progress.notice    |  1124 |         0 |                
+ handoff.requested  |  1310 |         0 |                
+(11 rows)
+
+ status  | count 
+---------+-------
+ expired |  1124
+(1 row)
+

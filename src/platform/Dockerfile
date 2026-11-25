@@ -34,6 +34,9 @@ RUN bundle install --jobs 4
 
 COPY platform .
 
+# Os assets precisam estar na imagem também no perfil de experimento em production.
+RUN SECRET_KEY_BASE_DUMMY=1 bin/rails assets:precompile
+
 ENTRYPOINT ["/rails/bin/docker-entrypoint"]
 EXPOSE 3000
 CMD ["./bin/rails", "server", "-b", "0.0.0.0"]

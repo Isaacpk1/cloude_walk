@@ -57,6 +57,7 @@ RSpec.describe "Experimento: bench/analysis/reconcile.rb" do
 
   it "mede a latência da resposta entregue desde a mensagem do cliente" do
     inbound = customer_message("oi", external_id: "bench_r4_1")
+    travel_to(start + 2.seconds)
     delivery = requested_delivery(inbound.ticket)
     delivery.update_columns(status: "delivered", provider_message_id: "chat_out_1", delivered_at: start + 2.5.seconds)
 
@@ -64,5 +65,45 @@ RSpec.describe "Experimento: bench/analysis/reconcile.rb" do
 
     expect(report["reply_delivered_after_ms"]).to include("count" => 1, "p50" => 2500.0)
     expect(report["lost_messages"]).to be_nil
+  end
+
+  it "RNF-24: não conta outra marca com o mesmo ID externo" do
+    create(:brand, :jim)
+    customer_message("oi", external_id: "bench_r5_1", brand: "jim")
+    expect(reconcile("r5", k6: k6_summary(accepted: 0))).to include("stored_messages" => 0, "lost_messages" => 0)
+  end
+
+  it "RNF-30: a busca trata underscore do ID da execução como texto literal" do
+    customer_message("oi", external_id: "bench_rx6_1")
+    expect(reconcile("r_6")["stored_messages"]).to eq(0)
+  end
+
+  it "RNF-03: uma resposta cobrindo duas entradas mede a espera de cada mensagem e exclui avisos" do
+    first = customer_message("oi", external_id: "bench_r7_1")
+    travel_to(start + 1.second)
+    customer_message("outra informação", external_id: "bench_r7_2")
+    travel_to(start + 2.seconds)
+    delivery = requested_delivery(first.ticket)
+    delivery.update_columns(status: "delivered", provider_message_id: "reply_7", delivered_at: start + 4.seconds)
+    notice = requested_delivery(first.ticket, kind: "progress")
+    notice.update_columns(status: "delivered", provider_message_id: "notice_7", delivered_at: start + 10.seconds)
+    expect(reconcile("r7")["reply_delivered_after_ms"]).to include("count" => 2, "p50" => 3000.0, "p95" => 4000.0)
+  end
+
+  it "RNF-03: desconta tempo do agente e espera intencional com origem no turno aplicado" do
+    inbound = customer_message("meu repasse", external_id: "bench_r8_1")
+    travel_to(start + 1.5.seconds, with_usec: true)
+    turn = open_turn_for(inbound.ticket)
+    travel_to(start + 3.7.seconds, with_usec: true)
+    allow(DatabaseClock).to receive(:now) { Time.current }
+    action = agent_action_for(turn, timing: { "received_at" => (start + 1.5.seconds).iso8601(3),
+                                            "responded_at" => (start + 3.5.seconds).iso8601(3), "agent_ms" => 2000 })
+    AgentActions::Apply.call(action)
+    Delivery.where(ticket_id: inbound.ticket_id).sole.update_columns(status: "delivered", provider_message_id: "r8", delivered_at: start + 4.seconds)
+
+    report = reconcile("r8")
+    expect(report["platform_overhead_ms"]).to include("count" => 1, "p95" => 500.0)
+    expect(report["agent_ms"]).to include("p95" => 2000.0)
+    expect(report["grouping_wait_ms"]).to include("p95" => 1500.0)
   end
 end

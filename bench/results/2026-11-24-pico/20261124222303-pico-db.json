@@ -1,0 +1,36 @@
+﻿opentelemetry indispon├¡vel: cannot load such file -- opentelemetry/sdk
+{
+  "run_id": "20261124222303-pico",
+  "k6": {
+    "profile": "pico",
+    "mode": "independent",
+    "seed": 42,
+    "accepted_202": 1553,
+    "duplicate_200": null,
+    "rejected": 0,
+    "ack_ms": {
+      "med": 23579.377032,
+      "p(95)": 44634.3025452,
+      "p(99)": 47326.530705440004,
+      "max": 48677.002575
+    }
+  },
+  "stored_messages": 1570,
+  "lost_messages": -17,
+  "conversations": 1570,
+  "ai_turns": {
+    "total": 411,
+    "by_status": {
+      "expired": 411
+    },
+    "superseded_ratio": 0.0
+  },
+  "outbox_published_after_ms": {},
+  "reply_delivered_after_ms": {},
+  "platform_overhead_ms": {},
+  "agent_ms": {},
+  "grouping_wait_ms": {},
+  "overhead_excluded_samples": {},
+  "messages_without_delivered_reply": 1570,
+  "outbox_pending_now": 1682
+}

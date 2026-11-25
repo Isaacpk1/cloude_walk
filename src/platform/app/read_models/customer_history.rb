@@ -2,14 +2,15 @@
 # único por marca (RN-05), então filtrar por `customer_id` e `brand_id` não mistura marcas (RN-52).
 class CustomerHistory
   LIMIT = 10
-  Entry = Data.define(:ticket_id, :channel, :state, :created_at)
+  Entry = Data.define(:ticket_id, :channel, :state, :created_at, :summary)
 
   def self.for(ticket_id, brand_ids)
     ticket = Ticket.find_by(id: ticket_id, brand_id: brand_ids)
     return [] unless ticket
 
-    Ticket.where(brand_id: ticket.brand_id, customer_id: ticket.customer_id).where.not(id: ticket.id)
-          .order(id: :desc).limit(LIMIT)
-          .map { Entry.new(ticket_id: _1.id, channel: _1.channel, state: _1.state, created_at: _1.created_at) }
+    previous = Ticket.where(brand_id: ticket.brand_id, customer_id: ticket.customer_id).where.not(id: ticket.id)
+                     .order(id: :desc).limit(LIMIT).to_a
+    summaries = TicketSummary.where(brand_id: ticket.brand_id, ticket_id: previous.map(&:id)).order(resolved_at: :asc, id: :asc).index_by(&:ticket_id)
+    previous.map { Entry.new(ticket_id: _1.id, channel: _1.channel, state: _1.state, created_at: _1.created_at, summary: summaries[_1.id]&.body) }
   end
 end

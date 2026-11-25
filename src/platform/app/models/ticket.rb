@@ -4,6 +4,9 @@ class Ticket < ApplicationRecord
   CHANNELS = CustomerIdentity::CHANNELS
   # 07, seção 3.3: mensagens nesses estados não vão para a IA.
   HUMAN_STATES = %w[aguardando_humano com_analista resolvido fechado].freeze
+  # Trava da linha do atendimento (ADR-031). FOR NO KEY UPDATE continua exclusivo entre quem altera o atendimento, mas
+  # não bloqueia quem só grava linhas filhas (FOR KEY SHARE das chaves estrangeiras: auditoria, mensagens, entregas).
+  ROW_LOCK = "FOR NO KEY UPDATE".freeze
 
   belongs_to :brand
   belongs_to :customer

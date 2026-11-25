@@ -76,3 +76,7 @@ AGENT_PROFILE=mudo bundle exec karafka server # E2: agente fora do ar
 bundle exec rspec                             # sem Kafka: karafka-testing e WaterDrop em memória
 bundle exec rubocop
 ```
+
+## Motor com LLM (Gemini; ADR-030)
+
+`AGENT_ENGINE=gemini` e `GEMINI_API_KEY` no `.env` (e `docker compose up -d agent-mock`). A política continua por regra; o Gemini só redige a resposta das consultas e do caso padrão. Falha ou teto de chamadas voltam à resposta das regras (`agent.llm_fallback` no log). Use só dados sintéticos. Variáveis: `GEMINI_MODEL`, `GEMINI_TEMPERATURE`, `GEMINI_TIMEOUT_S`, `GEMINI_MAX_CONCURRENCY`, `GEMINI_MAX_CALLS` (`.env.example`). `agent.model` e `config_hash` da ação refletem o modelo e o prompt.

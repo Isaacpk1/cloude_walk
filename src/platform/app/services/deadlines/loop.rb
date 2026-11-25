@@ -21,6 +21,9 @@ module Deadlines
       "Deadlines::SlaAlert", # RN-25
       "Deadlines::SlaBreach", # RN-26
       "Deadlines::AnalystOffline", # RN-31
+      "Deadlines::CustomerInactivity", # RN-07: antes do lembrete atrasado
+      "Deadlines::CustomerReminder", # RN-07
+      "Deadlines::TicketClose", # RN-09
       "Distribution::Run" # RN-30: depois dos prazos, para a ordem da fila já refletir os alertas (só Postgres, sem outbox)
     ].freeze
 

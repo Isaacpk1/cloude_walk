@@ -21,21 +21,62 @@
 #
 # A espera de uma retentativa é só um despertador: o horário que vale é outbox_events.next_attempt_at,
 # no Postgres. Se o Redis perder o job, a recuperação (Outbox::Recover) reoferece o item.
+#
+# Fila por urgência e trava sem espera (ADR-032): o caminho que o cliente espera (critical) não divide a fila com os
+# prazos (timers) nem com tarefas de fundo (low); os pesos do config/sidekiq.yml impedem que alguma fique parada. Um
+# item que encontra o atendimento travado por outro job desiste em LOCK_TIMEOUT e volta à fila, em vez de segurar a
+# thread esperando: os serviços revalidam o estado no banco, então repetir é seguro.
 class OutboxJob < ApplicationJob
-  queue_as :critical
+  LOCK_TIMEOUT = "300ms".freeze
+  # Tentativas curtas antes de cair na retentativa padrão do Sidekiq; a recuperação do outbox cobre o resto.
+  LOCK_ATTEMPTS = 25
+
+  queue_as { self.class.queue_for(OutboxEvent.where(id: arguments.first).pick(:event_type)) }
+  retry_on ActiveRecord::LockWaitTimeout, attempts: LOCK_ATTEMPTS, wait: ->(_executions) { rand(0.1..0.5) }, jitter: 0
 
   MESSAGE_RECEIVED = Triage::OnMessage::EVENT_TYPE
   TIMEOUTS = [ Deadlines::TurnTimeout::EVENT_TYPE, Deadlines::CycleTimeout::EVENT_TYPE ].freeze
   HANDLED = [ MESSAGE_RECEIVED, Turns::Open::DISPATCH_TYPE, Turns::Open::EVENT_TYPE, Deliveries::Send::EVENT_TYPE,
-              *TIMEOUTS, Handoff::Request::EVENT_TYPE,
+              *TIMEOUTS, *TicketLifecycle::DeadlineAction::TYPES.keys, Handoff::Request::EVENT_TYPE,
               Deadlines::ProgressDue::EVENT_TYPE, Handoff::Summarize::EVENT_TYPE,
               Deadlines::AnalystOffline::EVENT_TYPE, Deadlines::SlaAlert::EVENT_TYPE, Deadlines::SlaBreach::EVENT_TYPE ].freeze
+  # Prazos que levam o caso a um humano (RN-46, RN-57, RN-42): atrasar demais quebra a garantia, por isso vêm antes de low.
+  TIMERS_QUEUE = [ *TIMEOUTS, Deadlines::ProgressDue::EVENT_TYPE, Handoff::Request::EVENT_TYPE,
+                   Deadlines::AnalystOffline::EVENT_TYPE ].freeze
+  LOW_QUEUE = [ Handoff::Summarize::EVENT_TYPE, Deadlines::SlaAlert::EVENT_TYPE, Deadlines::SlaBreach::EVENT_TYPE,
+                *TicketLifecycle::DeadlineAction::TYPES.keys ].freeze
+
+  def self.queue_for(event_type)
+    if TIMERS_QUEUE.include?(event_type) then "timers"
+    elsif LOW_QUEUE.include?(event_type) then "low"
+    else "critical"
+    end
+  end
 
   def perform(outbox_event_id)
+    with_lock_timeout { process(outbox_event_id) }
+  end
+
+  private
+
+  # Vale só para este job, nesta conexão: o painel e a ingestão continuam esperando a trava normalmente.
+  def with_lock_timeout
+    connection = ActiveRecord::Base.connection
+    connection.execute("SET lock_timeout = '#{LOCK_TIMEOUT}'")
+    yield
+  ensure
+    connection&.execute("SET lock_timeout = DEFAULT")
+  end
+
+  def process(outbox_event_id)
     item = OutboxEvent.find_by(id: outbox_event_id)
     return unless item && item.completed_at.nil?
 
     case item.event_type
+    when *TicketLifecycle::DeadlineAction::TYPES.keys
+      result = TicketLifecycle::DeadlineAction.call(item.id)
+      retry_when_not_due(result, item)
+      wake(result.delivery_event_id)
     when Turns::Open::DISPATCH_TYPE
       result = Turns::Open.call(item.id)
       self.class.perform_later(result.turn.event_id) if result.status == :opened
@@ -69,8 +110,6 @@ class OutboxJob < ApplicationJob
       Triage::OnMessage.call(item.id).wake_ids.each { wake(_1) }
     end
   end
-
-  private
 
   # Prazo ainda não vencido pelo relógio do banco: o item fica aberto e o despertador vai para o prazo gravado.
   def retry_when_not_due(result, item)

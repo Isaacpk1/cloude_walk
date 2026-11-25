@@ -1,0 +1,106 @@
+﻿**********************
+Início da transcrição do Windows PowerShell
+Hora de início: 20261124160307
+Nome de Usuário: ISAAC\Inteli
+Executar como Usuário: ISAAC\Inteli
+Nome da Configuração: 
+Computador: ISAAC (Microsoft Windows NT 10.0.26200.0)
+Aplicativo Host: C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File .\bench\tudo.ps1
+ID do Processo: 8796
+PSVersion: 5.1.26100.9818
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9818
+BuildVersion: 10.0.26100.9818
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+
+===== Ambiente de desenvolvimento =====
+
+FALHOU: Ambiente de desenvolvimento (cÃ³digo 1)
+
+===== RSpec da plataforma =====
+
+FALHOU: RSpec da plataforma (cÃ³digo 1)
+
+===== RSpec dos contratos =====
+
+FALHOU: RSpec dos contratos (cÃ³digo 1)
+
+===== RSpec do broker =====
+
+FALHOU: RSpec do broker (cÃ³digo 1)
+
+===== RSpec do agente (inclui o motor Gemini com cliente falso) =====
+
+FALHOU: RSpec do agente (inclui o motor Gemini com cliente falso) (cÃ³digo 1)
+
+===== RSpec dos canais simulados =====
+
+FALHOU: RSpec dos canais simulados (cÃ³digo 1)
+
+===== RuboCop da plataforma =====
+
+FALHOU: RuboCop da plataforma (cÃ³digo 1)
+
+===== RuboCop do broker =====
+
+FALHOU: RuboCop do broker (cÃ³digo 1)
+
+===== RuboCop do agente =====
+
+FALHOU: RuboCop do agente (cÃ³digo 1)
+
+===== RuboCop dos canais =====
+
+FALHOU: RuboCop dos canais (cÃ³digo 1)
+
+===== Brakeman =====
+
+FALHOU: Brakeman (cÃ³digo 1)
+
+===== ValidaÃ§Ã£o de operaÃ§Ã£o (E2, E3, E4, E6) =====
+
+FALHOU: ValidaÃ§Ã£o de operaÃ§Ã£o (E2, E3, E4, E6) (cÃ³digo 1)
+
+===== Desliga o desenvolvimento (libera memÃ³ria para o perfil de produÃ§Ã£o) =====
+
+FALHOU: Desliga o desenvolvimento (libera memÃ³ria para o perfil de produÃ§Ã£o) (cÃ³digo 1)
+
+===== Perfil de produÃ§Ã£o com agente realista e Toxiproxy =====
+
+FALHOU: Perfil de produÃ§Ã£o com agente realista e Toxiproxy (cÃ³digo 1)
+
+===== Banco do experimento =====
+
+
+FALHOU: Banco do experimento (cÃ³digo 1)
+
+===== Falha: kafka =====
+
+== carga (perfil caos: 5 msg/s por 3 min) ==
+== falha: kafka por 30 s ==
+
+
+== falha encerrada; esperando o fim da carga ==
+PS>TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+>> TerminatingError(docker.exe): "O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+O comando em execução parou porque a variável preferencial "ErrorActionPreference" ou o parâmetro comum está definido como Stop: failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+docker : failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is
+correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file
+specified.
+No C:\Users\Inteli\Documents\Projeto_Inteli\cloude_walk\bench\chaos\run.ps1:35 caractere:1
++ docker logs $k6 *> "$dir/$run-k6.log"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (failed to conne...file specified.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+**********************
+Fim da transcrição do Windows PowerShell
+Hora de término: 20261124160439
+**********************

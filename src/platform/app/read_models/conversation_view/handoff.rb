@@ -25,7 +25,8 @@ class ConversationView::Handoff < Data.define(:state, :reason, :source, :turn, :
     "falha_de_integracao" => "Falha de integração: evento do turno na DLQ (RN-45)",
     "limite_de_trocas" => "Limite de trocas com a IA sem resolver (RN-33)",
     "pedido_do_cliente" => "Pedido explícito do cliente (RN-34)",
-    "decisao_do_agente" => "Decisão do agente de IA: ação escalate (RN-33)"
+    "decisao_do_agente" => "Decisão do agente de IA: ação escalate (RN-33)",
+    "agente_sem_vaga" => "Agente de IA sem vaga a tempo do prazo do turno (RN-46, ADR-035)"
   }.freeze
 
   SOURCES = {

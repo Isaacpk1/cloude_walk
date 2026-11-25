@@ -42,7 +42,10 @@ module Outbox
     end
 
     def call
-      return not_claimed unless claim
+      case admission_claim
+      when :waiting then return wait_for_slot
+      when false then return not_claimed
+      end
 
       @item = OutboxEvent.find(@id)
       @turn = AiTurn.find_by(event_id: @item.id)
@@ -68,6 +71,44 @@ module Outbox
       OutboxEvent.where(id: @id, completed_at: nil).where(next_attempt_at: ..now)
                  .where("lease_until IS NULL OR lease_until < ?", now)
                  .update_all([ "lease_until = ?, attempts = attempts + 1", now + LEASE ]) == 1
+    end
+
+    # ADR-035: com o controle de admissão ligado, a reserva só acontece se o agente tiver vaga para este turno.
+    def admission_claim
+      return claim unless Admission.enabled?
+
+      ActiveRecord::Base.transaction do
+        Admission.serialize!
+        now = Time.current
+        row = OutboxEvent.find_by(id: @id)
+        next claim unless row && row.event_type == Admission::EVENT_TYPE && row.completed_at.nil? && row.next_attempt_at <= now
+
+        waiting_turn = AiTurn.find_by(event_id: row.id)
+        next claim if waiting_turn.nil? || !waiting_turn.eligible?
+
+        Admission.admit?(row, waiting_turn, now:) ? claim : :waiting
+      end
+    end
+
+    # Sem vaga. Obsoleto sai sem ocupar o agente; sem tempo para a resposta caber no prazo, o caso vai para um humano
+    # agora (RN-46); senão espera, sem gastar tentativa, e o aviso ao cliente sai cedo (RN-57).
+    def wait_for_slot
+      @item = OutboxEvent.find(@id)
+      @turn = AiTurn.find_by(event_id: @item.id)
+      stale = stale_reason
+      return discard(stale) if stale
+
+      now = Time.current
+      if turn.deadline_at - now < Admission.expected_agent_time
+        @handoff_reason = Admission::HANDOFF_REASON
+        return terminal(Admission::HANDOFF_REASON, { origin: "admissao", http_status: nil,
+                                                     error: "agente sem vaga a tempo do prazo do turno", retry: false })
+      end
+
+      Admission.bring_notice_forward(turn, now:)
+      retry_at = now + Admission::POLL
+      OutboxEvent.where(id: @id, completed_at: nil).update_all(next_attempt_at: retry_at)
+      Result.new(status: :waiting_slot, next_attempt_at: retry_at)
     end
 
     def not_claimed
@@ -195,7 +236,7 @@ module Outbox
     # `lock_ticket`, trava antes a linha do atendimento (da marca do item), na ordem atendimento → item.
     def finish(lock_ticket: false, **attrs)
       ActiveRecord::Base.transaction do
-        ticket = Ticket.lock.find_by(id: item.ticket_id, brand_id: item.brand_id) if lock_ticket
+        ticket = Ticket.lock(Ticket::ROW_LOCK).find_by(id: item.ticket_id, brand_id: item.brand_id) if lock_ticket
         updated = OutboxEvent.where(id: item.id, completed_at: nil).update_all(attrs.merge(lease_until: nil))
         yield ticket if updated == 1
       end
@@ -206,7 +247,7 @@ module Outbox
       return unless ticket && turn
       return unless turn.reload.eligible? && turn.assignment_version == ticket.assignment_version && ticket.with_ai?
 
-      @handoff_event_id = Handoff::Request.call(ticket:, reason: HANDOFF_REASON, source: "outbox", turn: turn.turn,
+      @handoff_event_id = Handoff::Request.call(ticket:, reason: @handoff_reason || HANDOFF_REASON, source: "outbox", turn: turn.turn,
                                                 trace_id: item.trace_id)
     end
 

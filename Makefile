@@ -35,7 +35,7 @@ reset: ## Recria o banco, carrega o seed e reinicia o channels-mock (o estado de
 
 test: ## Roda o rspec da plataforma, dos contratos, do broker, do agente mock e dos canais simulados
 	$(PLATFORM) -v $(CURDIR)/bench:/bench:ro sh -c "RAILS_ENV=test bin/rails db:prepare && RAILS_ENV=test DATABASE_CLEANER_ALLOW_REMOTE_DATABASE_URL=true bundle exec rspec"
-	docker run --rm -v $(CURDIR)/src/contracts:/contracts -w /contracts ruby:$(CONTRACTS_RUBY)-slim sh -c "bundle install --quiet && bundle exec rspec"
+	docker run --rm -v $(CURDIR)/src/contracts:/contracts -w /contracts ruby:$(CONTRACTS_RUBY)-slim sh -c "apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential >/dev/null && bundle install --quiet && bundle exec rspec"
 	$(COMPOSE) run --rm --no-deps broker bundle exec rspec
 	$(COMPOSE) run --rm --no-deps agent-mock bundle exec rspec
 	$(COMPOSE) run --rm --no-deps channels-mock bundle exec rspec

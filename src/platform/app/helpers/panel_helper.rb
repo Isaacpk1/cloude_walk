@@ -2,8 +2,8 @@
 module PanelHelper
   DISPLAY_TIME_ZONE = PanelClock::TIME_ZONE
 
-  def nav_link(label, path, active:)
-    link_to label, path, class: class_names("nav__item", "nav__item--active" => active), aria: { current: (active ? "page" : nil) }
+  def nav_link(label, path, active:, icon: nil)
+    link_to label, path, class: class_names("nav__item", ("nav__item--#{icon}" if icon), "nav__item--active" => active), aria: { current: (active ? "page" : nil) }
   end
 
   def source_badge(source)

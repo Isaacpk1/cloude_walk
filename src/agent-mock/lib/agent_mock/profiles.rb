@@ -41,7 +41,7 @@ module AgentMock
     def fallback = @runtimes.fetch(@default.profile)
 
     def build(config)
-      Runtime.new(config:, failures: FailureModes.new(config), engine: Scenarios::Engine.new(config), source: "env")
+      Runtime.new(config:, failures: FailureModes.new(config), engine: Scenarios.build_engine(config), source: "env")
     end
   end
 end

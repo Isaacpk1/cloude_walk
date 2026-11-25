@@ -82,12 +82,16 @@ flowchart LR
 
 ### Filas do Sidekiq
 
-| Fila | Peso | Jobs | Por que essa prioridade |
+| Fila | Peso | Itens do outbox (`OutboxJob.queue_for`) | Por que essa prioridade |
 | --- | --- | --- | --- |
-| `critical` | 6 | Publicação do outbox, abertura de turno, fallback de IA, disparo do webhook ao broker, entrega ao canal | Estão no caminho da resposta ao cliente ou da escalação (RNF-03, RNF-18) |
-| `default` | 3 | Triagem, roteamento, atribuição, handoff e resumo | Decidem para onde o caso vai, mas não seguram a resposta da IA |
-| `timers` | 2 | Aviso de progresso, alertas de SLA, inatividade e analista offline | O `scheduler` registra a ação no Postgres quando o prazo vence. O Sidekiq executa a partir do ID da ação |
-| `low` | 1 | Varreduras de segurança, resumos de resolução, métricas agregadas | Podem esperar |
+| `critical` | 6 | `message.received` (triagem), `turn.dispatch` (abre o turno), `agent.event` (publica para o agente), `delivery.requested` (entrega ao canal). Tipo desconhecido também cai aqui | Estão no caminho da resposta ao cliente (RNF-03) |
+| `timers` | 2 | `turn.timeout`, `cycle.timeout`, `progress.notice`, `handoff.requested`, `analyst.offline` | Levam o caso a um humano no prazo (RN-46, RN-57). Ficam acima de `low` para o handoff não atrasar |
+| `low` | 1 | `handoff.summary`, `sla.alert`, `sla.breach`, `ticket.close`, `customer.reminder`, `customer.inactivity` | Podem esperar alguns segundos |
+| `default` | 3 | Reservada; nenhum item do outbox usa hoje | — |
+
+**Situação.** Até 24/11 todos os itens iam para a `critical`, apesar desta tabela. Corrigido no [ADR-032](08-decisoes-de-arquitetura.md), depois de o pico mostrar timeouts e avisos furando a fila da resposta.
+
+**Trava sem espera (ADR-032).** O `OutboxJob` roda com `lock_timeout = 300ms`. Se outro job já tem a trava do atendimento, ele desiste e volta à fila em 0,1 a 0,5 s, em vez de segurar a thread esperando. O painel e a ingestão continuam esperando a trava normalmente.
 
 **Por quê.** Separar por fila com peso evita que uma rajada de jobs lentos (por exemplo, resumos) atrase a resposta ao cliente durante o pico do E1.
 
@@ -309,13 +313,25 @@ Só o supervisor (RN-53), dentro das marcas das equipes dele (RNF-24), em `/conf
 - **Filas (RF-13, RF-18).** Editar nome, IA primeiro ou SLA publica uma versão nova sob a trava da fila (RN-20); a antiga não muda. A fila padrão e a de escalas da marca não são desativadas nem excluídas, e nenhuma fila usada pelas regras atuais também não (RF-17). **Excluir arquiva** (`queues.archived_at`): as versões são imutáveis no banco e os atendimentos antigos continuam apontando para a fila. Só vale sem atendimento aberto.
 - **Regras (RF-14, RF-15, RF-17).** O formulário manda a lista inteira (grupos OU, condições E) e a fila padrão; vira o JSON do ADR-003 e `RoutingRuleset.publish!` valida esquema, categorias e filas ativas da marca. A versão nova vale para o atendimento seguinte, porque o cache do avaliador confere a versão a cada roteamento (RF-16, RNF-07). A decisão fica no `routing.decided` do atendimento, com a versão do conjunto.
 - **Equipes e atendentes (RF-22, RF-58).** Equipe com nome único na marca; atendente humano com senha (bcrypt, 10 caracteres ou mais), perfil analista ou supervisor, capacidade de 1 a 50 e uma equipe da marca.
-- **Fora deste bloco:** cadastro de marcas (as marcas vêm do seed), tempos da IA por marca versionados em `Turns::Policy.for(brand)` e SLA por horário de atendimento da fila.
+- **Marcas e tempos da IA (conclusão do bloco 12).** O supervisor cadastra a marca junto com equipe inicial, bot e filas padrão e de escalas. Recebe acesso à marca nova pela equipe; o cadastro não cria contas de provedores. Os tempos são versões imutáveis em `ai_policy_versions`. A ingestão guarda `tickets.ai_policy_snapshot` no primeiro recebimento do ciclo. Mensagens seguintes, turnos e avisos usam a cópia persistida; ciclos legados sem cópia usam os padrões anteriores. Formulários e limites no [ADR-028](08-decisoes-de-arquitetura.md#adr-028--cadastro-de-marcas-e-configuração-dos-tempos-da-ia). SLA por horário de atendimento continua pendente.
 
 ### 3.8 Indicadores operacionais (bloco 18, RF-60)
 
 O painel operacional do supervisor fica em `/fila`, usa as marcas autorizadas e informa o instante da consulta. Volume, espera e SLA representam os atendimentos abertos por fila, sem o limite de linhas da listagem. Para esses indicadores, abertos são os estados diferentes de `resolvido` e `fechado`. Espera é o tempo desde `sla_started_at` dos casos `aguardando_humano`; o painel mostra quantidade esperando, média e maior espera, e informa os casos sem esse marco. SLA mostra os casos marcados permanentemente com `sla_breached` e os que ainda aguardam assunção no prazo exato ou após `sla_due_at`.
 
 A taxa de escalação considera os atendimentos criados nas últimas 24 horas: quantidade distinta com `ticket.escalated` dividida pelo total criado na mesma janela; sem atendimentos, mostra “sem dados”. O painel exibe numerador, denominador e janela. Os limites da janela são inclusivos. A fila é a atual do atendimento, não uma reconstrução histórica de transferências. Registros sem fila aparecem como “Sem fila”. Os indicadores são uma leitura do Postgres, atualizada ao recarregar a página; não são resultados de carga nem percentis experimentais.
+
+### 3.9 Resolução, espera e reabertura (conclusão da entrega)
+
+`TicketLifecycle::Resolve`, chamado sob o lock e dentro da transação da ação válida, grava estado, `resolved_at`, origem, motivo e `close_due_at`. A resolução humana libera a vaga; a ação `resolve` da IA encerra o atendimento mesmo sem texto de saída. A mesma transação insere um `ticket_summaries` imutável, com problema, consultas registradas, última resposta entregue e motivo. Notas internas não entram. O contexto do próximo atendimento e o painel humano usam o último resumo gravado, sempre pela marca e pelo cliente. Sem resumo legado, permanece o aviso explícito de ausência.
+
+Uma resposta `reply` ou `analyst` entregue inicia `aguardando_cliente`, `waiting_since`, `reminder_due_at` (24 h) e `inactivity_due_at` (48 h). A entrega antiga não inicia espera quando uma mensagem mais nova já foi gravada. O analista responsável mantém as ações durante a espera. Nova mensagem encerra essa espera na transação da ingestão.
+
+O scheduler registra `customer.reminder`, `customer.inactivity` e `ticket.close` no outbox com chaves únicas por atendimento, atribuição e prazo. `TicketLifecycle::DeadlineAction` revalida estado, atribuição, prazo e ciclo sob o lock, usando o relógio do banco. Conclui o item junto do efeito; ações obsoletas geram descarte auditado. O lembrete usa uma entrega `reminder` ordenada no mesmo canal e não reinicia a inatividade. Um lembrete atrasado até 48 h é descartado. A resolução por inatividade libera a vaga humana uma vez e gera resumo.
+
+Até o instante exato de `resolved_at + 72 h`, a mensagem reabre o mesmo caso, na mesma fila, com `assignment_version + 1`. Caso resolvido por analista volta à fila humana sem reservar vaga. Caso resolvido pela IA retorna à IA somente em fila IA primeiro e sem pedido de humano. Depois da janela, a ingestão fecha o caso anterior e cria outro vinculado, mesmo se o scheduler estiver atrasado. O worker de fechamento só atua estritamente após o prazo. O SLA de assunção já iniciado permanece preservado.
+
+Casos legados sem marco de resolução não recebem uma data inferida de `updated_at`; exigem conciliação explícita. Não há backfill silencioso. Decisão aprovada no [ADR-027](08-decisoes-de-arquitetura.md#adr-027--conclusão-do-ciclo-e-memória-do-atendimento).
 
 ## 4. Modelo de dados
 
@@ -637,9 +653,9 @@ Com o broker fora do ar, os casos escalam assim que as retentativas do turno se 
 
 | Peça | Como escala | Limite conhecido | Medido em |
 | --- | --- | --- | --- |
-| `web` | Réplicas sem estado | Pool de conexões do Postgres | E1 |
-| `worker` | Mais processos Sidekiq | Pool de conexões do Postgres | E1, E5 |
-| `consumer`, `agent-mock` | Réplicas e threads até o número de partições (48) | Partições do tópico e latência do agente | E5 |
+| `web` | Processos Puma no container (`WEB_CONCURRENCY`, [ADR-033](08-decisoes-de-arquitetura.md)); depois réplicas atrás de um balanceador | Um processo usa um núcleo (GVL); pool de conexões do Postgres | E1 |
+| `worker` | Mais processos Sidekiq com poucas threads cada (2 no teste, ADR-032). A fila do Redis distribui o trabalho: não há balanceador | Pool de conexões do Postgres; threads demais por processo pioram (GVL) | E1, E5 |
+| `consumer`, `agent-mock` | Réplicas e threads até o número de partições (48; 192 no teste, [ADR-034](08-decisoes-de-arquitetura.md)). O grupo de consumidores do Kafka divide as partições | Partições do tópico, latência e capacidade do agente | E5 |
 | `broker` | Réplicas sem estado | — | E1 |
 | Postgres | Vertical (CPU, memória, índices) | É o gargalo esperado | E1 (`EXPLAIN ANALYZE`) |
 
@@ -648,6 +664,10 @@ Com o broker fora do ar, os casos escalam assim que as retentativas do turno se 
 **Três unidades diferentes.** Mensagens recebidas por segundo, turnos de IA por segundo e respostas entregues por segundo não são a mesma coisa. O experimento mede as três separadamente e identifica qual fila acumula primeiro.
 
 **Por quê.** Tudo que roda código da aplicação é sem estado, então escala com réplicas (RNF-11). O estado fica no Postgres e no Kafka. As partições limitam o paralelismo do agente e dos consumidores, e o Postgres é o gargalo provável da plataforma. O E1 deve confirmar ou refutar isso. Se confirmar, as evoluções naturais são réplicas de leitura para o painel e particionamento de `messages` e `audit_events`.
+
+**Controle de admissão ([ADR-035](08-decisoes-de-arquitetura.md)).** A capacidade do agente é finita e é da CloudWalk. A plataforma não a aumenta, mas deixa de empurrar turnos além dela: só publica quando há vaga (`AGENT_MAX_IN_FLIGHT`), segura a espera no Postgres com o prazo mais próximo primeiro, avisa o cliente depois de 5 s e transfere para um humano quando a resposta não caberia no prazo do turno (`agente_sem_vaga`). Com isso o tópico do Kafka guarda só o que o agente já consegue processar.
+
+**Medido em 24 e 25/11 ([docs/12](12-validacao-realista.md#o-que-as-rodadas-de-24-e-25-11-mostraram)).** O gargalo esperado (Postgres por volume) não apareceu do jeito previsto: o que pesou foi a disputa pela linha do atendimento, threads demais por processo, a fila única do Sidekiq, a entrada HTTP num processo só e a fila do agente.
 
 ## 8. Segurança e isolamento
 

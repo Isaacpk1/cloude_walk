@@ -1,0 +1,12 @@
+# Ajuste de capacidade para a medição "depois" (ADR-029). Só muda quantas threads atendem; nenhum código muda.
+# Linha de base ("antes"): web com 3 threads do Puma (padrão) e Sidekiq com 5 (config/sidekiq.yml), medida em
+# bench/results/2026-11-24-negocio. O pool do banco acompanha RAILS_MAX_THREADS (config/database.yml).
+#   .\bench\negocio\run.ps1 -Ajustado
+services:
+  web:
+    environment:
+      RAILS_MAX_THREADS: "16"
+  worker:
+    environment:
+      RAILS_MAX_THREADS: "30"
+      SIDEKIQ_CONCURRENCY: "25"

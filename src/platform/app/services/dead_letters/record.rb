@@ -152,7 +152,7 @@ module DeadLetters
 
     # RN-45 sob o lock do atendimento (a mesma ordem da ingestão e do AgentActions::Apply: dead_letters → atendimento).
     def judge
-      @ticket = Ticket.lock.find_by!(id: @correlation.ticket_id, brand_id: @correlation.brand_id)
+      @ticket = Ticket.lock(Ticket::ROW_LOCK).find_by!(id: @correlation.ticket_id, brand_id: @correlation.brand_id)
       @turn = AiTurn.find_by!(id: @correlation.turn_id, brand_id: @ticket.brand_id)
       invalid = invalid_reason
       invalid ? audit_only(invalid) : escalate

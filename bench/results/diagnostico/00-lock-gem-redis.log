@@ -1,0 +1,17 @@
+﻿ Network helpdesk_default Creating 
+ Network helpdesk_default Created 
+ Container helpdesk-web-run-9796a06a90c5 Creating 
+ Container helpdesk-web-run-9796a06a90c5 Created 
+The following gems are missing
+ * redis (6.1.0)
+Install missing gems with `bundle install`
+Fetching gem metadata from https://rubygems.org/........
+Resolving dependencies...
+Fetching redis 6.1.0
+Installing redis 6.1.0
+Bundle complete! 27 Gemfile dependencies, 128 gems now installed.
+Bundled gems are installed into `/usr/local/bundle`
+1 installed gem you directly depend on is looking for funding.
+  Run `bundle fund` for details
+Writing lockfile to /rails/Gemfile.lock
+exit=0

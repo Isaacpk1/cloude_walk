@@ -15,6 +15,37 @@
 <% if flash[:notice] %><p class="flash flash--notice" role="status"><%= flash[:notice] %></p><% end %>
 <% if flash[:alert] %><p class="flash flash--alert" role="alert"><%= flash[:alert] %></p><% end %>
 
+<section class="card config-section" aria-label="Tempos da IA">
+  <% policy = Turns::Policy.for(@brand) %>
+  <h2>Tempos da IA <span class="muted">versão <%= policy.version %></span></h2>
+  <p>Os valores estão em segundos. A nova versão vale para ciclos novos; atendimentos que já aguardam resposta conservam os prazos.</p>
+  <%= form_with url: configuration_ai_policy_path, method: :put, class: "config-form" do %>
+    <%= hidden_field_tag :marca, slug %>
+    <% labels = { "chat_window" => "Janela do chat", "whatsapp_window" => "Janela do WhatsApp", "email_window" => "Janela do e-mail", "ceiling" => "Teto da janela", "turn_deadline" => "Prazo do turno", "cycle_deadline" => "Teto do ciclo", "progress_notice" => "Aviso de progresso" } %>
+    <% labels.each do |field, label| %>
+      <%= label_tag "policy_#{field}", label %>
+      <%= number_field_tag "policy[#{field}]", policy.to_snapshot.fetch(field), id: "policy_#{field}", min: 0, step: 0.1, required: true %>
+    <% end %>
+    <%= submit_tag "Publicar tempos da IA" %>
+  <% end %>
+</section>
+
+<section class="card config-section" aria-label="Nova marca">
+  <h2>Nova marca</h2>
+  <p>A marca terá uma equipe inicial, um bot e filas padrão e de escalas. Os canais precisam de contas de provedores configuradas separadamente.</p>
+  <%= form_with url: configuration_brands_path, class: "config-form" do %>
+    <%= label_tag :brand_name, "Nome da marca" %>
+    <%= text_field_tag :name, nil, id: "brand_name", maxlength: 120, required: true %>
+    <%= label_tag :brand_slug, "Identificador (slug)" %>
+    <%= text_field_tag :slug, nil, id: "brand_slug", maxlength: 63, pattern: "[a-z][a-z0-9-]*", required: true %>
+    <%= label_tag :brand_locale, "Idioma" %>
+    <%= select_tag :locale, options_for_select([["Português", "pt-BR"], ["English", "en"]]), id: "brand_locale" %>
+    <%= label_tag :brand_timezone, "Fuso horário IANA" %>
+    <%= text_field_tag :timezone, "America/Sao_Paulo", id: "brand_timezone", required: true %>
+    <%= submit_tag "Criar marca" %>
+  <% end %>
+</section>
+
 <section class="card config-section" aria-label="Filas">
   <h2>Filas</h2>
   <% priorities = Handoff::Policy::PRIORITIES %>

@@ -40,7 +40,8 @@ module Handoff
       "falha_de_integracao" => "Falha de integração com o agente de IA (evento na DLQ).",
       "limite_de_trocas" => "A IA trocou o limite de mensagens sem resolver o atendimento.",
       "pedido_do_cliente" => "O cliente pediu para falar com um atendente.",
-      "decisao_do_agente" => "O agente de IA decidiu escalar o atendimento."
+      "decisao_do_agente" => "O agente de IA decidiu escalar o atendimento.",
+      "agente_sem_vaga" => "O agente de IA estava sem vaga e a resposta não chegaria a tempo."
     }.freeze
 
     QUOTE_LIMIT = 300
@@ -64,7 +65,7 @@ module Handoff
         @item = OutboxEvent.find_by(id: @id, event_type: EVENT_TYPE)
         next Result.new(status: :skipped, reason: nil) unless @item
 
-        @ticket = Ticket.lock.find_by(id: @item.ticket_id || payload["ticket_id"], brand_id: @item.brand_id)
+        @ticket = Ticket.lock(Ticket::ROW_LOCK).find_by(id: @item.ticket_id || payload["ticket_id"], brand_id: @item.brand_id)
         @item.lock!
         next Result.new(status: :already_done, reason: nil) if @item.completed_at
 

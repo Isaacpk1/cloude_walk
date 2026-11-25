@@ -27,7 +27,7 @@ RSpec.describe "RN-57: corrida entre o aviso de progresso e a resposta aplicada"
       end
 
       expect(results).to all(satisfy { !_1.is_a?(Exception) })
-      expect(results.last.status).to eq(:applied)
+      expect(results.last.status).to eq(:applied), "cenário #{i}: ação #{results.last.status} (#{results.last.reason.inspect})"
       reply = Delivery.find_by!(ticket_id: ticket.id, kind: "reply")
       notice = Delivery.find_by(ticket_id: ticket.id, kind: "progress")
       expect(OutboxEvent.find(item_id).completed_at).to be_present

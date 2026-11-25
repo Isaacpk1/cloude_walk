@@ -19,7 +19,7 @@ module Deadlines
       tickets = scoped(Ticket.where(ai_deadline_at: ..now).where.not(first_pending_seq: nil)
                              .where.not(state: Ticket::HUMAN_STATES))
                 .where("NOT EXISTS (SELECT 1 FROM outbox_events o WHERE o.dedup_key = #{KEY_SQL})")
-                .order(:ai_deadline_at, :id).limit(limit).lock("FOR UPDATE SKIP LOCKED").to_a
+                .order(:ai_deadline_at, :id).limit(limit).lock("#{Ticket::ROW_LOCK} SKIP LOCKED").to_a
       return [] if tickets.empty?
 
       traces = trace_ids(tickets)

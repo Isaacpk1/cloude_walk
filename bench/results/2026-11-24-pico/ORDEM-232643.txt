@@ -1,0 +1,4 @@
+23:39:03 inicio workers=4 threads=8
+23:48:13 fim workers=4 threads=8
+23:48:13 inicio workers=8 threads=2
+23:56:27 fim workers=8 threads=2

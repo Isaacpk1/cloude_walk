@@ -1,8 +1,8 @@
 {
-  "started_at": "2026-11-23T14:33:20Z",
-  "finished_at": "2026-11-23T14:37:31Z",
-  "base_revision": "68baab6",
-  "source_sha256": "aa47d4aff331bba02c22ac7f6178cf3a44879c17dd318d5aef6b9e56c13487e1",
+  "started_at": "2026-11-24T19:43:08Z",
+  "finished_at": "2026-11-24T19:48:29Z",
+  "base_revision": "0c4df9aa341cccf7273c2343c66c7b9734c6ddaa",
+  "source_sha256": "995de1494c15c3a40ab7729978f98c41ca78fc376030e79e159e4aefdb898b7b",
   "ruby": "ruby 4.0.10 (2026-11-19 revision a704b7cd95) +PRISM [x86_64-linux]",
   "database": "helpdesk_test_operation",
   "seed": 42,
@@ -13,7 +13,7 @@
     "Inscrições e broadcasts conferidos no servidor; roteiro visual em bench/validation/README.md."
   ],
   "summary": {
-    "duration": 240.693473443,
+    "duration": 242.544545437,
     "example_count": 166,
     "failure_count": 0,
     "pending_count": 0,
